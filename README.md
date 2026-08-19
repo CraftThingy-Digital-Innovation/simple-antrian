@@ -13,11 +13,13 @@ Aplikasi ini dibuat oleh **Alif Nurhidayat** di bawah naungan **CraftThingy Digi
 
 2. **Mode Jaringan Client-Server & Auto-Discovery (Bebas Bentrok)**:
    * **Auto-Discovery**: Server secara berkala menyiarkan metadatanya via **UDP Multicast** (`239.255.255.250:41234`). Client di jaringan lokal yang sama akan langsung mendeteksi server aktif dan menampilkannya di daftar koneksi.
-   * **Bebas Bentrok**: Setiap server menghasilkan UUID unik saat startup pertama kali. Sistem mendukung operasional beberapa pasang server dan client sekaligus di satu jaringan lokal (misal: 3 server dan 3 client) tanpa terjadi bentrokan data.
+   * **Bebas Bentrok & Nama Acak**: Setiap database baru yang terbuat akan menghasilkan nama server acak unik berbasis gabungan nama hewan, warna, dan sifat (contoh: *Server Garuda Emas Cepat*) beserta UUID unik. Hal ini memudahkan operator klien mengenali server mana yang sedang tersambung secara visual pada status panel sidebar.
    * **Sinkronisasi WebSocket**: Sinkronisasi data tiket antrian dan panggilan loket berjalan secara instan (*real-time*) di seluruh client terhubung.
 
 3. **Panggilan Suara Loket Multi-Bahasa (Piper TTS - Neural Offline)**:
-   Sistem panggilan suara antrian kini menggunakan engine neural **Piper TTS** yang berjalan 100% offline dan mandiri (tanpa internet). Mengucapkan nomor antrian secara berurutan dalam **3 bahasa sekaligus** (Bahasa Indonesia, Inggris, dan Mandarin/China) dengan lafal alami berkualitas studio. Aset suara dasar (angka dan huruf) serta modul binari Piper diunduh secara dinamis dan di-generate di latar belakang saat startup pertama kali. Nama loket kustom baru akan di-generate secara otomatis saat diinput oleh operator sebelum panggilan dimulai.
+   * **Tiga Bahasa Offline**: Sistem panggilan suara antrian menggunakan engine neural **Piper TTS** yang berjalan 100% offline dan mandiri (tanpa internet). Mengucapkan nomor antrian secara berurutan dalam **3 bahasa sekaligus** (Bahasa Indonesia, Inggris, dan Mandarin/China) dengan lafal alami berkualitas studio. Aset suara dasar (angka dan huruf) serta modul binari Piper diunduh secara dinamis dan di-generate di latar belakang saat startup pertama kali.
+   * **Generasi Custom Desk On-the-fly**: Nama loket kustom baru akan di-generate secara otomatis saat diinput oleh operator sebelum panggilan dimulai.
+   * **HTTP Range Requests (206 Partial Content)**: Server internal audio kini mendukung protokol Range Requests (206 Partial Content) untuk menyajikan berkas audio secara asinkron ke Chromium/Electron, yang secara penuh menjamin pemutaran antrean suara secara presisi dan berurutan tanpa tumpang-tindih (overlapping).
 
 4. **Tombol "Selesai" Panggil Otomatis (Complete & Call Next)**:
    Meningkatkan efisiensi kerja operator. Ketika operator mengeklik tombol **✅ Selesai** (Complete), jika masih ada antrian yang menunggu pada layanan tersebut, sistem secara otomatis akan memanggil nomor antrian berikutnya secara instan tanpa perlu operator mengeklik tombol panggil secara manual.
