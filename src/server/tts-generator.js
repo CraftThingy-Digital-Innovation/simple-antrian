@@ -28,9 +28,9 @@ const BINARY_URLS = {
 
 const MODELS = {
   id: {
-    onnx: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/id/id_ID/kurniawan/medium/id_ID-kurniawan-medium.onnx',
-    json: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/id/id_ID/kurniawan/medium/id_ID-kurniawan-medium.onnx.json',
-    file: 'id_ID-kurniawan-medium.onnx'
+    onnx: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/id/id_ID/news_tts/medium/id_ID-news_tts-medium.onnx',
+    json: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/id/id_ID/news_tts/medium/id_ID-news_tts-medium.onnx.json',
+    file: 'id_ID-news_tts-medium.onnx'
   },
   en: {
     onnx: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx',
@@ -65,9 +65,17 @@ function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
     const request = https.get(url, (response) => {
-      if (response.statusCode === 302 || response.statusCode === 301) {
-        // Handle redirect
-        downloadFile(response.headers.location, dest).then(resolve).catch(reject);
+      if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+        // Handle redirect (resolving relative paths against the original url)
+        let redirectUrl;
+        try {
+          redirectUrl = new URL(response.headers.location, url).toString();
+        } catch (e) {
+          redirectUrl = response.headers.location;
+        }
+        file.end(() => {
+          downloadFile(redirectUrl, dest).then(resolve).catch(reject);
+        });
         return;
       }
       if (response.statusCode !== 200) {
