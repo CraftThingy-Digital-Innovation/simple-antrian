@@ -2,6 +2,9 @@ const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require('electron
 const path = require('path');
 const fs = require('fs');
 
+// Matikan Autoplay Policy agar audio bisa berputar otomatis tanpa interaksi user
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
 // Redirect console logs to a local file for debugging
 const debugLogPath = app ? path.join(app.getPath('userData'), 'app-debug.log') : path.join(__dirname, 'app-debug.log');
 const logStdout = process.stdout;
