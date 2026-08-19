@@ -90,9 +90,15 @@ async function initDb() {
     await run("INSERT INTO services (id, name, prefix, current_number) VALUES ('cs', 'Customer Service', 'B', 0)");
   }
 
+  // Inisialisasi nama server acak unik (Human Readable)
+  const animals = ['Elang', 'Harimau', 'Singa', 'Lumba', 'Kancil', 'Merak', 'Garuda', 'Banteng', 'Panda', 'Koala', 'Kucing', 'Serigala', 'Rajawali', 'Cendrawasih'];
+  const colors = ['Biru', 'Merah', 'Hijau', 'Emas', 'Perak', 'Putih', 'Abu', 'Jingga', 'Ungu', 'Cokelat', 'Kuning', 'Hitam'];
+  const adjectives = ['Pintar', 'Cepat', 'Tangguh', 'Handal', 'Prima', 'Lancar', 'Aman', 'Kreatif', 'Agung', 'Hebat', 'Setia'];
+  const randomServerName = `Server ${animals[Math.floor(Math.random() * animals.length)]} ${colors[Math.floor(Math.random() * colors.length)]} ${adjectives[Math.floor(Math.random() * adjectives.length)]}`;
+
   // Isi setting default
   const defaultSettings = [
-    { key: 'server_name', value: 'Server Utama' },
+    { key: 'server_name', value: randomServerName },
     { key: 'server_uuid', value: require('crypto').randomUUID() },
     { key: 'port', value: '8080' },
     { key: 'wa_enabled', value: 'false' },

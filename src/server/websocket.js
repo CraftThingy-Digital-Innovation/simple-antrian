@@ -135,8 +135,11 @@ async function getCurrentState() {
   const services = await db.getServices();
   const waitingTickets = await db.getWaitingTickets();
   const callingTickets = await db.getCallingTickets();
+  const settings = await db.getSettings();
   
   return {
+    serverName: settings.server_name || 'Server Utama',
+    serverUuid: settings.server_uuid || '',
     services,
     waitingTickets,
     callingTickets

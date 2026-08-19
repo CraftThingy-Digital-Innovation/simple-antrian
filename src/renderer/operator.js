@@ -149,6 +149,17 @@ async function initSystemInfo() {
       document.getElementById('status-text').innerText = `${info.localIp}:${serverPort}`;
       document.getElementById('status-dot').style.background = 'var(--accent-success)';
       
+      // Update local server name display
+      const settings = await window.api.getSettings();
+      if (settings && settings.server_name) {
+        const lbl = document.getElementById('status-server-name');
+        const val = document.getElementById('status-server-name-val');
+        if (lbl && val) {
+          val.innerText = settings.server_name;
+          lbl.style.display = 'block';
+        }
+      }
+      
       // Sembunyikan/Tampilkan menu pengaturan yang relevan
       document.getElementById('settings-server-group').style.display = 'flex';
       document.getElementById('settings-client-group').style.display = 'none';
@@ -565,8 +576,18 @@ function playDingDong() {
 
 // Render State Antrian ke UI Dashboard
 function renderQueueState(state) {
-  const { services, waitingTickets, callingTickets } = state;
+  const { services, waitingTickets, callingTickets, serverName } = state;
   servicesList = services;
+
+  // Render server name if received from WebSocket server
+  if (serverName) {
+    const lbl = document.getElementById('status-server-name');
+    const val = document.getElementById('status-server-name-val');
+    if (lbl && val) {
+      val.innerText = serverName;
+      lbl.style.display = 'block';
+    }
+  }
 
   // 1. Render Calling Grid di Dashboard
   const callingGrid = document.getElementById('calling-grid');
