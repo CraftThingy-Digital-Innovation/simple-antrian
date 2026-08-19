@@ -378,6 +378,22 @@ async function handleClientAction(action, ws) {
         break;
       }
 
+      case 'SAVE_DISPLAY_CUSTOM': {
+        const { title, subtitle, logo } = payload;
+        const dbMod = require('./db');
+        await dbMod.saveSetting('display_title', title);
+        await dbMod.saveSetting('display_subtitle', subtitle);
+        await dbMod.saveSetting('display_logo', logo);
+        
+        // Broadcast ke semua client
+        broadcast({
+          type: 'DISPLAY_CUSTOM_UPDATE',
+          payload: { title, subtitle, logo }
+        });
+        ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Pengaturan Tampilan berhasil disimpan!' } }));
+        break;
+      }
+
       case 'SYNC_DESK_NAMES': {
         const { deskNames } = payload;
         if (!Array.isArray(deskNames)) break;

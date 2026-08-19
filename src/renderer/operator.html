@@ -676,6 +676,41 @@
           </div>
         </section>
 
+        <!-- Kustomisasi Tampilan Display -->
+        <section class="glass-panel config-section" id="section-display-custom-config">
+          <h3 class="config-title">🖼️ Tampilan Layar Display</h3>
+          
+          <div class="form-group">
+            <label for="setting-display-title">Judul Utama Welcome Banner</label>
+            <input type="text" class="input-control" id="setting-display-title" placeholder="Default: SimpleAntrian">
+          </div>
+
+          <div class="form-group">
+            <label for="setting-display-subtitle">Teks Deskripsi / Slogan</label>
+            <textarea class="input-control" id="setting-display-subtitle" rows="3" placeholder="Teks yang akan tampil di bawah judul..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Logo Instansi / Perusahaan (Opsional)</label>
+            <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-start; margin-top: 6px;">
+              <!-- Pratinjau logo -->
+              <div id="display-logo-preview-container" style="display: none; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 12px; border: 1px dashed var(--border-glass); align-items: center; justify-content: center; width: 120px; height: 120px; position: relative;">
+                <img id="display-logo-preview" src="" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                <button type="button" id="btn-remove-display-logo" style="position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; background: #ef4444; border: none; color: white; cursor: pointer; font-size: 0.8rem; font-weight: bold; display: flex; align-items: center; justify-content: center;">✕</button>
+              </div>
+              <input type="file" id="setting-display-logo-file" accept="image/*" style="display: none;">
+              <button type="button" class="btn btn-secondary" id="btn-browse-display-logo" style="padding: 8px 16px; font-size: 0.85rem;">
+                📁 Unggah Logo Gambar
+              </button>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Format didukung: PNG, JPG, GIF, WebP. Maksimal 2MB.</div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" id="btn-save-display-custom" style="margin-top: 15px; width: 100%;">
+            💾 Simpan Pengaturan Tampilan
+          </button>
+        </section>
+
         <!-- ===== TEKS BERJALAN (RUNNING TEXT) ===== -->
         <section class="glass-panel config-section" id="section-running-text-config">
           <h3 class="config-title">🖥️ Teks Berjalan (Running Text) — Layar Display</h3>

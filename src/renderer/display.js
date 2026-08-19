@@ -106,6 +106,20 @@ function handleWebSocketMessage(message) {
 
     case 'SETTINGS_RESPONSE':
       globalSettings = payload;
+      applyDisplayCustomization(payload);
+      break;
+
+    case 'DISPLAY_CUSTOM_UPDATE':
+      if (globalSettings) {
+        globalSettings.display_title = payload.title;
+        globalSettings.display_subtitle = payload.subtitle;
+        globalSettings.display_logo = payload.logo;
+      }
+      applyDisplayCustomization({
+        display_title: payload.title,
+        display_subtitle: payload.subtitle,
+        display_logo: payload.logo
+      });
       break;
 
     case 'TTS_SETTING_UPDATE':
@@ -113,6 +127,32 @@ function handleWebSocketMessage(message) {
         globalSettings.tts_enabled = payload.enabled;
       }
       break;
+  }
+}
+
+// Terapkan penyesuaian tampilan Welcome Banner (Logo, Judul, Deskripsi)
+function applyDisplayCustomization(settings) {
+  if (!settings) return;
+  const titleEl = document.getElementById('display-card-title');
+  const textEl = document.getElementById('display-card-text');
+  const logoContainer = document.getElementById('display-logo-container');
+  const logoImg = document.getElementById('display-logo-img');
+
+  if (titleEl) {
+    titleEl.innerText = settings.display_title || 'SimpleAntrian';
+  }
+  if (textEl) {
+    const textVal = settings.display_subtitle || 'Budayakan antri demi kenyamanan bersama. <br> Silakan siapkan tiket Anda dan perhatikan panggilan layar.';
+    textEl.innerHTML = textVal.replace(/\n/g, '<br>');
+  }
+  if (logoContainer && logoImg) {
+    if (settings.display_logo) {
+      logoImg.src = settings.display_logo;
+      logoContainer.style.display = 'flex';
+    } else {
+      logoContainer.style.display = 'none';
+      logoImg.src = '';
+    }
   }
 }
 

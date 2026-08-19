@@ -6,6 +6,7 @@ let serverPort = 8080;
 let servicesList = [];
 let localDeskSettings = {}; // Menyimpan nomor loket per layanan, misal: { teller: 'Loket 1' }
 let currentTxId = '';
+let currentLogoBase64 = '';
 
 function generateTxId() {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -342,6 +343,21 @@ function handleWebSocketMessage(message) {
         delete wsRequestCallbacks['SEARCH_RESPONSE'];
       }
       break;
+
+    case 'DISPLAY_CUSTOM_UPDATE': {
+      document.getElementById('setting-display-title').value = payload.title || 'SimpleAntrian';
+      document.getElementById('setting-display-subtitle').value = payload.subtitle || '';
+      if (payload.logo) {
+        currentLogoBase64 = payload.logo;
+        document.getElementById('display-logo-preview').src = currentLogoBase64;
+        document.getElementById('display-logo-preview-container').style.display = 'flex';
+      } else {
+        currentLogoBase64 = '';
+        document.getElementById('display-logo-preview').src = '';
+        document.getElementById('display-logo-preview-container').style.display = 'none';
+      }
+      break;
+    }
 
     case 'ERROR':
       showToast(payload.message, 'error');
@@ -848,6 +864,59 @@ function setupEventListeners() {
     });
   }
 
+  // Pengaturan Kustomisasi Tampilan Display (Logo, Judul, Slogan)
+  const btnBrowseLogo = document.getElementById('btn-browse-display-logo');
+  const fileInputLogo = document.getElementById('setting-display-logo-file');
+  const logoPreviewContainer = document.getElementById('display-logo-preview-container');
+  const logoPreview = document.getElementById('display-logo-preview');
+  const btnRemoveLogo = document.getElementById('btn-remove-display-logo');
+
+  if (btnBrowseLogo && fileInputLogo) {
+    btnBrowseLogo.addEventListener('click', () => fileInputLogo.click());
+
+    fileInputLogo.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (file.size > 2 * 1024 * 1024) {
+          showToast('Ukuran berkas logo terlalu besar (maksimal 2MB).', 'error');
+          fileInputLogo.value = '';
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          currentLogoBase64 = event.target.result;
+          logoPreview.src = currentLogoBase64;
+          logoPreviewContainer.style.display = 'flex';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  if (btnRemoveLogo) {
+    btnRemoveLogo.addEventListener('click', () => {
+      currentLogoBase64 = '';
+      logoPreview.src = '';
+      logoPreviewContainer.style.display = 'none';
+      fileInputLogo.value = '';
+    });
+  }
+
+  const btnSaveDisplayCustom = document.getElementById('btn-save-display-custom');
+  if (btnSaveDisplayCustom) {
+    btnSaveDisplayCustom.addEventListener('click', () => {
+      const title = document.getElementById('setting-display-title').value.trim();
+      const subtitle = document.getElementById('setting-display-subtitle').value.trim();
+
+      sendAction('SAVE_DISPLAY_CUSTOM', {
+        title: title || 'SimpleAntrian',
+        subtitle: subtitle || 'Budayakan antri demi kenyamanan bersama. Silakan siapkan tiket Anda dan perhatikan panggilan layar.',
+        logo: currentLogoBase64
+      });
+      showToast('Menyimpan pengaturan tampilan display...', 'info');
+    });
+  }
+
   // Simpan WA Settings
   const btnSaveWa = document.getElementById('btn-save-wa');
   btnSaveWa.addEventListener('click', async () => {
@@ -1173,6 +1242,19 @@ async function loadSettings() {
   document.getElementById('setting-wa-enabled').checked = settings.wa_enabled === 'true';
   document.getElementById('setting-wa-template-wait').value = settings.wa_template_wait || '';
   document.getElementById('setting-wa-template-call').value = settings.wa_template_call || '';
+
+  // Display Customization UI
+  document.getElementById('setting-display-title').value = settings.display_title || 'SimpleAntrian';
+  document.getElementById('setting-display-subtitle').value = settings.display_subtitle || '';
+  if (settings.display_logo) {
+    currentLogoBase64 = settings.display_logo;
+    document.getElementById('display-logo-preview').src = currentLogoBase64;
+    document.getElementById('display-logo-preview-container').style.display = 'flex';
+  } else {
+    currentLogoBase64 = '';
+    document.getElementById('display-logo-preview').src = '';
+    document.getElementById('display-logo-preview-container').style.display = 'none';
+  }
 
   // Minta status WA terbaru ke WebSocket server
   sendAction('WA_STATUS');

@@ -114,7 +114,10 @@ async function initDb() {
         '欢迎光临我们的服务中心。请遵守秩序排队，共同维护良好环境。感谢您的配合。'
       ])
     },
-    { key: 'tts_enabled', value: 'true' }
+    { key: 'tts_enabled', value: 'true' },
+    { key: 'display_title', value: 'SimpleAntrian' },
+    { key: 'display_subtitle', value: 'Budayakan antri demi kenyamanan bersama. \nSilakan siapkan tiket Anda dan perhatikan panggilan layar.' },
+    { key: 'display_logo', value: '' }
   ];
 
   for (const s of defaultSettings) {
