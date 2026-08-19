@@ -2,6 +2,41 @@ const { app, BrowserWindow, ipcMain, screen, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// Redirect console logs to a local file for debugging
+const debugLogPath = app ? path.join(app.getPath('userData'), 'app-debug.log') : path.join(__dirname, 'app-debug.log');
+const logStdout = process.stdout;
+
+console.log = function (...args) {
+  const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ') + '\n';
+  try {
+    fs.appendFileSync(debugLogPath, `[LOG] ${new Date().toISOString()} - ${msg}`);
+  } catch (e) {}
+  logStdout.write(msg);
+};
+
+console.error = function (...args) {
+  const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ') + '\n';
+  try {
+    fs.appendFileSync(debugLogPath, `[ERR] ${new Date().toISOString()} - ${msg}`);
+  } catch (e) {}
+  logStdout.write(msg);
+};
+
+console.warn = function (...args) {
+  const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ') + '\n';
+  try {
+    fs.appendFileSync(debugLogPath, `[WRN] ${new Date().toISOString()} - ${msg}`);
+  } catch (e) {}
+  logStdout.write(msg);
+};
+
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err.stack || err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('UNHANDLED REJECTION:', reason.stack || reason || 'Unknown Rejection');
+});
+
 // Impor modul backend
 const db = require('./src/server/db');
 const discovery = require('./src/server/discovery');

@@ -1,9 +1,10 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
+const { app } = require('electron');
 
-// Path database di folder data aplikasi
-const dbDir = path.join(process.cwd(), 'data');
+// Path database di folder data aplikasi (userData agar aman dari permission EPERM)
+const dbDir = app ? path.join(app.getPath('userData'), 'data') : path.join(process.cwd(), 'data');
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }

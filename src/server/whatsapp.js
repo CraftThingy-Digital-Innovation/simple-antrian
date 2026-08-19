@@ -1,4 +1,6 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+let makeWASocket = null;
+let useMultiFileAuthState = null;
+let DisconnectReason = null;
 const pino = require('pino');
 const QRCode = require('qrcode');
 const path = require('path');
@@ -6,7 +8,8 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const db = require('./db');
 
-const sessionDir = path.join(process.cwd(), 'data', 'wa-session');
+const { app } = require('electron');
+const sessionDir = app ? path.join(app.getPath('userData'), 'data', 'wa-session') : path.join(process.cwd(), 'data', 'wa-session');
 
 let sock = null;
 let qrCodeBase64 = null;
@@ -47,6 +50,22 @@ async function startWhatsAppClient() {
     await checkAndPerformSilentUpdate();
   } catch (err) {
     console.warn("[Baileys Auto-Update] Gagal mengecek/memperbarui pustaka otomatis atau sedang offline. Menjalankan versi saat ini. Error:", err.message);
+  }
+
+  // Load Baileys ES Module secara dinamis jika belum dimuat
+  if (!makeWASocket) {
+    try {
+      console.log("[Baileys] Memuat modul ES secara dinamis...");
+      const baileys = await import('@whiskeysockets/baileys');
+      makeWASocket = baileys.default;
+      useMultiFileAuthState = baileys.useMultiFileAuthState;
+      DisconnectReason = baileys.DisconnectReason;
+    } catch (err) {
+      console.error("Gagal meload pustaka Baileys secara dinamis:", err);
+      connectionStatus = 'disconnected';
+      broadcastWaStatus();
+      return;
+    }
   }
 
   try {
