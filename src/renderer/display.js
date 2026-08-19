@@ -3,6 +3,7 @@ let currentMode = 'server';
 let serverPort = 8080;
 let announcementQueue = [];
 let isAnnouncing = false;
+let globalSettings = {};
 
 // Inisialisasi Halaman Display
 document.addEventListener('DOMContentLoaded', async () => {
@@ -24,6 +25,7 @@ async function initDisplayConnection() {
     serverPort = info.port || 8080;
 
     const dbSettings = await window.api.getSettings();
+    globalSettings = dbSettings;
 
     if (currentMode === 'server') {
       // Connect ke server lokal
@@ -52,6 +54,7 @@ function connectWebSocket(url) {
     console.log('Display WebSocket connected!');
     // Request data awal
     ws.send(JSON.stringify({ type: 'GET_STATE' }));
+    ws.send(JSON.stringify({ type: 'GET_SETTINGS' }));
   };
 
   ws.onmessage = (event) => {
@@ -99,6 +102,16 @@ function handleWebSocketMessage(message) {
           restartCycler();
         }
       } catch (_) {}
+      break;
+
+    case 'SETTINGS_RESPONSE':
+      globalSettings = payload;
+      break;
+
+    case 'TTS_SETTING_UPDATE':
+      if (globalSettings) {
+        globalSettings.tts_enabled = payload.enabled;
+      }
       break;
   }
 }
@@ -355,6 +368,11 @@ function playDingDongChime() {
 
 // Pengumuman Suara Text-To-Speech dalam 3 Bahasa (Indonesian, English, Chinese) secara Berurutan
 async function playVoice(ticketNumber, deskNumber) {
+  if (globalSettings && globalSettings.tts_enabled === 'false') {
+    console.log('TTS is disabled, skipping playVoice');
+    return;
+  }
+
   const prefix = ticketNumber.charAt(0);
   const num = parseInt(ticketNumber.substring(1));
 

@@ -108,7 +108,8 @@ async function initDb() {
         'Welcome to Our Service. Please Queue in an Orderly Manner for Everyone\'s Comfort. Thank you for your cooperation.',
         '欢迎光临我们的服务中心。请遵守秩序排队，共同维护良好环境。感谢您的配合。'
       ])
-    }
+    },
+    { key: 'tts_enabled', value: 'true' }
   ];
 
   for (const s of defaultSettings) {

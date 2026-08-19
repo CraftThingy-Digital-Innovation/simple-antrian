@@ -750,6 +750,16 @@ function setupEventListeners() {
     }
   });
 
+  // Simpan TTS Settings
+  const btnSaveTts = document.getElementById('btn-save-tts');
+  if (btnSaveTts) {
+    btnSaveTts.addEventListener('click', () => {
+      const enabled = document.getElementById('setting-tts-enabled').checked ? 'true' : 'false';
+      sendAction('SAVE_TTS', { enabled });
+      showToast('Menyimpan pengaturan Text-to-Speech...', 'info');
+    });
+  }
+
   // Simpan WA Settings
   const btnSaveWa = document.getElementById('btn-save-wa');
   btnSaveWa.addEventListener('click', async () => {
@@ -1065,6 +1075,12 @@ async function loadSettings() {
   document.getElementById('setting-server-name').value = settings.server_name || 'Server Utama';
   document.getElementById('setting-port').value = settings.port || '8080';
   
+  // TTS Settings UI
+  const ttsCheckbox = document.getElementById('setting-tts-enabled');
+  if (ttsCheckbox) {
+    ttsCheckbox.checked = settings.tts_enabled !== 'false';
+  }
+
   // WA Settings UI
   document.getElementById('setting-wa-enabled').checked = settings.wa_enabled === 'true';
   document.getElementById('setting-wa-template-wait').value = settings.wa_template_wait || '';

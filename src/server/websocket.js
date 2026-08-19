@@ -319,6 +319,19 @@ async function handleClientAction(action, ws) {
         break;
       }
 
+      case 'SAVE_TTS': {
+        const { enabled } = payload;
+        const dbMod = require('./db');
+        await dbMod.saveSetting('tts_enabled', enabled);
+        // Broadcast ke semua client
+        broadcast({
+          type: 'TTS_SETTING_UPDATE',
+          payload: { enabled }
+        });
+        ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Pengaturan Suara (TTS) berhasil disimpan!' } }));
+        break;
+      }
+
       case 'GET_SETTINGS': {
         const settings = await db.getSettings();
         ws.send(JSON.stringify({ type: 'SETTINGS_RESPONSE', payload: settings }));
