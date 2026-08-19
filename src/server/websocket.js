@@ -12,15 +12,42 @@ let httpServer = null;
 function startWebSocketServer(port) {
   if (wss) stopWebSocketServer();
 
-  // Create combined HTTP server to serve local static audio files
+  // Create combined HTTP server to serve local static audio files (with Range Request support)
   httpServer = http.createServer((req, res) => {
     if (req.url.startsWith('/audio/')) {
       const filename = path.basename(req.url);
       const filePath = path.join(process.cwd(), 'data', 'tts-cache', filename);
       
       if (fs.existsSync(filePath)) {
-        res.writeHead(200, { 'Content-Type': 'audio/wav' });
-        fs.createReadStream(filePath).pipe(res);
+        const stat = fs.statSync(filePath);
+        const total = stat.size;
+        const range = req.headers.range;
+        
+        if (range) {
+          const parts = range.replace(/bytes=/, "").split("-");
+          const partialstart = parts[0];
+          const partialend = parts[1];
+          
+          const start = parseInt(partialstart, 10);
+          const end = partialend ? parseInt(partialend, 10) : total - 1;
+          const chunksize = (end - start) + 1;
+          
+          res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${total}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunksize,
+            'Content-Type': 'audio/wav'
+          });
+          
+          fs.createReadStream(filePath, { start: start, end: end }).pipe(res);
+        } else {
+          res.writeHead(200, {
+            'Content-Length': total,
+            'Content-Type': 'audio/wav',
+            'Accept-Ranges': 'bytes'
+          });
+          fs.createReadStream(filePath).pipe(res);
+        }
       } else {
         res.writeHead(404);
         res.end();

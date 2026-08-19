@@ -396,6 +396,18 @@ function playAudioSequence(urls) {
     }
     
     let index = 0;
+    const audio = new Audio();
+    
+    audio.onended = () => {
+      index++;
+      playNext();
+    };
+    
+    audio.onerror = (e) => {
+      console.error('Audio playback error for:', urls[index], e);
+      index++;
+      playNext();
+    };
     
     function playNext() {
       if (index >= urls.length) {
@@ -404,19 +416,7 @@ function playAudioSequence(urls) {
       }
       
       const url = urls[index];
-      const audio = new Audio(url);
-      
-      audio.onended = () => {
-        index++;
-        playNext();
-      };
-      
-      audio.onerror = (e) => {
-        console.error('Audio playback error for:', url, e);
-        index++;
-        playNext();
-      };
-      
+      audio.src = url;
       audio.play().catch(err => {
         console.error('Audio play failed:', err);
         index++;
