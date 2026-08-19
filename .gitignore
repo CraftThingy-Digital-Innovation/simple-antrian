@@ -1,0 +1,10 @@
+node_modules/
+dist/
+package-lock.json
+*.log
+.DS_Store
+.idea/
+.vscode/
+db.sqlite
+db.sqlite-journal
+db.sqlite-wal

@@ -1,0 +1,64 @@
+{
+  "name": "simple-antrian",
+  "version": "1.0.0",
+  "description": "Aplikasi Antrian Standalone dengan Dual Screen dan Client-Server Auto-Discovery",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-packager . SimpleAntrian --platform=win32 --arch=x64 --out=dist --overwrite --ignore=\"(dist|data|\\.git)\"",
+    "pack-linux": "electron-packager . SimpleAntrian --platform=linux --arch=x64 --out=dist --overwrite --ignore=\"(dist|data|\\.git)\""
+  },
+  "keywords": [
+    "antrian",
+    "queue",
+    "electron",
+    "standalone",
+    "dual-screen"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "pino": "^10.3.1",
+    "qrcode": "^1.5.4",
+    "sqlite3": "^5.1.7",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^31.3.0",
+    "electron-builder": "^24.13.3",
+    "electron-packager": "^17.1.2"
+  },
+  "build": {
+    "appId": "com.craftthingy.simpleantrian",
+    "productName": "SimpleAntrian",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  }
+}
