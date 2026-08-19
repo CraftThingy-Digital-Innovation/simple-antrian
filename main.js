@@ -61,7 +61,20 @@ app.whenReady().then(async () => {
 
   // 2. Baca konfigurasi mode dari database
   const settings = await db.getSettings();
-  currentMode = settings.app_mode || 'server';
+  
+  const hasClientArg = process.argv.includes('--client') || process.argv.includes('-c');
+  const hasServerArg = process.argv.includes('--server') || process.argv.includes('-s');
+  const isClientName = path.basename(process.execPath).toLowerCase().includes('client');
+
+  if (hasClientArg || isClientName) {
+    currentMode = 'client';
+    console.log("[Mode Overridden] Dipaksa berjalan sebagai CLIENT karena parameter command line atau nama file.");
+  } else if (hasServerArg) {
+    currentMode = 'server';
+    console.log("[Mode Overridden] Dipaksa berjalan sebagai SERVER karena parameter command line.");
+  } else {
+    currentMode = settings.app_mode || 'server';
+  }
 
   // 3. Jalankan service sesuai mode
   await startServicesBasedOnMode(settings);
