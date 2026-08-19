@@ -58,6 +58,7 @@ function setupTabs() {
         triggerSearch();
       } else if (tabName === 'settings') {
         loadSettings();
+        loadRunningTexts(); // refresh running texts setiap kali tab settings dibuka
       }
     });
   });
@@ -248,6 +249,10 @@ function handleWebSocketMessage(message) {
     case 'ALERT':
       showToast(payload.message, 'info');
       break;
+
+    case 'RUNNING_TEXT_SAVED':
+      showToast(`✅ Teks berjalan berhasil disimpan & diterapkan! (${payload.count} teks)`, 'success');
+      break;
       
     case 'ERROR':
       showToast(payload.message, 'error');
@@ -257,22 +262,37 @@ function handleWebSocketMessage(message) {
 
 // Render status WhatsApp lokal ke UI settings
 function renderWaStatus(waState) {
-  const { status, qr, number, version, latestVersion, updateAvailable } = waState;
+  const { status, qr, pairingCode, pairingPhone, number, version } = waState;
   
-  const badge = document.getElementById('wa-status-badge');
-  const qrContainer = document.getElementById('wa-qr-container');
-  const qrImg = document.getElementById('wa-qr-img');
-  const details = document.getElementById('wa-details');
-  const detailsNumber = document.getElementById('wa-details-number');
-  const btnLogout = document.getElementById('btn-wa-logout');
-  
-  badge.innerText = status === 'connected' ? 'Terhubung' : 
-                   status === 'qr' ? 'Pindai QR Code' : 
-                   status === 'connecting' ? 'Menghubungkan...' : 'Terputus';
-                   
-  badge.className = `badge ${status === 'connected' ? 'badge-completed' : 
-                            status === 'qr' ? 'badge-calling' : 'badge-skipped'}`;
-  
+  const badge        = document.getElementById('wa-status-badge');
+  const qrContainer  = document.getElementById('wa-qr-container');
+  const qrImg        = document.getElementById('wa-qr-img');
+  const pairContainer = document.getElementById('wa-pairing-container');
+  const pairDisplay  = document.getElementById('wa-pairing-code-display');
+  const details      = document.getElementById('wa-details');
+  const detailsNum   = document.getElementById('wa-details-number');
+  const btnLogout    = document.getElementById('btn-wa-logout');
+  const authMethods  = document.getElementById('wa-auth-methods');
+
+  // --- Badge Status ---
+  const labelMap = {
+    connected:    'Terhubung ✅',
+    qr:           'Pindai QR Code 📷',
+    pairing_code: 'Masukkan Kode 🔐',
+    connecting:   'Menghubungkan...',
+    disconnected: 'Terputus'
+  };
+  const classMap = {
+    connected:    'badge-completed',
+    qr:           'badge-calling',
+    pairing_code: 'badge-calling',
+    connecting:   'badge-waiting',
+    disconnected: 'badge-skipped'
+  };
+  badge.innerText   = labelMap[status] || 'Terputus';
+  badge.className   = `badge ${classMap[status] || 'badge-skipped'}`;
+
+  // --- QR Code panel ---
   if (status === 'qr' && qr) {
     qrImg.src = qr;
     qrContainer.style.display = 'flex';
@@ -280,21 +300,34 @@ function renderWaStatus(waState) {
     qrContainer.style.display = 'none';
     qrImg.src = '';
   }
-  
-  if (status === 'connected') {
-    detailsNumber.innerText = number;
-    details.style.display = 'flex';
-    btnLogout.style.display = 'block';
+
+  // --- Pairing Code panel ---
+  if (status === 'pairing_code' && pairingCode) {
+    pairDisplay.innerText = pairingCode;
+    pairContainer.style.display = 'flex';
   } else {
-    details.style.display = 'none';
-    btnLogout.style.display = 'none';
+    pairContainer.style.display = 'none';
   }
 
-  // Update panel versi
-  document.getElementById('wa-version-lbl').innerText = `v${version}`;
+  // --- Connected details ---
+  if (status === 'connected') {
+    detailsNum.innerText = number || '-';
+    details.style.display   = 'flex';
+    btnLogout.style.display = 'block';
+    if (authMethods) authMethods.style.display = 'none'; // Sembunyikan pilihan metode saat sudah connect
+  } else {
+    details.style.display   = 'none';
+    btnLogout.style.display = 'none';
+    if (authMethods) authMethods.style.display = 'flex';
+  }
+
+  // --- Versi Baileys ---
+  if (version) {
+    document.getElementById('wa-version-lbl').innerText = `v${version}`;
+  }
 }
 
-// Play Voice Announce menggunakan Web Speech API & Web Audio Ding-Dong
+// Play Voice Announce menggunakan Web Speech API & Web Audio Ding-Dong (3 bahasa)
 async function playVoiceAnnounce(ticketNumber, deskNumber) {
   // Hanya bunyikan jika dicentang di setelan audio (opsional, untuk operator)
   const settings = await window.api.getSettings();
@@ -304,20 +337,51 @@ async function playVoiceAnnounce(ticketNumber, deskNumber) {
     // 1. Play Ding-Dong
     await playDingDong();
 
-    // 2. Speech Synthesis
     const prefix = ticketNumber.charAt(0);
     const num = parseInt(ticketNumber.substring(1));
-    const cleanDesk = deskNumber.replace(/([0-9]+)/, ' $1'); // Pisah angka biar lebih jelas dibaca TTS
-    
-    const text = `Nomor antrian ${prefix}, ${num}. Silakan menuju ${cleanDesk}.`;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'id-ID';
-    
-    const voices = window.speechSynthesis.getVoices();
-    const idVoice = voices.find(v => v.lang.includes('id') || v.lang.includes('ID'));
-    if (idVoice) utterance.voice = idVoice;
-    
-    window.speechSynthesis.speak(utterance);
+    const delayMs = (ms) => new Promise(r => setTimeout(r, ms));
+
+    const speakTextLocal = (text, langCode, voiceSearchPattern) => {
+      return new Promise((resolve) => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = langCode;
+        
+        const voices = window.speechSynthesis.getVoices();
+        const voice = voices.find(v => v.lang.toLowerCase().includes(voiceSearchPattern.toLowerCase()));
+        if (voice) utterance.voice = voice;
+        
+        utterance.onend = () => resolve();
+        utterance.onerror = (e) => {
+          console.error(`TTS operator error (${langCode}):`, e);
+          resolve();
+        };
+        window.speechSynthesis.speak(utterance);
+      });
+    };
+
+    // 1. Indonesian
+    const deskId = deskNumber.replace(/([0-9]+)/, ' $1');
+    const textId = `Nomor antrian ${prefix}, ${num}. Silakan menuju ${deskId}.`;
+    await speakTextLocal(textId, 'id-ID', 'id');
+
+    await delayMs(300);
+
+    // 2. English
+    const deskEn = deskNumber.replace(/loket/i, 'counter').replace(/([0-9]+)/, ' $1');
+    const textEn = `Queue number ${prefix}, ${num}. Please proceed to ${deskEn}.`;
+    await speakTextLocal(textEn, 'en-US', 'en');
+
+    await delayMs(300);
+
+    // 3. Chinese
+    const deskZh = deskNumber
+      .replace(/loket/i, '柜台')
+      .replace(/customer\s*service/i, '客户服务')
+      .replace(/teller/i, '出纳柜台')
+      .replace(/([0-9]+)/, ' $1');
+    const textZh = `排队号码 ${prefix}, ${num}。请前往 ${deskZh}。`;
+    await speakTextLocal(textZh, 'zh-CN', 'zh');
+
   } catch (err) {
     console.error('Speech synthesis failed:', err);
   }
@@ -618,13 +682,50 @@ function setupEventListeners() {
     const waitTemplate = document.getElementById('setting-wa-template-wait').value.trim();
     const callTemplate = document.getElementById('setting-wa-template-call').value.trim();
 
-    await window.api.saveSetting('wa_enabled', enabled);
-    await window.api.saveSetting('wa_template_wait', waitTemplate);
-    await window.api.saveSetting('wa_template_call', callTemplate);
-
-    showToast('Pengaturan WhatsApp berhasil disimpan!', 'success');
-    sendAction('GET_STATE');
+    // Simpan + restart WA via WebSocket (sehingga berlaku di server mode maupun client mode)
+    sendAction('WA_SAVE_AND_RESTART', {
+      enabled,
+      templateWait: waitTemplate,
+      templateCall: callTemplate
+    });
+    showToast('Menyimpan pengaturan WhatsApp...', 'info');
   });
+
+  // Tambah Teks Berjalan Baru
+  const btnAddRunningText = document.getElementById('btn-add-running-text');
+  if (btnAddRunningText) {
+    btnAddRunningText.addEventListener('click', () => {
+      const input = document.getElementById('new-running-text-input');
+      const text = input.value.trim();
+      if (!text) {
+        showToast('Teks tidak boleh kosong.', 'error');
+        return;
+      }
+      currentRunningTexts.push(text);
+      input.value = '';
+      renderRunningTextsList();
+      showToast('Teks ditambahkan. Klik Simpan untuk menerapkan.', 'info');
+    });
+  }
+
+  // Simpan & Terapkan Teks Berjalan ke Display
+  const btnSaveRunningTexts = document.getElementById('btn-save-running-texts');
+  if (btnSaveRunningTexts) {
+    btnSaveRunningTexts.addEventListener('click', () => {
+      // Sync nilai textarea terkini (user mungkin mengedit langsung)
+      currentRunningTexts = currentRunningTexts.map((_, i) => {
+        const el = document.getElementById(`rt-input-${i}`);
+        return el ? el.value.trim() : currentRunningTexts[i];
+      }).filter(t => t);
+
+      if (currentRunningTexts.length === 0) {
+        showToast('Minimal harus ada 1 teks.', 'error');
+        return;
+      }
+
+      sendAction('SAVE_RUNNING_TEXTS', { texts: currentRunningTexts });
+    });
+  }
 
   // Logout WhatsApp
   const btnWaLogout = document.getElementById('btn-wa-logout');
@@ -635,6 +736,76 @@ function setupEventListeners() {
     }
   });
 
+  // Tombol Metode QR
+  const btnWaMethodQr = document.getElementById('btn-wa-method-qr');
+  if (btnWaMethodQr) {
+    btnWaMethodQr.addEventListener('click', () => {
+      document.getElementById('wa-phone-input-group').style.display = 'none';
+      document.getElementById('wa-qr-start-group').style.display = 'flex';
+      btnWaMethodQr.className = 'btn btn-primary'; // Aktif
+      document.getElementById('btn-wa-method-phone').className = 'btn btn-secondary';
+    });
+  }
+
+  // Tombol Metode Pairing Code
+  const btnWaMethodPhone = document.getElementById('btn-wa-method-phone');
+  if (btnWaMethodPhone) {
+    btnWaMethodPhone.addEventListener('click', () => {
+      document.getElementById('wa-phone-input-group').style.display = 'flex';
+      document.getElementById('wa-qr-start-group').style.display = 'none';
+      btnWaMethodPhone.className = 'btn btn-primary'; // Aktif
+      document.getElementById('btn-wa-method-qr').className = 'btn btn-secondary';
+    });
+  }
+
+  // Tombol Sambungkan QR (reset sesi lama, tampilkan QR baru)
+  const btnWaStartQr = document.getElementById('btn-wa-start-qr');
+  if (btnWaStartQr) {
+    btnWaStartQr.addEventListener('click', async () => {
+      btnWaStartQr.disabled = true;
+      btnWaStartQr.innerText = 'Memulai koneksi QR...';
+      showToast('Menghubungkan ulang WhatsApp via QR...', 'info');
+      try {
+        // Pastikan WA enabled dulu
+        const enabled = document.getElementById('setting-wa-enabled').checked;
+        if (!enabled) {
+          showToast('Aktifkan notifikasi WhatsApp terlebih dahulu, lalu simpan.', 'error');
+          return;
+        }
+        sendAction('WA_START_QR');
+      } finally {
+        setTimeout(() => {
+          btnWaStartQr.disabled = false;
+          btnWaStartQr.innerText = '🔄 Sambungkan / Perbarui QR Code';
+        }, 3000);
+      }
+    });
+  }
+
+  // Tombol Minta Pairing Code
+  const btnWaRequestPairing = document.getElementById('btn-wa-request-pairing');
+  if (btnWaRequestPairing) {
+    btnWaRequestPairing.addEventListener('click', async () => {
+      const phone = document.getElementById('wa-phone-input').value.trim().replace(/[^0-9]/g, '');
+      if (phone.length < 8) {
+        showToast('Masukkan nomor HP yang valid (contoh: 6281368898090).', 'error');
+        return;
+      }
+      const enabled = document.getElementById('setting-wa-enabled').checked;
+      if (!enabled) {
+        showToast('Aktifkan notifikasi WhatsApp terlebih dahulu, lalu simpan.', 'error');
+        return;
+      }
+      btnWaRequestPairing.disabled = true;
+      btnWaRequestPairing.innerText = 'Mengirim...';
+      showToast(`Meminta kode penyandingan untuk nomor ${phone}...`, 'info');
+      sendAction('WA_START_PAIRING', { phone });
+      setTimeout(() => {
+        btnWaRequestPairing.disabled = false;
+        btnWaRequestPairing.innerText = 'Minta Kode';
+      }, 5000);
+    });
+  }
 
   // Export DB Backup
   const btnExportDb = document.getElementById('btn-export-db');
@@ -862,3 +1033,107 @@ window.deleteService = async function(id) {
     }
   }
 };
+
+// ==================== RUNNING TEXTS MANAGEMENT ====================
+
+/** State lokal daftar teks berjalan */
+let currentRunningTexts = [];
+
+/**
+ * Deteksi bahasa teks untuk label badge (sama dengan display.js).
+ */
+function detectRunningTextLang(text) {
+  if (/[\u4e00-\u9fff\u3400-\u4dbf]/.test(text)) return { label: 'ZH 🇨🇳', color: '#f59e0b' };
+  if (/\b(the|and|please|thank|welcome|service|queue)\b/i.test(text)) return { label: 'EN 🇬🇧', color: '#60a5fa' };
+  if (/\b(di|dan|kami|antrian|terima|layanan|silakan|selamat)\b/i.test(text)) return { label: 'ID 🇮🇩', color: '#4ade80' };
+  return { label: 'MSG', color: '#a78bfa' };
+}
+
+/**
+ * Muat running texts dari settings database dan render ke UI.
+ */
+async function loadRunningTexts() {
+  try {
+    const settings = await window.api.getSettings();
+    let texts = [];
+    if (settings.running_texts) {
+      try { texts = JSON.parse(settings.running_texts); } catch (_) {}
+    }
+    // Fallback ke nilai default jika masih kosong
+    if (!Array.isArray(texts) || texts.length === 0) {
+      texts = [
+        'Selamat Datang di Layanan Kami. Budayakan Mengantri dengan Tertib demi Kenyamanan Bersama. Terima kasih atas kerja sama Anda.',
+        'Welcome to Our Service. Please Queue in an Orderly Manner for Everyone\'s Comfort. Thank you for your cooperation.',
+        '\u6b22\u8fce\u5149\u4e34\u6211\u4eec\u7684\u670d\u52a1\u4e2d\u5fc3\u3002\u8bf7\u9075\u5b88\u79e9\u5e8f\u6392\u961f\uff0c\u5171\u540c\u7ef4\u62a4\u826f\u597d\u73af\u5883\u3002\u611f\u8c22\u60a8\u7684\u914d\u5408\u3002'
+      ];
+    }
+    currentRunningTexts = texts.filter(t => t && t.trim());
+    renderRunningTextsList();
+  } catch (err) {
+    showToast('Gagal memuat teks berjalan: ' + err.message, 'error');
+  }
+}
+
+/**
+ * Render daftar teks berjalan di UI settings.
+ */
+function renderRunningTextsList() {
+  const container = document.getElementById('running-texts-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (currentRunningTexts.length === 0) {
+    container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:16px;">Belum ada teks. Tambahkan di bawah.</div>`;
+    return;
+  }
+
+  currentRunningTexts.forEach((text, index) => {
+    const langInfo = detectRunningTextLang(text);
+    const item = document.createElement('div');
+    item.style.cssText = 'display:flex; gap:10px; align-items:flex-start; background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:10px; padding:12px;';
+    item.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:6px; flex:1; min-width:0;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:2px;">
+          <span style="font-size:0.7rem; font-weight:700; background:rgba(0,0,0,0.3); color:${langInfo.color}; border:1px solid ${langInfo.color}40; padding:2px 7px; border-radius:4px; white-space:nowrap;">${langInfo.label}</span>
+          <span style="font-size:0.72rem; color:var(--text-muted);">Teks ${index + 1} dari ${currentRunningTexts.length}</span>
+        </div>
+        <textarea class="input-control" id="rt-input-${index}" rows="2"
+          style="resize:vertical; min-height:48px; font-size:0.88rem; width:100%; box-sizing:border-box;"
+          oninput="updateRunningText(${index}, this.value)">${escapeHtmlAttr(text)}</textarea>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0;">
+        <button class="btn btn-secondary" onclick="moveRunningText(${index}, -1)" title="Geser ke atas" ${index === 0 ? 'disabled' : ''} style="padding:6px 10px; font-size:0.85rem;">▲</button>
+        <button class="btn btn-secondary" onclick="moveRunningText(${index}, 1)" title="Geser ke bawah" ${index === currentRunningTexts.length - 1 ? 'disabled' : ''} style="padding:6px 10px; font-size:0.85rem;">▼</button>
+        <button class="btn btn-danger" onclick="removeRunningText(${index})" title="Hapus" style="padding:6px 10px; font-size:0.85rem;">🗑️</button>
+      </div>
+    `;
+    container.appendChild(item);
+  });
+}
+
+/** Escape untuk HTML attribute */
+function escapeHtmlAttr(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/** Update teks di index tertentu saat diketik */
+window.updateRunningText = function(index, value) {
+  currentRunningTexts[index] = value;
+};
+
+/** Hapus teks di index tertentu */
+window.removeRunningText = function(index) {
+  currentRunningTexts.splice(index, 1);
+  renderRunningTextsList();
+};
+
+/** Pindahkan teks ke atas/bawah */
+window.moveRunningText = function(index, dir) {
+  const newIndex = index + dir;
+  if (newIndex < 0 || newIndex >= currentRunningTexts.length) return;
+  const temp = currentRunningTexts[index];
+  currentRunningTexts[index] = currentRunningTexts[newIndex];
+  currentRunningTexts[newIndex] = temp;
+  renderRunningTextsList();
+};
+

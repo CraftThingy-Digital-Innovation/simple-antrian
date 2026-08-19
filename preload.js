@@ -41,5 +41,10 @@ contextBridge.exposeInMainWorld('api', {
   getServices: () => ipcRenderer.invoke('get-services'),
   addService: (name, prefix) => ipcRenderer.invoke('add-service', name, prefix),
   deleteService: (id) => ipcRenderer.invoke('delete-service', id),
-  resetAllQueues: () => ipcRenderer.invoke('reset-all-queues')
+  resetAllQueues: () => ipcRenderer.invoke('reset-all-queues'),
+  openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
+
+  // WhatsApp Auth
+  waStartQr: () => ipcRenderer.invoke('wa-start-qr'),
+  waStartPairing: (phone) => ipcRenderer.invoke('wa-start-pairing', phone)
 });

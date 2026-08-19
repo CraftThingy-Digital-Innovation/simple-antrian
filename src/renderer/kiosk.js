@@ -5,6 +5,7 @@ let selectedServiceId = null;
 let currentServices = [];
 let localIp = 'localhost';
 let transactionId = '';
+let isReconnecting = false; // Guard untuk mencegah double-reconnect
 
 // Generate random string for tracking transaction
 function generateTxId() {
@@ -51,13 +52,14 @@ function connectWebSocket(url) {
   socket = new WebSocket(url);
 
   socket.onopen = () => {
+    isReconnecting = false;
     statusDot.innerText = 'Connected';
     statusDot.className = 'badge badge-completed';
     showToast("Terhubung ke server antrian.", "success");
     
-    // Minta data layanan aktif
+    // Minta data state penuh (layanan, tiket) - server menangani GET_STATE
     socket.send(JSON.stringify({
-      type: 'GET_SERVICES'
+      type: 'GET_STATE'
     }));
   };
 
@@ -66,21 +68,28 @@ function connectWebSocket(url) {
       const data = JSON.parse(event.data);
       
       switch (data.type) {
+        case 'STATE_UPDATE':
+          // Tangani state update untuk mendapatkan daftar layanan aktif
+          currentServices = data.payload.services || [];
+          renderKioskServices(currentServices);
+          break;
+
         case 'SERVICES_LIST':
           currentServices = data.payload;
           renderKioskServices(currentServices);
           break;
           
-        case 'TICKET_CREATED':
+        case 'TICKET_CREATED': {
           const ticket = data.payload;
           // Periksa apakah tiket ini dibuat oleh transaksi Kiosk ini
-          if (ticket.tx_id === transactionId) {
+          if (transactionId && ticket.tx_id === transactionId) {
             triggerTicketPrint(ticket);
             closeKioskModal();
             showToast(`Nomor antrian Anda: ${ticket.ticket_number}`, 'success');
             transactionId = ''; // Reset transaksi
           }
           break;
+        }
           
         case 'SYSTEM_STATE':
           currentServices = data.payload.services || [];
@@ -96,10 +105,13 @@ function connectWebSocket(url) {
     statusDot.innerText = 'Disconnected';
     statusDot.className = 'badge badge-skipped';
     
-    // Coba hubungkan kembali setelah 5 detik
-    setTimeout(() => {
-      connectWebSocket(url);
-    }, 5000);
+    // Hindari double-reconnect dengan flag guard
+    if (!isReconnecting) {
+      isReconnecting = true;
+      setTimeout(() => {
+        connectWebSocket(url);
+      }, 5000);
+    }
   };
 }
 
@@ -197,9 +209,12 @@ function triggerTicketPrint(ticket) {
   window.print();
 }
 
-// Inisialisasi event listener di tombol modal
-document.getElementById('btn-kiosk-cancel').addEventListener('click', closeKioskModal);
-document.getElementById('btn-kiosk-submit').addEventListener('click', submitKioskTicket);
-
-// Hubungkan Kiosk saat halaman termuat
-window.addEventListener('DOMContentLoaded', initKiosk);
+// Hubungkan Kiosk saat halaman termuat + pasang event listener setelah DOM siap
+window.addEventListener('DOMContentLoaded', () => {
+  // Pasang event listener di sini agar DOM sudah tersedia
+  document.getElementById('btn-kiosk-cancel').addEventListener('click', closeKioskModal);
+  document.getElementById('btn-kiosk-submit').addEventListener('click', submitKioskTicket);
+  
+  // Inisialisasi koneksi Kiosk
+  initKiosk();
+});

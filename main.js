@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -384,12 +384,47 @@ ipcMain.handle('check-app-updates', async () => {
   return { success: true };
 });
 
-// Mengecek pembaruan aplikasi dari repositori GitHub organisasi craftthingy
+// Restart WhatsApp client dengan mode QR code
+ipcMain.handle('wa-start-qr', async () => {
+  try {
+    await whatsapp.logoutWhatsAppClient(); // Bersihkan sesi lama
+    return { success: true };
+  } catch (err) {
+    console.error('wa-start-qr error:', err);
+    return { success: false, message: err.message };
+  }
+});
+
+// Mulai pairing via nomor HP, kembalikan kode ke renderer
+ipcMain.handle('wa-start-pairing', async (event, phone) => {
+  try {
+    if (!phone || phone.replace(/[^0-9]/g, '').length < 8) {
+      return { success: false, message: 'Nomor HP tidak valid.' };
+    }
+    // Logout sesi lama agar socket bersih, lalu connect pairing mode
+    await whatsapp.logoutWhatsAppClient();
+    // Tunggu logout selesai lalu start ulang dengan pairing mode
+    setTimeout(() => {
+      whatsapp.startWhatsAppClient({ phone });
+    }, 1500);
+    return { success: true };
+  } catch (err) {
+    console.error('wa-start-pairing error:', err);
+    return { success: false, message: err.message };
+  }
+});
+
+// Buka URL eksternal dengan aman (digunakan renderer untuk link GitHub)
+ipcMain.handle('open-external-url', (event, url) => {
+  shell.openExternal(url);
+});
+
+// Mengecek pembaruan aplikasi dari repositori GitHub organisasi CraftThingy-Digital-Innovation
 function checkAppUpdates() {
   const https = require('https');
   const options = {
     hostname: 'api.github.com',
-    path: '/repos/craftthingy/simple-antrian/releases/latest',
+    path: '/repos/CraftThingy-Digital-Innovation/simple-antrian/releases/latest',
     method: 'GET',
     headers: {
       'User-Agent': 'simple-antrian-app'

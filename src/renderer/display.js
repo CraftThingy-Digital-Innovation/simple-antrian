@@ -85,8 +85,20 @@ function handleWebSocketMessage(message) {
     case 'ANNOUNCE_CALL':
       // Tambahkan panggilan ke antrian suara untuk diputar berurutan
       queueAnnouncement(payload.ticketNumber, payload.deskNumber);
-      // Animasi kedip kedip pada display utama
+      // Animasi kedip pada display utama
       triggerCallAnimation(payload.ticketNumber, payload.deskNumber);
+      break;
+
+    case 'RUNNING_TEXT_UPDATE':
+      // Update teks berjalan secara langsung dari server
+      try {
+        const texts = JSON.parse(payload.texts);
+        if (Array.isArray(texts) && texts.length > 0) {
+          runningTexts = texts.filter(t => t && t.trim());
+          currentTextIndex = 0;
+          restartCycler();
+        }
+      } catch (_) {}
       break;
   }
 }
@@ -158,16 +170,109 @@ function triggerCallAnimation(ticketNumber, deskNumber) {
   }, 3000);
 }
 
-// Load Running Text pengumuman dari SQLite Settings
+// ==================== CYCLING RUNNING TEXT ====================
+
+// Daftar teks yang akan di-cycle
+let runningTexts = [
+  'Selamat Datang di Layanan Kami. Budayakan Mengantri dengan Tertib demi Kenyamanan Bersama. Terima kasih atas kerja sama Anda.',
+  'Welcome to Our Service. Please Queue in an Orderly Manner for Everyone\'s Comfort. Thank you for your cooperation.',
+  '欢迎光临我们的服务中心。请遵守秩序排队，共同维护良好环境。感谢您的配合。'
+];
+let currentTextIndex = 0;
+let cyclerTimeout = null;
+
+/**
+ * Deteksi bahasa teks untuk label badge.
+ * Deteksi sederhana: karakter CJK = ZH, lainnya heuristik.
+ */
+function detectLang(text) {
+  if (/[\u4e00-\u9fff\u3400-\u4dbf]/.test(text)) return 'ZH';
+  if (/[\u00C0-\u024F]/.test(text) && /\b(le|la|les|de|du|en|je|vous)\b/i.test(text)) return 'FR';
+  if (/\b(the|and|please|thank|welcome|service|queue)\b/i.test(text)) return 'EN';
+  if (/\b(di|dan|kami|antrian|terima|layanan|silakan|selamat)\b/i.test(text)) return 'ID';
+  return 'MSG';
+}
+
+/**
+ * Jalankan satu teks sebagai marquee, lalu cycle ke berikutnya.
+ */
+function runNextText() {
+  if (!runningTexts || runningTexts.length === 0) return;
+
+  const el = document.getElementById('running-text-content');
+  const langBadge = document.getElementById('running-text-lang');
+  const text = runningTexts[currentTextIndex];
+
+  // Set teks dan bahasa
+  el.innerText = text;
+  const lang = detectLang(text);
+  langBadge.innerText = lang;
+
+  // Hitung durasi marquee proporsional dengan panjang teks
+  // Asumsi: 60 karakter = 15 detik, minimum 12 detik
+  const charCount = text.length;
+  const durationSec = Math.max(12, Math.round(charCount * 0.22));
+  el.style.setProperty('--marquee-dur', `${durationSec}s`);
+
+  // Reset animasi agar teks mulai dari kanan lagi
+  el.classList.remove('fade-out');
+  el.style.animation = 'none';
+  el.offsetHeight; // force reflow
+  el.style.animation = '';
+
+  // Setelah marquee selesai (+ 800ms buffer), cycle ke teks berikutnya
+  cyclerTimeout = setTimeout(() => {
+    // Fade out teks yang selesai
+    el.classList.add('fade-out');
+
+    setTimeout(() => {
+      currentTextIndex = (currentTextIndex + 1) % runningTexts.length;
+      runNextText();
+    }, 700);
+  }, (durationSec + 0.8) * 1000);
+}
+
+/**
+ * Hentikan cycler yang sedang berjalan dan mulai ulang dari awal.
+ */
+function restartCycler() {
+  if (cyclerTimeout) {
+    clearTimeout(cyclerTimeout);
+    cyclerTimeout = null;
+  }
+  currentTextIndex = 0;
+  runNextText();
+}
+
+/**
+ * Muat running texts dari database via IPC, lalu mulai cycling.
+ */
 async function loadAnnouncements() {
   try {
     const settings = await window.api.getSettings();
-    if (settings.running_text) {
-      document.getElementById('running-text-content').innerText = settings.running_text;
+
+    // Parse running_texts (JSON array) atau fallback ke running_text lama
+    if (settings.running_texts) {
+      try {
+        const parsed = JSON.parse(settings.running_texts);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          runningTexts = parsed.filter(t => t && t.trim());
+        }
+      } catch (_) {
+        // Jika gagal parse, gunakan teks tunggal lama sebagai array
+        if (settings.running_text) {
+          runningTexts = [settings.running_text];
+        }
+      }
+    } else if (settings.running_text) {
+      runningTexts = [settings.running_text];
     }
   } catch (err) {
-    console.error('Failed to load announcements:', err);
+    console.error('[Display] Gagal load running texts:', err);
   }
+
+  // Mulai cycling
+  runNextText();
 }
 
 // ==================== ANTRIAN SUARA (VOICE ANNOUNCEMENT QUEUE) ====================
@@ -248,29 +353,54 @@ function playDingDongChime() {
   });
 }
 
-// Pengumuman Suara Text-To-Speech
-function playVoice(ticketNumber, deskNumber) {
+// Pengumuman Suara Text-To-Speech dalam 3 Bahasa (Indonesian, English, Chinese) secara Berurutan
+async function playVoice(ticketNumber, deskNumber) {
+  const prefix = ticketNumber.charAt(0);
+  const num = parseInt(ticketNumber.substring(1));
+
+  // 1. Bahasa Indonesia
+  const deskId = deskNumber.replace(/([0-9]+)/, ' $1');
+  const textId = `Nomor antrian ${prefix}, ${num}. Silakan menuju ${deskId}.`;
+  await speakText(textId, 'id-ID', 'id');
+
+  await delay(300);
+
+  // 2. English
+  const deskEn = deskNumber.replace(/loket/i, 'counter').replace(/([0-9]+)/, ' $1');
+  const textEn = `Queue number ${prefix}, ${num}. Please proceed to ${deskEn}.`;
+  await speakText(textEn, 'en-US', 'en');
+
+  await delay(300);
+
+  // 3. Chinese (Mandarin)
+  const deskZh = deskNumber
+    .replace(/loket/i, '柜台')
+    .replace(/customer\s*service/i, '客户服务')
+    .replace(/teller/i, '出纳柜台')
+    .replace(/([0-9]+)/, ' $1');
+  const textZh = `排队号码 ${prefix}, ${num}。请前往 ${deskZh}。`;
+  await speakText(textZh, 'zh-CN', 'zh');
+}
+
+function speakText(text, langCode, voiceSearchPattern) {
   return new Promise((resolve) => {
-    const prefix = ticketNumber.charAt(0);
-    const num = parseInt(ticketNumber.substring(1));
-    const cleanDesk = deskNumber.replace(/([0-9]+)/, ' $1'); // Pisah angka biar dibaca "Loket Satu", bukan "Loket Sebelas" jika 11
-    
-    const text = `Nomor antrian ${prefix}, ${num}. Silakan menuju ${cleanDesk}.`;
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'id-ID';
-    
-    // Cari suara Bahasa Indonesia
+    utterance.lang = langCode;
+
+    // Cari suara spesifik jika tersedia di sistem
     const voices = window.speechSynthesis.getVoices();
-    const idVoice = voices.find(v => v.lang.includes('id') || v.lang.includes('ID'));
-    if (idVoice) utterance.voice = idVoice;
-    
+    const voice = voices.find(v => v.lang.toLowerCase().includes(voiceSearchPattern.toLowerCase()));
+    if (voice) {
+      utterance.voice = voice;
+    }
+
     utterance.onend = () => {
       resolve();
     };
 
     utterance.onerror = (e) => {
-      console.error("Utterance error:", e);
-      resolve(); // Pastikan antrian tetap berjalan meskipun TTS error
+      console.error(`TTS Error (${langCode}):`, e);
+      resolve(); // Pastikan tidak memblokir antrian jika salah satu bahasa error/tidak disupport
     };
 
     window.speechSynthesis.speak(utterance);

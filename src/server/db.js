@@ -92,6 +92,7 @@ async function initDb() {
 
   // Isi setting default
   const defaultSettings = [
+    { key: 'app_mode', value: 'server' },
     { key: 'server_name', value: 'Server Utama' },
     { key: 'server_uuid', value: require('crypto').randomUUID() },
     { key: 'port', value: '8080' },
@@ -99,7 +100,15 @@ async function initDb() {
     { key: 'wa_gateway_url', value: '' },
     { key: 'wa_token', value: '' },
     { key: 'wa_template_wait', value: 'Halo {{name}}, antrian Anda {{ticket}} berjarak {{waiting}} antrian lagi. Silakan bersiap-siap.' },
-    { key: 'wa_template_call', value: 'Halo {{name}}, antrian Anda {{ticket}} sedang dipanggil ke {{desk}}.' }
+    { key: 'wa_template_call', value: 'Halo {{name}}, antrian Anda {{ticket}} sedang dipanggil ke {{desk}}.' },
+    {
+      key: 'running_texts',
+      value: JSON.stringify([
+        'Selamat Datang di Layanan Kami. Budayakan Mengantri dengan Tertib demi Kenyamanan Bersama. Terima kasih atas kerja sama Anda.',
+        'Welcome to Our Service. Please Queue in an Orderly Manner for Everyone\'s Comfort. Thank you for your cooperation.',
+        '欢迎光临我们的服务中心。请遵守秩序排队，共同维护良好环境。感谢您的配合。'
+      ])
+    }
   ];
 
   for (const s of defaultSettings) {
@@ -376,8 +385,14 @@ async function restoreDatabase(srcPath) {
     });
   });
 
-  // Hubungkan kembali
-  global.db = new sqlite3.Database(dbPath);
+  // Hubungkan kembali ke modul-scoped db (bukan global.db)
+  const newDb = new sqlite3.Database(dbPath);
+  // Override reference internal helper functions agar mengarah ke koneksi baru
+  db.run = newDb.run.bind(newDb);
+  db.get = newDb.get.bind(newDb);
+  db.all = newDb.all.bind(newDb);
+  db.serialize = newDb.serialize.bind(newDb);
+  db.close = newDb.close.bind(newDb);
   // Re-enable WAL
   await run("PRAGMA journal_mode=WAL;");
   await run("PRAGMA foreign_keys=ON;");

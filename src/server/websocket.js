@@ -130,6 +130,44 @@ async function handleClientAction(action, ws) {
         break;
       }
 
+      case 'WA_START_QR': {
+        // Bersihkan sesi dan reconnect untuk mendapatkan QR baru
+        await require('./whatsapp').logoutWhatsAppClient();
+        break;
+      }
+
+      case 'WA_START_PAIRING': {
+        // Mulai koneksi via nomor HP (pairing code)
+        const phone = payload.phone;
+        if (!phone || phone.replace(/[^0-9]/g, '').length < 8) {
+          ws.send(JSON.stringify({ type: 'ERROR', payload: { message: 'Nomor HP tidak valid untuk pairing.' } }));
+          break;
+        }
+        await require('./whatsapp').logoutWhatsAppClient();
+        setTimeout(() => {
+          require('./whatsapp').startWhatsAppClient({ phone });
+        }, 1500);
+        break;
+      }
+
+      case 'WA_SAVE_AND_RESTART': {
+        // Simpan pengaturan WA, lalu restart WA client sesuai status enabled
+        const { enabled, templateWait, templateCall } = payload;
+        const dbMod = require('./db');
+        await dbMod.saveSetting('wa_enabled', enabled);
+        if (templateWait) await dbMod.saveSetting('wa_template_wait', templateWait);
+        if (templateCall) await dbMod.saveSetting('wa_template_call', templateCall);
+
+        const wa = require('./whatsapp');
+        if (enabled === 'true') {
+          wa.startWhatsAppClient();
+        } else {
+          wa.stopWhatsAppClient();
+        }
+        ws.send(JSON.stringify({ type: 'WA_STATUS_UPDATE', payload: wa.getWaStatus() }));
+        break;
+      }
+
       case 'CREATE_TICKET': {
         const serviceId = payload.serviceId;
         const name = payload.customerName || payload.name || 'Pelanggan';
@@ -214,7 +252,40 @@ async function handleClientAction(action, ws) {
 
       case 'COMPLETE': {
         const { ticketId } = payload;
+        // Ambil info tiket sebelum diselesaikan untuk tahu layanan dan loketnya
+        const ticket = await db.get("SELECT * FROM tickets WHERE id = ?", [ticketId]);
         await db.completeTicket(ticketId);
+
+        if (ticket) {
+          const { service_id, desk_number } = ticket;
+          // Cari apakah ada antrian berikutnya untuk layanan yang sama
+          const calledTicket = await db.callNextTicket(service_id, desk_number);
+          if (calledTicket) {
+            await broadcastStateUpdate();
+            
+            // Broadcast ke display untuk memutar suara panggilan
+            broadcast({
+              type: 'ANNOUNCE_CALL',
+              payload: {
+                ticketNumber: calledTicket.ticket_number,
+                deskNumber: calledTicket.desk_number,
+                serviceName: calledTicket.service_name
+              }
+            });
+
+            // Kirim notifikasi WA
+            try {
+              const { sendTicketCalledNotification } = require('./whatsapp');
+              sendTicketCalledNotification(calledTicket);
+            } catch (e) {}
+
+            try {
+              await triggerWhatsAppQueueReminder(service_id, calledTicket.number_sequence);
+            } catch (e) {}
+            break;
+          }
+        }
+        
         await broadcastStateUpdate();
         break;
       }
@@ -229,6 +300,22 @@ async function handleClientAction(action, ws) {
       case 'RESET_ALL': {
         await db.resetAllQueues();
         await broadcastStateUpdate();
+        break;
+      }
+
+      case 'SAVE_RUNNING_TEXTS': {
+        // Simpan array teks berjalan ke DB dan broadcast langsung ke semua display
+        const { texts } = payload;
+        if (!Array.isArray(texts)) break;
+        const filtered = texts.filter(t => typeof t === 'string' && t.trim());
+        await db.saveSetting('running_texts', JSON.stringify(filtered));
+        // Broadcast ke seluruh client (display, kiosk, operator)
+        broadcast({
+          type: 'RUNNING_TEXT_UPDATE',
+          payload: { texts: JSON.stringify(filtered) }
+        });
+        // Balas sukses ke pengirim
+        ws.send(JSON.stringify({ type: 'RUNNING_TEXT_SAVED', payload: { count: filtered.length } }));
         break;
       }
 

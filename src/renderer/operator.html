@@ -656,6 +656,42 @@
           </div>
         </section>
 
+        <!-- ===== TEKS BERJALAN (RUNNING TEXT) ===== -->
+        <section class="glass-panel config-section" id="section-running-text-config">
+          <h3 class="config-title">🖥️ Teks Berjalan (Running Text) — Layar Display</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+            Teks berikut akan ditampilkan bergantian (cycling) di bagian bawah layar display pelanggan.
+            Tambahkan sebanyak yang diinginkan. Setiap teks akan terdeteksi bahasanya secara otomatis.
+          </p>
+
+          <!-- Daftar teks saat ini -->
+          <div id="running-texts-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; max-height: 280px; overflow-y: auto; padding-right: 4px;">
+            <!-- JS-populated -->
+          </div>
+
+          <!-- Form tambah teks baru -->
+          <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
+            <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Tambah Teks Baru</label>
+            <div style="display: flex; gap: 8px; align-items: flex-start;">
+              <textarea class="input-control" id="new-running-text-input" rows="2"
+                placeholder="Ketik teks pengumuman baru di sini..."
+                style="flex: 1; resize: vertical; min-height: 56px;"></textarea>
+              <button class="btn btn-secondary" id="btn-add-running-text" style="white-space: nowrap; padding: 12px 16px; align-self: stretch;">
+                ➕ Tambah
+              </button>
+            </div>
+
+            <!-- Default 3 bahasa -->
+            <div style="font-size: 0.75rem; color: var(--text-muted);">
+              💡 Tips: Tambahkan teks dalam berbagai bahasa. Sistem akan mendeteksi dan menampilkan label bahasa secara otomatis.
+            </div>
+          </div>
+
+          <button class="btn btn-primary" id="btn-save-running-texts" style="margin-top: 16px; width: 100%;">
+            💾 Simpan & Terapkan ke Layar Display
+          </button>
+        </section>
+
         <!-- Konfigurasi WhatsApp -->
         <section class="glass-panel config-section">
           <h3 class="config-title">WhatsApp Lokal Terintegrasi</h3>
@@ -665,30 +701,99 @@
             <label for="setting-wa-enabled" style="font-size: 0.95rem;">Aktifkan Notifikasi WhatsApp</label>
           </div>
 
-          <!-- Panel Koneksi & QR Code -->
-          <div id="wa-connection-panel" style="display: flex; flex-direction: column; gap: 15px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; border: 1px solid var(--border-glass);">
+          <!-- Panel Koneksi & Status -->
+          <div id="wa-connection-panel" style="display: flex; flex-direction: column; gap: 15px; background: rgba(0,0,0,0.2); padding: 18px; border-radius: 12px; border: 1px solid var(--border-glass);">
+            
+            <!-- Status Row -->
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Status WhatsApp:</span>
               <span id="wa-status-badge" class="badge badge-skipped">Terputus</span>
             </div>
-            
-            <div id="wa-qr-container" style="display: none; flex-direction: column; align-items: center; gap: 10px; background: white; padding: 15px; border-radius: 10px; margin: 10px 0;">
-              <img id="wa-qr-img" src="" alt="Scan QR Code" style="width: 200px; height: 200px;">
-              <span style="font-size: 0.75rem; color: #000; font-weight: 700; text-align: center;">Pindai QR ini dari aplikasi WhatsApp Anda</span>
+
+            <!-- Nomor HP yang tersambung -->
+            <div id="wa-details" style="display: none; font-size: 0.9rem; flex-direction: column; gap: 6px; background: rgba(34,197,94,0.1); padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(34,197,94,0.3);">
+              <div>✅ Terhubung sebagai: <strong id="wa-details-number" style="color: #4ade80;"></strong></div>
             </div>
 
-            <div id="wa-details" style="display: none; font-size: 0.9rem; flex-direction: column; gap: 6px;">
-              <div>Nomor HP: <strong id="wa-details-number"></strong></div>
+            <!-- ===== QR CODE PANEL ===== -->
+            <div id="wa-qr-container" style="display: none; flex-direction: column; align-items: center; gap: 12px;">
+              <div style="background: white; padding: 16px; border-radius: 12px; display: inline-block;">
+                <img id="wa-qr-img" src="" alt="Scan QR Code" style="width: 200px; height: 200px; display: block;">
+              </div>
+              <div style="text-align: center;">
+                <div style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;">Pindai QR ini di WhatsApp → Perangkat Tertaut</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">QR kedaluwarsa tiap ~20 detik. Akan diperbarui otomatis.</div>
+              </div>
             </div>
 
-            <button class="btn btn-danger" id="btn-wa-logout" style="display: none; padding: 8px 16px; font-size: 0.85rem;">
-              Putuskan Sambungan (Logout)
+            <!-- ===== PAIRING CODE PANEL ===== -->
+            <div id="wa-pairing-container" style="display: none; flex-direction: column; align-items: center; gap: 12px;">
+              <div style="font-size: 0.85rem; color: var(--text-secondary);">Masukkan kode ini di WhatsApp → Perangkat Tertaut → Tautkan dengan Nomor HP:</div>
+              <div id="wa-pairing-code-display" style="
+                font-family: 'Courier New', monospace;
+                font-size: 2.2rem;
+                font-weight: 900;
+                letter-spacing: 8px;
+                color: #a5b4fc;
+                background: rgba(99,102,241,0.1);
+                border: 2px dashed rgba(99,102,241,0.4);
+                padding: 14px 24px;
+                border-radius: 12px;
+                min-width: 240px;
+                text-align: center;
+              ">--- ----</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Kode berlaku ~60 detik setelah diminta.</div>
+            </div>
+
+            <!-- ===== METODE KONEKSI ===== -->
+            <div id="wa-auth-methods" style="display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--border-glass); padding-top: 14px;">
+              <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Pilih Metode Koneksi</div>
+              
+              <!-- Tab Pilihan Metode -->
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary" id="btn-wa-method-qr" style="flex: 1; font-size: 0.85rem; padding: 8px;">
+                  📱 Scan QR Code
+                </button>
+                <button class="btn btn-secondary" id="btn-wa-method-phone" style="flex: 1; font-size: 0.85rem; padding: 8px;">
+                  📞 Kode Penyandingan
+                </button>
+              </div>
+
+              <!-- Input Nomor HP untuk Pairing (tersembunyi secara default) -->
+              <div id="wa-phone-input-group" style="display: none; flex-direction: column; gap: 10px;">
+                <div class="form-group">
+                  <label for="wa-phone-input" style="font-size: 0.8rem;">Nomor HP WhatsApp (format internasional, tanpa +)</label>
+                  <div style="display: flex; gap: 8px;">
+                    <input type="tel" class="input-control" id="wa-phone-input" 
+                      placeholder="Contoh: 6281368898090" 
+                      style="flex: 1; font-size: 0.95rem; letter-spacing: 1px;">
+                    <button class="btn btn-primary" id="btn-wa-request-pairing" style="white-space: nowrap; padding: 0 16px;">
+                      Minta Kode
+                    </button>
+                  </div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                    Mulai dengan kode negara, misal: <strong>62</strong>812345678 (Indonesia)
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tombol Koneksi QR -->
+              <div id="wa-qr-start-group" style="display: flex; flex-direction: column; gap: 8px;">
+                <button class="btn btn-primary" id="btn-wa-start-qr" style="width: 100%;">
+                  🔄 Sambungkan / Perbarui QR Code
+                </button>
+              </div>
+            </div>
+
+            <!-- Tombol Logout -->
+            <button class="btn btn-danger" id="btn-wa-logout" style="display: none; padding: 8px 16px; font-size: 0.85rem; width: 100%;">
+              🔓 Putuskan Sambungan (Logout WhatsApp)
             </button>
           </div>
 
           <!-- Pustaka Update Info -->
           <div id="wa-update-panel" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); padding: 12px; border-radius: 10px; font-size: 0.85rem; display: flex; flex-direction: column; gap: 4px;">
-            <div>Pustaka WhatsApp: <strong id="wa-version-lbl">v...</strong></div>
+            <div>Pustaka WhatsApp (Baileys): <strong id="wa-version-lbl">v...</strong></div>
             <div style="color: var(--text-muted); font-size: 0.75rem;">(Diperbarui otomatis di latar belakang saat aplikasi dijalankan)</div>
           </div>
 
@@ -706,6 +811,7 @@
             💾 Simpan Pengaturan WA
           </button>
         </section>
+
 
         <!-- Impor/Ekspor & Reset (Hanya Server Mode) -->
         <section class="glass-panel config-section" id="section-db-config">
