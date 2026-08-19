@@ -135,10 +135,12 @@ function createMainWindow() {
   });
 }
 
+const runtimeServerUuid = require('crypto').randomUUID();
+
 // Menjalankan/Menghentikan service secara dinamis
 async function startServicesBasedOnMode(settings) {
   const wsPort = parseInt(settings.port || '8080');
-  const serverUuid = settings.server_uuid;
+  const serverUuid = runtimeServerUuid;
   const serverName = settings.server_name || 'Server Antrian';
 
   if (currentMode === 'select-mode') {
@@ -186,7 +188,7 @@ ipcMain.handle('get-system-info', async () => {
   const appVersion = require('./package.json').version;
   return {
     mode: currentMode,
-    serverUuid: settings.server_uuid,
+    serverUuid: runtimeServerUuid,
     serverName: settings.server_name,
     port: settings.port,
     localIp: discovery.getLocalIp(),
