@@ -87,7 +87,7 @@ function handleWebSocketMessage(message) {
 
     case 'ANNOUNCE_CALL':
       // Tambahkan panggilan ke antrian suara untuk diputar berurutan
-      queueAnnouncement(payload.ticketNumber, payload.deskNumber);
+      queueAnnouncement(payload.ticketNumber, payload.deskNumber, payload.voiceFiles);
       // Animasi kedip pada display utama
       triggerCallAnimation(payload.ticketNumber, payload.deskNumber);
       break;
@@ -290,8 +290,8 @@ async function loadAnnouncements() {
 
 // ==================== ANTRIAN SUARA (VOICE ANNOUNCEMENT QUEUE) ====================
 
-function queueAnnouncement(ticketNumber, deskNumber) {
-  announcementQueue.push({ ticketNumber, deskNumber });
+function queueAnnouncement(ticketNumber, deskNumber, voiceFiles) {
+  announcementQueue.push({ ticketNumber, deskNumber, voiceFiles });
   if (!isAnnouncing) {
     processNextAnnouncement();
   }
@@ -304,7 +304,7 @@ async function processNextAnnouncement() {
   }
 
   isAnnouncing = true;
-  const { ticketNumber, deskNumber } = announcementQueue.shift();
+  const { ticketNumber, deskNumber, voiceFiles } = announcementQueue.shift();
 
   try {
     // 1. Bunyikan Bel Ding-Dong
@@ -367,61 +367,64 @@ function playDingDongChime() {
 }
 
 // Pengumuman Suara Text-To-Speech dalam 3 Bahasa (Indonesian, English, Chinese) secara Berurutan
-async function playVoice(ticketNumber, deskNumber) {
+async function playVoice(ticketNumber, deskNumber, voiceFiles) {
   if (globalSettings && globalSettings.tts_enabled === 'false') {
     console.log('TTS is disabled, skipping playVoice');
     return;
   }
 
-  const prefix = ticketNumber.charAt(0);
-  const num = parseInt(ticketNumber.substring(1));
+  if (!voiceFiles || voiceFiles.length === 0) {
+    console.warn('No voice files provided for announcement.');
+    return;
+  }
 
-  // 1. Bahasa Indonesia
-  const deskId = deskNumber.replace(/([0-9]+)/, ' $1');
-  const textId = `Nomor antrian ${prefix}, ${num}. Silakan menuju ${deskId}.`;
-  await speakText(textId, 'id-ID', 'id');
-
-  await delay(300);
-
-  // 2. English
-  const deskEn = deskNumber.replace(/loket/i, 'counter').replace(/([0-9]+)/, ' $1');
-  const textEn = `Queue number ${prefix}, ${num}. Please proceed to ${deskEn}.`;
-  await speakText(textEn, 'en-US', 'en');
-
-  await delay(300);
-
-  // 3. Chinese (Mandarin)
-  const deskZh = deskNumber
-    .replace(/loket/i, '柜台')
-    .replace(/customer\s*service/i, '客户服务')
-    .replace(/teller/i, '出纳柜台')
-    .replace(/([0-9]+)/, ' $1');
-  const textZh = `排队号码 ${prefix}, ${num}。请前往 ${deskZh}。`;
-  await speakText(textZh, 'zh-CN', 'zh');
+  try {
+    const wsUrlObj = new URL(ws.url);
+    const audioBaseUrl = `http://${wsUrlObj.host}/audio`;
+    const urls = voiceFiles.map(file => `${audioBaseUrl}/${file}`);
+    await playAudioSequence(urls);
+  } catch (err) {
+    console.error('Offline TTS playback failed:', err);
+  }
 }
 
-function speakText(text, langCode, voiceSearchPattern) {
+function playAudioSequence(urls) {
   return new Promise((resolve) => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = langCode;
-
-    // Cari suara spesifik jika tersedia di sistem
-    const voices = window.speechSynthesis.getVoices();
-    const voice = voices.find(v => v.lang.toLowerCase().includes(voiceSearchPattern.toLowerCase()));
-    if (voice) {
-      utterance.voice = voice;
-    }
-
-    utterance.onend = () => {
+    if (!urls || urls.length === 0) {
       resolve();
-    };
-
-    utterance.onerror = (e) => {
-      console.error(`TTS Error (${langCode}):`, e);
-      resolve(); // Pastikan tidak memblokir antrian jika salah satu bahasa error/tidak disupport
-    };
-
-    window.speechSynthesis.speak(utterance);
+      return;
+    }
+    
+    let index = 0;
+    
+    function playNext() {
+      if (index >= urls.length) {
+        resolve();
+        return;
+      }
+      
+      const url = urls[index];
+      const audio = new Audio(url);
+      
+      audio.onended = () => {
+        index++;
+        playNext();
+      };
+      
+      audio.onerror = (e) => {
+        console.error('Audio playback error for:', url, e);
+        index++;
+        playNext();
+      };
+      
+      audio.play().catch(err => {
+        console.error('Audio play failed:', err);
+        index++;
+        playNext();
+      });
+    }
+    
+    playNext();
   });
 }
 

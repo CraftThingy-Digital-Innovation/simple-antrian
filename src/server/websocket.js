@@ -1,13 +1,45 @@
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const { WebSocketServer } = require('ws');
 const db = require('./db');
+const ttsGenerator = require('./tts-generator');
 
 let wss = null;
+let httpServer = null;
 
 // Mulai server WebSocket
 function startWebSocketServer(port) {
   if (wss) stopWebSocketServer();
 
-  wss = new WebSocketServer({ port });
+  // Create combined HTTP server to serve local static audio files
+  httpServer = http.createServer((req, res) => {
+    if (req.url.startsWith('/audio/')) {
+      const filename = path.basename(req.url);
+      const filePath = path.join(process.cwd(), 'data', 'tts-cache', filename);
+      
+      if (fs.existsSync(filePath)) {
+        res.writeHead(200, { 'Content-Type': 'audio/wav' });
+        fs.createReadStream(filePath).pipe(res);
+      } else {
+        res.writeHead(404);
+        res.end();
+      }
+    } else {
+      res.writeHead(404);
+      res.end();
+    }
+  });
+
+  wss = new WebSocketServer({ server: httpServer });
+
+  // Initialize TTS Engine in the background
+  ttsGenerator.initTtsEngine((status) => {
+    broadcast({
+      type: 'TTS_GEN_STATUS',
+      payload: status
+    });
+  });
 
   wss.on('connection', async (ws) => {
     console.log('Client connected to WebSocket server');
@@ -34,7 +66,8 @@ function startWebSocketServer(port) {
     });
   });
 
-  console.log('WebSocket Server started on port', port);
+  httpServer.listen(port);
+  console.log('WebSocket & HTTP Audio Server started on port', port);
 }
 
 // Hentikan server WebSocket
@@ -45,7 +78,11 @@ function stopWebSocketServer() {
     });
     wss.close();
     wss = null;
-    console.log('WebSocket Server stopped.');
+  }
+  if (httpServer) {
+    httpServer.close();
+    httpServer = null;
+    console.log('WebSocket & HTTP Server stopped.');
   }
 }
 
@@ -205,14 +242,7 @@ async function handleClientAction(action, ws) {
           await broadcastStateUpdate();
           
           // Kirim trigger panggilan suara (announcement) ke seluruh display
-          broadcast({
-            type: 'ANNOUNCE_CALL',
-            payload: {
-              ticketNumber: calledTicket.ticket_number,
-              deskNumber: calledTicket.desk_number,
-              serviceName: calledTicket.service_name
-            }
-          });
+          await announceCall(calledTicket.ticket_number, calledTicket.desk_number, calledTicket.service_name);
 
           // Kirim WhatsApp pemberitahuan giliran tiba
           try {
@@ -238,14 +268,7 @@ async function handleClientAction(action, ws) {
           await broadcastStateUpdate();
 
           // Kirim trigger panggilan ulang suara
-          broadcast({
-            type: 'ANNOUNCE_CALL',
-            payload: {
-              ticketNumber: recalledTicket.ticket_number,
-              deskNumber: recalledTicket.desk_number,
-              serviceName: recalledTicket.service_name
-            }
-          });
+          await announceCall(recalledTicket.ticket_number, recalledTicket.desk_number, recalledTicket.service_name);
         }
         break;
       }
@@ -264,14 +287,7 @@ async function handleClientAction(action, ws) {
             await broadcastStateUpdate();
             
             // Broadcast ke display untuk memutar suara panggilan
-            broadcast({
-              type: 'ANNOUNCE_CALL',
-              payload: {
-                ticketNumber: calledTicket.ticket_number,
-                deskNumber: calledTicket.desk_number,
-                serviceName: calledTicket.service_name
-              }
-            });
+            await announceCall(calledTicket.ticket_number, calledTicket.desk_number, calledTicket.service_name);
 
             // Kirim notifikasi WA
             try {
@@ -332,6 +348,34 @@ async function handleClientAction(action, ws) {
         break;
       }
 
+      case 'SYNC_DESK_NAMES': {
+        const { deskNames } = payload;
+        if (!Array.isArray(deskNames)) break;
+        
+        // Run background generation of custom desk name sounds
+        for (const fullDeskName of deskNames) {
+          if (!fullDeskName || typeof fullDeskName !== 'string') continue;
+          
+          const wordPart = fullDeskName.replace(/[0-9]+/g, '').trim();
+          if (!wordPart) continue;
+
+          // Generate Indonesian
+          await ttsGenerator.generatePhraseIfNeeded(wordPart, 'id');
+
+          // Generate English
+          const enWord = wordPart.replace(/loket/i, 'counter');
+          await ttsGenerator.generatePhraseIfNeeded(enWord, 'en');
+
+          // Generate Chinese
+          const zhWord = wordPart
+            .replace(/loket/i, '柜台')
+            .replace(/customer\s*service/i, '客户服务')
+            .replace(/teller/i, '出纳柜台');
+          await ttsGenerator.generatePhraseIfNeeded(zhWord, 'zh');
+        }
+        break;
+      }
+
       case 'GET_SETTINGS': {
         const settings = await db.getSettings();
         ws.send(JSON.stringify({ type: 'SETTINGS_RESPONSE', payload: settings }));
@@ -383,5 +427,183 @@ module.exports = {
   stopWebSocketServer,
   broadcast,
   broadcastStateUpdate,
-  getCurrentState
+  getCurrentState,
+  announceCall
 };
+
+function getIndonesianNumberTokens(num) {
+  if (num === 0) return ['0'];
+  const tokens = [];
+  
+  const hundreds = Math.floor(num / 100);
+  const remainder100 = num % 100;
+  
+  if (hundreds > 0) {
+    if (hundreds === 1) {
+      tokens.push('100');
+    } else {
+      tokens.push(String(hundreds), 'ratus');
+    }
+  }
+  
+  if (remainder100 > 0) {
+    if (remainder100 <= 19) {
+      tokens.push(String(remainder100));
+    } else {
+      const tens = Math.floor(remainder100 / 10);
+      const ones = remainder100 % 10;
+      tokens.push(String(tens), 'puluh');
+      if (ones > 0) {
+        tokens.push(String(ones));
+      }
+    }
+  }
+  
+  return tokens;
+}
+
+function getEnglishNumberTokens(num) {
+  if (num === 0) return ['0'];
+  const tokens = [];
+  
+  const hundreds = Math.floor(num / 100);
+  const remainder100 = num % 100;
+  
+  if (hundreds > 0) {
+    tokens.push(String(hundreds), 'hundred');
+  }
+  
+  if (remainder100 > 0) {
+    if (remainder100 <= 19) {
+      tokens.push(String(remainder100));
+    } else {
+      const tens = Math.floor(remainder100 / 10) * 10;
+      const ones = remainder100 % 10;
+      tokens.push(String(tens));
+      if (ones > 0) {
+        tokens.push(String(ones));
+      }
+    }
+  }
+  
+  return tokens;
+}
+
+function getChineseNumberTokens(num) {
+  if (num === 0) return ['0'];
+  const tokens = [];
+  
+  const hundreds = Math.floor(num / 100);
+  const remainder100 = num % 100;
+  
+  if (hundreds > 0) {
+    tokens.push(String(hundreds), 'bai');
+  }
+  
+  if (remainder100 > 0) {
+    if (hundreds > 0 && remainder100 < 10) {
+      tokens.push('0');
+    }
+    
+    if (remainder100 < 10) {
+      tokens.push(String(remainder100));
+    } else if (remainder100 === 10) {
+      tokens.push('10');
+    } else if (remainder100 < 20) {
+      tokens.push('shi', String(remainder100 % 10));
+    } else {
+      const tens = Math.floor(remainder100 / 10);
+      const ones = remainder100 % 10;
+      tokens.push(String(tens), 'shi');
+      if (ones > 0) {
+        tokens.push(String(ones));
+      }
+    }
+  }
+  
+  return tokens;
+}
+
+async function getVoiceAnnouncementFiles(ticketNumber, deskNumber) {
+  const prefix = ticketNumber.charAt(0);
+  const num = parseInt(ticketNumber.substring(1));
+  
+  const deskWord = deskNumber.replace(/[0-9]+/g, '').trim();
+  const deskNum = parseInt(deskNumber.replace(/[^0-9]/g, ''));
+  
+  const files = [];
+
+  const getDeskWordFile = (word, lang) => {
+    const crypto = require('crypto');
+    const hash = crypto.createHash('md5').update(word.toLowerCase()).digest('hex');
+    return `${lang}_phrase_${hash}.wav`;
+  };
+
+  // 1. Indonesian
+  files.push('id_nomor_antrian.wav');
+  files.push(`id_letter_${prefix}.wav`);
+  const idNumTokens = getIndonesianNumberTokens(num);
+  idNumTokens.forEach(t => files.push(`id_${t}.wav`));
+  files.push('id_silakan_menuju.wav');
+  if (deskWord) {
+    files.push(getDeskWordFile(deskWord, 'id'));
+  } else {
+    files.push('id_loket.wav');
+  }
+  if (!isNaN(deskNum)) {
+    const idDeskTokens = getIndonesianNumberTokens(deskNum);
+    idDeskTokens.forEach(t => files.push(`id_${t}.wav`));
+  }
+
+  // 2. English
+  files.push('en_queue_number.wav');
+  files.push(`en_letter_${prefix}.wav`);
+  const enNumTokens = getEnglishNumberTokens(num);
+  enNumTokens.forEach(t => files.push(`en_${t}.wav`));
+  files.push('en_please_proceed_to.wav');
+  if (deskWord) {
+    const enWord = deskWord.replace(/loket/i, 'counter');
+    files.push(getDeskWordFile(enWord, 'en'));
+  } else {
+    files.push('en_counter.wav');
+  }
+  if (!isNaN(deskNum)) {
+    const enDeskTokens = getEnglishNumberTokens(deskNum);
+    enDeskTokens.forEach(t => files.push(`en_${t}.wav`));
+  }
+
+  // 3. Chinese
+  files.push('zh_queue_number.wav');
+  files.push(`zh_letter_${prefix}.wav`);
+  const zhNumTokens = getChineseNumberTokens(num);
+  zhNumTokens.forEach(t => files.push(`zh_${t}.wav`));
+  files.push('zh_please_proceed_to.wav');
+  if (deskWord) {
+    const zhWord = deskWord
+      .replace(/loket/i, '柜台')
+      .replace(/customer\s*service/i, '客户服务')
+      .replace(/teller/i, '出纳柜台');
+    files.push(getDeskWordFile(zhWord, 'zh'));
+  } else {
+    files.push('zh_counter.wav');
+  }
+  if (!isNaN(deskNum)) {
+    const zhDeskTokens = getChineseNumberTokens(deskNum);
+    zhDeskTokens.forEach(t => files.push(`zh_${t}.wav`));
+  }
+
+  return files;
+}
+
+async function announceCall(ticketNumber, deskNumber, serviceName) {
+  const voiceFiles = await getVoiceAnnouncementFiles(ticketNumber, deskNumber);
+  broadcast({
+    type: 'ANNOUNCE_CALL',
+    payload: {
+      ticketNumber,
+      deskNumber,
+      serviceName,
+      voiceFiles
+    }
+  });
+}

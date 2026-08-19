@@ -235,6 +235,9 @@ function connectWebSocket(url) {
     
     // Minta data state awal
     sendAction('GET_STATE');
+    
+    // Sync desk names for local TTS pre-generation
+    sendAction('SYNC_DESK_NAMES', { deskNames: Object.values(localDeskSettings) });
   };
 
   ws.onmessage = (event) => {
@@ -297,7 +300,7 @@ function handleWebSocketMessage(message) {
     case 'ANNOUNCE_CALL':
       // Main process display window yang akan memutar suara, 
       // tapi kita juga bisa memutarnya secara opsional di operator panel.
-      playVoiceAnnounce(payload.ticketNumber, payload.deskNumber);
+      playVoiceAnnounce(payload.ticketNumber, payload.deskNumber, payload.voiceFiles);
       break;
 
     case 'ALERT':
@@ -332,6 +335,61 @@ function handleWebSocketMessage(message) {
     case 'ERROR':
       showToast(payload.message, 'error');
       break;
+
+    case 'TTS_GEN_STATUS':
+      renderTtsStatus(payload);
+      break;
+  }
+}
+
+// Render status download/generasi model suara offline TTS
+function renderTtsStatus(statusInfo) {
+  const banner = document.getElementById('tts-status-banner');
+  if (!banner) return;
+
+  const { status, progress, message } = statusInfo;
+  
+  if (status === 'ready' || status === 'error') {
+    if (status === 'ready') {
+      document.getElementById('tts-status-icon').innerText = '✅';
+      document.getElementById('tts-status-title').innerText = 'Layanan Suara Offline Siap';
+      document.getElementById('tts-status-desc').innerText = 'Model suara offline (TTS) berhasil dimuat.';
+      document.getElementById('tts-status-progress').style.width = '100%';
+      document.getElementById('tts-status-percent').innerText = '100%';
+      setTimeout(() => {
+        banner.style.display = 'none';
+      }, 5000);
+    } else {
+      document.getElementById('tts-status-icon').innerText = '❌';
+      document.getElementById('tts-status-title').innerText = 'Gagal Memuat Model Suara';
+      document.getElementById('tts-status-desc').innerText = message || 'Gagal mengunduh dependensi lokal.';
+      document.getElementById('tts-status-progress').style.width = '0%';
+      document.getElementById('tts-status-percent').innerText = '0%';
+      banner.style.display = 'flex';
+    }
+  } else {
+    banner.style.display = 'flex';
+    document.getElementById('tts-status-icon').innerText = '🔄';
+    
+    let title = 'Mempersiapkan Suara Offline (TTS)';
+    if (status.startsWith('downloading_model_')) {
+      const lang = status.replace('downloading_model_', '').toUpperCase();
+      title = `Mengunduh Model Suara Bahasa ${lang === 'ZH' ? 'Mandarin' : lang === 'ID' ? 'Indonesia' : 'Inggris'}...`;
+    } else if (status.startsWith('downloading_config_')) {
+      const lang = status.replace('downloading_config_', '').toUpperCase();
+      title = `Mengunduh Konfigurasi Bahasa ${lang === 'ZH' ? 'Mandarin' : lang === 'ID' ? 'Indonesia' : 'Inggris'}...`;
+    } else if (status === 'downloading_binary') {
+      title = 'Mengunduh Modul Piper Offline (Windows/Linux)...';
+    } else if (status === 'extracting_binary') {
+      title = 'Mengekstrak Modul Piper...';
+    } else if (status === 'generating_vocab') {
+      title = 'Menghasilkan File Suara Dasar (Angka & Huruf)...';
+    }
+
+    document.getElementById('tts-status-title').innerText = title;
+    document.getElementById('tts-status-desc').innerText = message || 'Sedang mengunduh aset lokal...';
+    document.getElementById('tts-status-progress').style.width = `${progress}%`;
+    document.getElementById('tts-status-percent').innerText = `${progress}%`;
   }
 }
 
@@ -403,63 +461,69 @@ function renderWaStatus(waState) {
 }
 
 // Play Voice Announce menggunakan Web Speech API & Web Audio Ding-Dong (3 bahasa)
-async function playVoiceAnnounce(ticketNumber, deskNumber) {
+async function playVoiceAnnounce(ticketNumber, deskNumber, voiceFiles) {
   // Hanya bunyikan jika dicentang di setelan audio (opsional, untuk operator)
   const settings = await window.api.getSettings();
   if (settings.play_audio_operator !== 'true') return;
+
+  if (!voiceFiles || voiceFiles.length === 0) return;
 
   try {
     // 1. Play Ding-Dong
     await playDingDong();
 
-    const prefix = ticketNumber.charAt(0);
-    const num = parseInt(ticketNumber.substring(1));
-    const delayMs = (ms) => new Promise(r => setTimeout(r, ms));
+    // Get current server host from WebSocket connection to build absolute URLs
+    const wsUrlObj = new URL(ws.url);
+    const audioBaseUrl = `http://${wsUrlObj.host}/audio`;
 
-    const speakTextLocal = (text, langCode, voiceSearchPattern) => {
-      return new Promise((resolve) => {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = langCode;
-        
-        const voices = window.speechSynthesis.getVoices();
-        const voice = voices.find(v => v.lang.toLowerCase().includes(voiceSearchPattern.toLowerCase()));
-        if (voice) utterance.voice = voice;
-        
-        utterance.onend = () => resolve();
-        utterance.onerror = (e) => {
-          console.error(`TTS operator error (${langCode}):`, e);
-          resolve();
-        };
-        window.speechSynthesis.speak(utterance);
-      });
-    };
+    // Map filenames to full URLs
+    const urls = voiceFiles.map(file => `${audioBaseUrl}/${file}`);
 
-    // 1. Indonesian
-    const deskId = deskNumber.replace(/([0-9]+)/, ' $1');
-    const textId = `Nomor antrian ${prefix}, ${num}. Silakan menuju ${deskId}.`;
-    await speakTextLocal(textId, 'id-ID', 'id');
-
-    await delayMs(300);
-
-    // 2. English
-    const deskEn = deskNumber.replace(/loket/i, 'counter').replace(/([0-9]+)/, ' $1');
-    const textEn = `Queue number ${prefix}, ${num}. Please proceed to ${deskEn}.`;
-    await speakTextLocal(textEn, 'en-US', 'en');
-
-    await delayMs(300);
-
-    // 3. Chinese
-    const deskZh = deskNumber
-      .replace(/loket/i, '柜台')
-      .replace(/customer\s*service/i, '客户服务')
-      .replace(/teller/i, '出纳柜台')
-      .replace(/([0-9]+)/, ' $1');
-    const textZh = `排队号码 ${prefix}, ${num}。请前往 ${deskZh}。`;
-    await speakTextLocal(textZh, 'zh-CN', 'zh');
-
+    // Play the sequence of audio files
+    await playAudioSequence(urls);
   } catch (err) {
-    console.error('Speech synthesis failed:', err);
+    console.error('Offline TTS playback failed:', err);
   }
+}
+
+function playAudioSequence(urls) {
+  return new Promise((resolve) => {
+    if (!urls || urls.length === 0) {
+      resolve();
+      return;
+    }
+    
+    let index = 0;
+    
+    function playNext() {
+      if (index >= urls.length) {
+        resolve();
+        return;
+      }
+      
+      const url = urls[index];
+      const audio = new Audio(url);
+      
+      audio.onended = () => {
+        index++;
+        playNext();
+      };
+      
+      audio.onerror = (e) => {
+        console.error('Audio playback error for:', url, e);
+        index++;
+        playNext();
+      };
+      
+      audio.play().catch(err => {
+        console.error('Audio play failed:', err);
+        index++;
+        playNext();
+      });
+    }
+    
+    playNext();
+  });
 }
 
 // Ding Dong Chime menggunakan Web Audio API (Tanpa asset file audio!)
@@ -560,6 +624,9 @@ function renderQueueState(state) {
     deskInput.addEventListener('input', (e) => {
       localDeskSettings[srv.id] = e.target.value;
       localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
+    });
+    deskInput.addEventListener('change', () => {
+      sendAction('SYNC_DESK_NAMES', { deskNames: Object.values(localDeskSettings) });
     });
   });
 

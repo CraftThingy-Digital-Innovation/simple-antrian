@@ -374,6 +374,23 @@
         <div class="badge badge-waiting" id="badge-mode">Server Mode</div>
       </div>
 
+      <!-- TTS Status Banner -->
+      <div id="tts-status-banner" style="display: none; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); padding: 14px 18px; border-radius: 12px; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 5px;" class="animate-slide-in">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 1.5rem;" id="tts-status-icon">🔄</span>
+          <div>
+            <div style="font-weight: 700; font-size: 0.95rem;" id="tts-status-title">Mengunduh Model Suara Offline (TTS)</div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary);" id="tts-status-desc">Sedang mengunduh file suara...</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 100px; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+            <div id="tts-status-progress" style="width: 0%; height: 100%; background: var(--accent-primary-gradient); transition: width 0.3s;"></div>
+          </div>
+          <span style="font-size: 0.85rem; font-weight: 700; min-width: 35px; text-align: right;" id="tts-status-percent">0%</span>
+        </div>
+      </div>
+
       <!-- Pemanggilan Grid -->
       <div class="grid-2" id="calling-grid">
         <!-- JS akan men-generate kartu pemanggilan untuk masing-masing layanan -->
