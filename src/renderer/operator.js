@@ -81,8 +81,18 @@ async function initSystemInfo() {
       lblNew.innerText = `v${updateInfo.latest}`;
       banner.style.display = 'block';
       btnDownload.onclick = () => {
-        window.open(updateInfo.url, '_blank');
+        window.api.openExternalUrl(updateInfo.url);
       };
+
+      // Tampilkan toast notifikasi
+      showToast(`Pembaruan aplikasi tersedia: v${updateInfo.latest}! Silakan periksa tab Pengaturan.`, 'info');
+
+      // Tampilkan prompt konfirmasi agar user langsung menyadari adanya update
+      setTimeout(() => {
+        if (confirm(`Pembaruan Baru Tersedia!\n\nVersi v${updateInfo.latest} telah dirilis (versi Anda saat ini: v${info.appVersion}).\nApakah Anda ingin membuka halaman unduhan GitHub sekarang untuk memperbarui aplikasi?`)) {
+          window.api.openExternalUrl(updateInfo.url);
+        }
+      }, 1000);
     });
     
     // Tampilkan mode di UI
