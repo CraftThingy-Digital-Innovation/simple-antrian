@@ -19,17 +19,25 @@ Aplikasi ini dibuat oleh **Alif Nurhidayat** di bawah naungan **CraftThingy Digi
 3. **WhatsApp Lokal Terintegrasi (Tanpa Pihak Ketiga & Gratis)**:
    Aplikasi menggunakan modul **Baileys** untuk terhubung langsung ke WhatsApp Web secara lokal.
    * **Scan QR**: Operator cukup memindai QR Code di tab Settings langsung dari HP mereka. Sesi aman disimpan secara lokal di folder `data/wa-session`.
-   * **Auto-Update Library**: Untuk mengantisipasi perubahan protokol WhatsApp Web di masa mendatang, aplikasi secara otomatis memeriksa versi terbaru `@whiskeysockets/baileys` di NPM Registry setiap kali startup. Jika terdeteksi versi baru, aplikasi akan mengunduh dan memasangnya secara senyap (*silent update*) di latar belakang sebelum menghubungkan layanan.
+   * **Auto-Update Library**: Untuk mengantisipasi perubahan protokol WhatsApp Web di masa mendatang, aplikasi secara otomatis memeriksa versi terbaru `@whiskeysockets/baileys` di NPM Registry setiap kali startup. Jika terdeteksi versi baru, aplikasi akan unduh dan pasang secara senyap (*silent update*) di latar belakang sebelum menghubungkan layanan.
    * **Notifikasi Antrian**: Mengirimkan notifikasi WA otomatis saat tiket baru dibuat, saat antrian berjarak 3 nomor lagi dari antrian aktif (pengingat bersiap), dan saat nomor antrian tersebut dipanggil ke loket.
 
-4. **Database SQLite yang Tangguh & Anti-Corrupt**:
+4. **Layar Kiosk Pendaftaran Mandiri (Layar Ketiga / Client Ketiga)**:
+   * Menyediakan antarmuka pendaftaran mandiri (self-service) bagi pelanggan. Pelanggan dapat memasukkan nama & nomor WhatsApp secara mandiri lewat layar sentuh (touchscreen) dan langsung mencetak struk antrian.
+   * Mendukung mode monitor ketiga di PC Server (dibuka otomatis fullscreen tanpa frame) atau di perangkat Client terpisah (tablet/PC pendaftaran) di area depan pintu masuk yang terhubung ke server utama via WebSockets.
+
+5. **Cetak Tiket Printer Thermal & Dot Matrix**:
+   * Layout tiket terformat secara otomatis via CSS media query `@media print` sehingga pas di kertas printer kasir/thermal 58mm/80mm maupun printer dot-matrix.
+   * Mendukung cetak otomatis saat tiket dibuat di Kiosk (hanya di printer Kiosk lokal berdasarkan ID transaksi unik) serta cetak ulang (reprint) manual dari panel operator untuk rekap data.
+
+6. **Database SQLite yang Tangguh & Anti-Corrupt**:
    Database lokal dikonfigurasi menggunakan mode **WAL (Write-Ahead Logging)** yang menjamin integritas data yang sangat aman dari korupsi data meskipun PC mengalami mati listrik tiba-tiba atau aplikasi dimatikan secara paksa. Semua data secara otomatis langsung disimpan (*auto-save*).
 
-5. **Pencarian, Filter, & Statistik Harian**:
+7. **Pencarian, Filter, & Statistik Harian**:
    * **Pencarian**: Cari tiket berdasarkan nomor antrian, nama pelanggan, atau nomor WA. Filter berdasarkan status tiket, kategori layanan, dan tanggal operasional.
    * **Statistik Harian**: Menghitung total antrian, tiket dilayani, dilewati, dan sedang menunggu, lengkap dengan performa rata-rata waktu tunggu serta waktu pelayanan per hari yang dipilih.
 
-6. **Utilitas Backup & Restore (SQL + CSV)**:
+8. **Utilitas Backup & Restore (SQL + CSV)**:
    Ekspor seluruh database SQLite ke file backup eksternal sekali klik sekaligus menghasilkan laporan rekapitulasi data dalam format **CSV**, serta impor database (restore) instan.
 
 ---
@@ -48,11 +56,13 @@ simple-antrian/
 │   │   ├── websocket.js # WebSocket Server & Client handler
 │   │   └── whatsapp.js  # Klien WA Baileys & silent updater
 │   └── renderer/        # Frontend Chromium (UI)
-│       ├── index.css    # Gaya glassmorphism & animasi neon
+│       ├── index.css    # Gaya glassmorphism & media cetak struk
 │       ├── operator.html# UI Kontrol Operator
 │       ├── operator.js  # Logika halaman operator & WS client
 │       ├── display.html # UI Layar Customer Display
-│       └── display.js   # Audio chime, Text-to-Speech & Visualizer Canvas
+│       ├── display.js   # Audio chime, Text-to-Speech & Visualizer Canvas
+│       ├── kiosk.html   # UI Kiosk Pendaftaran Mandiri (Layar Sentuh)
+│       └── kiosk.js     # Logika Kiosk & penanganan printer thermal
 ├── main.js              # Entry point utama Electron
 ├── preload.js           # Bridge API aman (IPC Renderer)
 ├── package.json         # Konfigurasi dependensi & build scripts
@@ -70,8 +80,8 @@ Pastikan komputer Anda sudah terinstal **Node.js (v18+)** dan **Git**.
 
 1. **Clone repositori dan masuk ke direktori**:
    ```bash
-   git clone https://github.com/craftthingy/simple-antrian.git
-   cd simple-antrian
+    git clone https://github.com/CraftThingy-Digital-Innovation/simple-antrian.git
+    cd simple-antrian
    ```
 2. **Install dependensi**:
    ```bash
@@ -109,7 +119,7 @@ Proyek ini telah dikonfigurasi dengan pipeline CI/CD GitHub Actions di [.github/
   git tag v1.0.0
   git push origin v1.0.0
   ```
-* **Hasil**: GitHub Actions akan otomatis membuat draf rilis baru di repositori GitHub organisasi `craftthingy`, mengompilasi module SQLite untuk Windows dan Linux pada runner native masing-masing, mengompresnya (`.zip` untuk Windows, `.tar.gz` untuk Linux), dan mengunggahnya sebagai aset rilis secara otomatis. Pengguna akhir Anda dapat langsung mengunduh versi rilis yang diinginkan dari tab **Releases** di GitHub.
+* **Hasil**: GitHub Actions akan otomatis membuat draf rilis baru di repositori GitHub organisasi `CraftThingy-Digital-Innovation`, mengompilasi module SQLite untuk Windows dan Linux pada runner native masing-masing, mengompresnya (`.zip` untuk Windows, `.tar.gz` untuk Linux), dan mengunggahnya sebagai aset rilis secara otomatis. Pengguna akhir Anda dapat langsung mengunduh versi rilis yang diinginkan dari tab **Releases** di GitHub.
 
 ---
 
