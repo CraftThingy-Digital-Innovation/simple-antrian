@@ -296,6 +296,27 @@ async function handleClientAction(action, ws) {
         break;
       }
 
+      case 'CALL_SKIPPED': {
+        const { serviceId, deskNumber } = payload;
+        const calledTicket = await db.callSkippedTicket(serviceId, deskNumber);
+        
+        if (calledTicket) {
+          await broadcastStateUpdate();
+          
+          // Kirim trigger panggilan suara (announcement)
+          await announceCall(calledTicket.ticket_number, calledTicket.desk_number, calledTicket.service_name);
+
+          // Kirim WhatsApp pemberitahuan
+          try {
+            const { sendTicketCalledNotification } = require('./whatsapp');
+            sendTicketCalledNotification(calledTicket);
+          } catch (e) {}
+        } else {
+          ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Tidak ada antrian terlewat.' } }));
+        }
+        break;
+      }
+
       case 'RECALL': {
         const { ticketId } = payload;
         const recalledTicket = await db.recallTicket(ticketId);

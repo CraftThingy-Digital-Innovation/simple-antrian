@@ -650,10 +650,10 @@ function renderQueueState(state) {
 
       <div class="calling-actions-grid">
         <button class="btn btn-primary" onclick="${activeCall ? `recall('${activeCall.id}')` : `callNext('${srv.id}')`}">
-          🔔 Panggil
+          ${activeCall ? '🔔 Panggil Ulang' : '🔔 Panggil'}
         </button>
-        <button class="btn btn-secondary" onclick="recall('${activeCall ? activeCall.id : ''}')" ${!activeCall ? 'disabled' : ''}>
-          🔄 Ulang
+        <button class="btn btn-secondary" onclick="callSkipped('${srv.id}')" ${(!activeCall && srv.skipped_count > 0) ? '' : 'disabled'}>
+          🔄 Terlewat ${srv.skipped_count > 0 ? `(${srv.skipped_count})` : ''}
         </button>
         <button class="btn btn-success" onclick="completeCall('${activeCall ? activeCall.id : ''}')" ${!activeCall ? 'disabled' : ''}>
           ✅ Selesai
@@ -729,6 +729,12 @@ window.callNext = function(serviceId) {
   const deskInput = document.getElementById(`desk-input-${serviceId}`);
   const deskNumber = deskInput ? deskInput.value : 'Loket 1';
   sendAction('CALL_NEXT', { serviceId, deskNumber });
+};
+
+window.callSkipped = function(serviceId) {
+  const deskInput = document.getElementById(`desk-input-${serviceId}`);
+  const deskNumber = deskInput ? deskInput.value : 'Loket 1';
+  sendAction('CALL_SKIPPED', { serviceId, deskNumber });
 };
 
 window.recall = function(ticketId) {

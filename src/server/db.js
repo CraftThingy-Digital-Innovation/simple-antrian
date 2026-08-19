@@ -131,7 +131,13 @@ async function initDb() {
 // ==================== OPERASI LAYANAN (SERVICES) ====================
 
 function getServices() {
-  return all("SELECT * FROM services ORDER BY prefix ASC");
+  return all(`
+    SELECT s.*, 
+      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'waiting' AND date(t.created_at) = date('now', 'localtime')) as waiting_count,
+      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'skipped' AND date(t.created_at) = date('now', 'localtime')) as skipped_count
+    FROM services s
+    ORDER BY s.prefix ASC
+  `);
 }
 
 function getServiceById(id) {
@@ -231,6 +237,24 @@ async function callNextTicket(serviceId, deskNumber) {
   );
 
   return get("SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.id = ?", [nextTicket.id]);
+}
+
+// Panggil antrian terlewat (skipped) pertama ke loket tertentu
+async function callSkippedTicket(serviceId, deskNumber) {
+  const nextSkipped = await get(
+    "SELECT * FROM tickets WHERE service_id = ? AND status = 'skipped' AND date(created_at) = date('now', 'localtime') ORDER BY created_at ASC LIMIT 1",
+    [serviceId]
+  );
+
+  if (!nextSkipped) return null;
+
+  const now = new Date().toISOString();
+  await run(
+    "UPDATE tickets SET status = 'calling', desk_number = ?, called_at = ? WHERE id = ?",
+    [deskNumber, now, nextSkipped.id]
+  );
+
+  return get("SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.id = ?", [nextSkipped.id]);
 }
 
 // Panggil ulang antrian (recall)
@@ -421,6 +445,7 @@ module.exports = {
   getCallingTickets,
   createTicket,
   callNextTicket,
+  callSkippedTicket,
   recallTicket,
   completeTicket,
   skipTicket,
