@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('api', {
   openDisplayWindow: () => ipcRenderer.invoke('open-display-window'),
   closeDisplayWindow: () => ipcRenderer.invoke('close-display-window'),
   isDisplayWindowOpen: () => ipcRenderer.invoke('is-display-window-open'),
+  openKioskWindow: () => ipcRenderer.invoke('open-kiosk-window'),
+  closeKioskWindow: () => ipcRenderer.invoke('close-kiosk-window'),
+  isKioskWindowOpen: () => ipcRenderer.invoke('is-kiosk-window-open'),
   performWaUpdate: () => ipcRenderer.invoke('wa-perform-update'),
   checkAppUpdates: () => ipcRenderer.invoke('check-app-updates'),
   onAppUpdateAvailable: (callback) => {

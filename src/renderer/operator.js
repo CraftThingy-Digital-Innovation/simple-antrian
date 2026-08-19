@@ -5,6 +5,11 @@ let serverIp = 'localhost';
 let serverPort = 8080;
 let servicesList = [];
 let localDeskSettings = {}; // Menyimpan nomor loket per layanan, misal: { teller: 'Loket 1' }
+let currentTxId = '';
+
+function generateTxId() {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
 
 // Inisialisasi Halaman
 document.addEventListener('DOMContentLoaded', async () => {
@@ -219,6 +224,16 @@ function handleWebSocketMessage(message) {
     case 'STATE_UPDATE':
       renderQueueState(payload);
       break;
+
+    case 'TICKET_CREATED': {
+      const ticket = payload;
+      // Cetak otomatis jika tiket dibuat oleh operator ini
+      if (ticket.tx_id && ticket.tx_id === currentTxId) {
+        printTicketHistory(ticket.ticket_number, ticket.service_name, ticket.customer_name, ticket.created_at);
+        currentTxId = ''; // Reset transaksi
+      }
+      break;
+    }
 
     case 'WA_STATUS_UPDATE':
       renderWaStatus(payload);
@@ -495,7 +510,20 @@ function setupEventListeners() {
     }
   });
 
-  // Buat Tiket Baru
+  // Proyeksi Kiosk Window (Layar Ketiga)
+  const btnToggleKiosk = document.getElementById('btn-toggle-kiosk');
+  btnToggleKiosk.addEventListener('click', async () => {
+    const isOpen = await window.api.isKioskWindowOpen();
+    if (isOpen) {
+      await window.api.closeKioskWindow();
+      showToast('Layar Kiosk Mandiri ditutup.', 'info');
+    } else {
+      await window.api.openKioskWindow();
+      showToast('Layar Kiosk Mandiri berhasil dibuka/diproyeksikan!', 'success');
+    }
+  });
+
+  // Buat Tiket Baru (Quick Ticket)
   const btnCreateTicket = document.getElementById('btn-create-ticket');
   btnCreateTicket.addEventListener('click', () => {
     const serviceId = document.getElementById('quick-service').value;
@@ -507,7 +535,10 @@ function setupEventListeners() {
       return;
     }
 
-    sendAction('CREATE_TICKET', { serviceId, name, phone });
+    // Set transaction ID untuk memicu auto-print setelah sukses broadcast
+    currentTxId = generateTxId();
+
+    sendAction('CREATE_TICKET', { serviceId, name, phone, txId: currentTxId });
     
     // Reset Form Input
     document.getElementById('quick-name').value = '';
@@ -676,7 +707,7 @@ async function triggerSearch() {
   tbody.innerHTML = '';
 
   if (results.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 15px;">Tidak ditemukan tiket yang cocok dengan filter.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 15px;">Tidak ditemukan tiket yang cocok dengan filter.</td></tr>';
     return;
   }
 
@@ -691,6 +722,10 @@ async function triggerSearch() {
     if (t.status === 'completed') badgeClass = 'badge-completed';
     if (t.status === 'skipped') badgeClass = 'badge-skipped';
 
+    // Format param-param text untuk HTML attribute yang aman dari karakter kutip
+    const nameEscaped = (t.customer_name || '').replace(/'/g, "\\'");
+    const serviceEscaped = (t.service_name || '').replace(/'/g, "\\'");
+
     tr.innerHTML = `
       <td><strong>${t.ticket_number}</strong></td>
       <td>${t.service_name}</td>
@@ -700,10 +735,38 @@ async function triggerSearch() {
       <td>${t.desk_number || '-'}</td>
       <td>${formattedCreated}</td>
       <td>${formattedCalled}</td>
+      <td>
+        <button class="btn btn-secondary" onclick="printTicketHistory('${t.ticket_number}', '${serviceEscaped}', '${nameEscaped}', '${t.created_at}')" style="padding: 4px 8px; font-size: 0.75rem;">
+          🖨️ Cetak
+        </button>
+      </td>
     `;
     tbody.appendChild(tr);
   });
 }
+
+// Fungsi Cetak Tiket untuk Printer Thermal / Dot Matrix
+window.printTicketHistory = function(ticketNumber, serviceName, customerName, createdAt) {
+  // Ambil nama server untuk kepala tiket dari data sistem
+  window.api.getSystemInfo().then(info => {
+    document.getElementById('print-header-name').innerText = (info.serverName || 'SIMPLE ANTRIAN').toUpperCase();
+    document.getElementById('print-service-name').innerText = serviceName;
+    document.getElementById('print-ticket-no').innerText = ticketNumber;
+    
+    const nameLbl = document.getElementById('print-customer-lbl');
+    if (customerName && customerName !== '-' && customerName !== '') {
+      nameLbl.innerText = `Nama: ${customerName}`;
+      nameLbl.style.display = 'block';
+    } else {
+      nameLbl.innerText = '';
+      nameLbl.style.display = 'none';
+    }
+    
+    document.getElementById('print-time-lbl').innerText = `Waktu: ${new Date(createdAt).toLocaleString('id-ID')}`;
+    
+    window.print();
+  });
+};
 
 // Muat Statistik Harian
 async function loadStats(dateStr) {

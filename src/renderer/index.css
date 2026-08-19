@@ -324,3 +324,23 @@ body::after {
 .toast.success { border-left: 4px solid var(--accent-success); }
 .toast.error { border-left: 4px solid var(--accent-secondary); }
 .toast.info { border-left: 4px solid var(--accent-primary); }
+
+/* Pengaturan Cetak untuk Printer Thermal (Receipt) */
+@media print {
+  body * {
+    display: none !important;
+  }
+  #print-ticket, #print-ticket * {
+    display: block !important;
+  }
+  #print-ticket {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white !important;
+    color: black !important;
+  }
+}

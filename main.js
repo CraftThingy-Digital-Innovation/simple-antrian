@@ -45,6 +45,7 @@ const whatsapp = require('./src/server/whatsapp');
 
 let mainWindow = null;
 let displayWindow = null;
+let kioskWindow = null;
 let currentMode = 'server'; // default mode
 let isDiscoveryRunning = false;
 
@@ -111,10 +112,9 @@ function createMainWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
-    // Jika window utama ditutup, tutup juga layar display
-    if (displayWindow) {
-      displayWindow.close();
-    }
+    // Jika window utama ditutup, tutup juga layar display & kiosk
+    if (displayWindow) displayWindow.close();
+    if (kioskWindow) kioskWindow.close();
   });
 }
 
@@ -251,6 +251,68 @@ ipcMain.handle('close-display-window', () => {
 
 ipcMain.handle('is-display-window-open', () => {
   return displayWindow !== null;
+});
+
+// Kiosk Mandiri (Layar Ketiga)
+ipcMain.handle('open-kiosk-window', () => {
+  if (kioskWindow) {
+    kioskWindow.focus();
+    return true;
+  }
+
+  const displays = screen.getAllDisplays();
+  // Cari layar ketiga (bukan primary dan bukan secondary)
+  let kioskDisplay = displays.find((display) => {
+    const isPrimary = display.bounds.x === 0 && display.bounds.y === 0;
+    let isSecondary = false;
+    if (displayWindow && !displayWindow.isDestroyed()) {
+      const bounds = displayWindow.getBounds();
+      isSecondary = display.bounds.x === bounds.x && display.bounds.y === bounds.y;
+    }
+    return !isPrimary && !isSecondary;
+  });
+
+  const windowOptions = {
+    width: 1024,
+    height: 768,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    },
+    title: "SimpleAntrian - Kiosk Mandiri"
+  };
+
+  if (kioskDisplay) {
+    windowOptions.x = kioskDisplay.bounds.x;
+    windowOptions.y = kioskDisplay.bounds.y;
+    windowOptions.fullscreen = true;
+    windowOptions.frame = false;
+  } else {
+    windowOptions.center = true;
+  }
+
+  kioskWindow = new BrowserWindow(windowOptions);
+  kioskWindow.loadFile(path.join(__dirname, 'src/renderer/kiosk.html'));
+
+  kioskWindow.on('closed', () => {
+    kioskWindow = null;
+  });
+
+  return true;
+});
+
+ipcMain.handle('close-kiosk-window', () => {
+  if (kioskWindow) {
+    kioskWindow.close();
+    kioskWindow = null;
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('is-kiosk-window-open', () => {
+  return kioskWindow !== null;
 });
 
 // Database Pass-through

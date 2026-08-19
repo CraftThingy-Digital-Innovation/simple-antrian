@@ -131,12 +131,25 @@ async function handleClientAction(action, ws) {
       }
 
       case 'CREATE_TICKET': {
-        const { serviceId, name, phone } = payload;
+        const serviceId = payload.serviceId;
+        const name = payload.customerName || payload.name || 'Pelanggan';
+        const phone = payload.customerPhone || payload.phone || null;
+        const txId = payload.txId || null;
+
         const newTicket = await db.createTicket(serviceId, name, phone);
+        
+        // Tempelkan txId ke objek tiket untuk dibroadcast balik
+        newTicket.tx_id = txId;
+
+        // Broadcast event TICKET_CREATED khusus untuk pencetakan tiket mandiri
+        broadcast({
+          type: 'TICKET_CREATED',
+          payload: newTicket
+        });
+
         await broadcastStateUpdate();
         
         // Optional WA Notification for Ticket creation
-        // Kirim notifikasi WhatsApp ke server pendukung (jika WA aktif)
         try {
           const { sendTicketCreatedNotification } = require('./whatsapp');
           sendTicketCreatedNotification(newTicket);
