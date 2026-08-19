@@ -16,8 +16,8 @@ Aplikasi ini dibuat oleh **Alif Nurhidayat** di bawah naungan **CraftThingy Digi
    * **Bebas Bentrok**: Setiap server menghasilkan UUID unik saat startup pertama kali. Sistem mendukung operasional beberapa pasang server dan client sekaligus di satu jaringan lokal (misal: 3 server dan 3 client) tanpa terjadi bentrokan data.
    * **Sinkronisasi WebSocket**: Sinkronisasi data tiket antrian dan panggilan loket berjalan secara instan (*real-time*) di seluruh client terhubung.
 
-3. **Panggilan Suara Loket Multi-Bahasa (Indonesian, English, Chinese)**:
-   Sistem panggilan suara antrian (Text-To-Speech) memanggil nomor antrian secara berurutan dalam **3 bahasa sekaligus** (Bahasa Indonesia, Inggris, dan Mandarin/China) untuk meningkatkan kenyamanan dan aksesibilitas pelanggan dari berbagai latar belakang bahasa.
+3. **Panggilan Suara Loket Multi-Bahasa (Piper TTS - Neural Offline)**:
+   Sistem panggilan suara antrian kini menggunakan engine neural **Piper TTS** yang berjalan 100% offline dan mandiri (tanpa internet). Mengucapkan nomor antrian secara berurutan dalam **3 bahasa sekaligus** (Bahasa Indonesia, Inggris, dan Mandarin/China) dengan lafal alami berkualitas studio. Aset suara dasar (angka dan huruf) serta modul binari Piper diunduh secara dinamis dan di-generate di latar belakang saat startup pertama kali. Nama loket kustom baru akan di-generate secara otomatis saat diinput oleh operator sebelum panggilan dimulai.
 
 4. **Tombol "Selesai" Panggil Otomatis (Complete & Call Next)**:
    Meningkatkan efisiensi kerja operator. Ketika operator mengeklik tombol **✅ Selesai** (Complete), jika masih ada antrian yang menunggu pada layanan tersebut, sistem secara otomatis akan memanggil nomor antrian berikutnya secara instan tanpa perlu operator mengeklik tombol panggil secara manual.
@@ -66,6 +66,7 @@ simple-antrian/
 │   ├── server/          # Backend Node.js
 │   │   ├── db.js        # Modul database SQLite & WAL
 │   │   ├── discovery.js # UDP Multicast Broadcaster & Listener
+│   │   ├── tts-generator.js # Modul offline Piper TTS, downloader & generator
 │   │   ├── websocket.js # WebSocket Server & Client handler
 │   │   └── whatsapp.js  # Klien WA Baileys & silent updater
 │   └── renderer/        # Frontend Chromium (UI)
