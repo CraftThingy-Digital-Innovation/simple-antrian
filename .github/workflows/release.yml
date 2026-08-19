@@ -1,0 +1,61 @@
+name: Release Standalone Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Build and Create Release
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            platform: win32
+            artifact_name: SimpleAntrian-windows-x64.zip
+            pack_cmd: npm run pack
+            output_dir: dist/SimpleAntrian-win32-x64
+          - os: ubuntu-latest
+            platform: linux
+            artifact_name: SimpleAntrian-linux-x64.tar.gz
+            pack_cmd: npm run pack-linux
+            output_dir: dist/SimpleAntrian-linux-x64
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build and Package Application
+        run: ${{ matrix.pack_cmd }}
+
+      - name: Compress Windows Build
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "${{ matrix.output_dir }}/*" -DestinationPath "${{ matrix.artifact_name }}"
+
+      - name: Compress Linux Build
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          tar -czvf ${{ matrix.artifact_name }} -C ${{ matrix.output_dir }} .
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
