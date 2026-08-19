@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SimpleAntrian - Customer Display</title>
+  <link rel="stylesheet" href="index.css">
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #060913;
+    }
+
+    /* Top Section containing Main Call + Right Panel */
+    .content-area {
+      flex: 1;
+      display: flex;
+      padding: 30px;
+      gap: 30px;
+      height: calc(100vh - 80px);
+    }
+
+    /* Left Side: Big Queue Call Panel */
+    .main-call-panel {
+      flex: 7;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .main-call-label {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 4px;
+    }
+
+    .main-call-number {
+      font-size: 10rem;
+      font-weight: 800;
+      color: var(--accent-warning);
+      text-shadow: 0 0 40px rgba(245, 158, 11, 0.4);
+      margin: 20px 0;
+      letter-spacing: -2px;
+      line-height: 1;
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .main-call-desk-label {
+      font-size: 2.2rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-top: 10px;
+      letter-spacing: 1px;
+    }
+
+    .main-call-desk {
+      font-size: 4rem;
+      font-weight: 800;
+      color: var(--accent-primary);
+      text-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-top: 10px;
+    }
+
+    /* Right Side: Media / Info + Other Services */
+    .right-sidebar {
+      flex: 5;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+
+    /* Premium Decorative Canvas Card */
+    .media-card {
+      flex: 6;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 16px;
+    }
+
+    #visualizer-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      opacity: 0.6;
+    }
+
+    .media-card-content {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      padding: 30px;
+    }
+
+    .media-card-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: linear-gradient(to right, #818cf8, #f43f5e);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+    }
+
+    .media-card-text {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* Other Services Grid List */
+    .other-services-card {
+      flex: 5;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .sidebar-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid var(--border-glass);
+      padding-bottom: 10px;
+      color: var(--text-secondary);
+    }
+
+    .other-services-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .other-service-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 18px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-glass);
+      border-radius: 10px;
+    }
+
+    .other-service-name {
+      font-weight: 600;
+      font-size: 1.05rem;
+      color: var(--text-primary);
+    }
+
+    .other-service-number {
+      font-weight: 800;
+      font-size: 1.35rem;
+      color: var(--accent-success);
+    }
+
+    /* Footer: Running text */
+    .footer-bar {
+      height: 60px;
+      background: rgba(15, 23, 42, 0.8);
+      border-top: 1px solid var(--border-glass);
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .running-text-container {
+      width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .running-text {
+      display: inline-block;
+      padding-left: 100%;
+      animation: marquee 25s linear infinite;
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+    }
+
+    @keyframes marquee {
+      0% { transform: translate(0, 0); }
+      100% { transform: translate(-100%, 0); }
+    }
+
+    /* Animation on call */
+    .scale-up {
+      transform: scale(1.15);
+      color: #fff !important;
+      text-shadow: 0 0 60px rgba(245, 158, 11, 0.8) !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- MAIN AREA -->
+  <div class="content-area">
+    <!-- LEFT PANEL: Active Call Display -->
+    <div class="glass-panel main-call-panel" id="main-display-panel">
+      <div class="main-call-label">Nomor Antrian</div>
+      <div class="main-call-number" id="lbl-call-number">---</div>
+      <div class="main-call-desk-label" id="lbl-desk-label">Silakan Menuju</div>
+      <div class="main-call-desk" id="lbl-call-desk">-</div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="right-sidebar">
+      <!-- High-tech Graphic/Visualization (100% Offline) -->
+      <div class="glass-panel media-card">
+        <canvas id="visualizer-canvas"></canvas>
+        <div class="media-card-content">
+          <div class="media-card-title">SimpleAntrian</div>
+          <div class="media-card-text">
+            Budayakan antri demi kenyamanan bersama. <br>
+            Silakan siapkan tiket Anda dan perhatikan panggilan layar.
+          </div>
+        </div>
+      </div>
+
+      <!-- Other Active Services List -->
+      <div class="glass-panel other-services-card">
+        <div class="sidebar-title">Daftar Antrian Aktif</div>
+        <div class="other-services-list" id="lst-other-services">
+          <!-- JS-populated -->
+          <div style="text-align: center; color: var(--text-muted); margin-top: 20px;">Menunggu data...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER RUNNING TEXT -->
+  <footer class="footer-bar">
+    <div class="running-text-container">
+      <div class="running-text" id="running-text-content">
+        Selamat Datang di Layanan Kami. Budayakan Mengantri dengan Tertib demi Kenyamanan Bersama. Terima kasih atas kerja sama Anda.
+      </div>
+    </div>
+  </footer>
+
+  <script src="display.js"></script>
+</body>
+</html>
