@@ -63,7 +63,20 @@ function setStatus(status, progress = 0, message = '') {
 // Helper to download file
 function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
+    // Delete target file if it already exists before starting download to prevent conflicts
+    if (fs.existsSync(dest)) {
+      try { fs.unlinkSync(dest); } catch (_) {}
+    }
+
     const file = fs.createWriteStream(dest);
+    
+    const cleanupAndReject = (err) => {
+      file.end(() => {
+        try { fs.unlinkSync(dest); } catch (_) {}
+        reject(err);
+      });
+    };
+
     const request = https.get(url, (response) => {
       if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
         // Handle redirect (resolving relative paths against the original url)
@@ -78,8 +91,9 @@ function downloadFile(url, dest) {
         });
         return;
       }
+      
       if (response.statusCode !== 200) {
-        reject(new Error(`Failed to download: Status Code ${response.statusCode}`));
+        cleanupAndReject(new Error(`Failed to download: Status Code ${response.statusCode}`));
         return;
       }
 
@@ -103,8 +117,7 @@ function downloadFile(url, dest) {
     });
 
     request.on('error', (err) => {
-      fs.unlink(dest, () => {});
-      reject(err);
+      cleanupAndReject(err);
     });
   });
 }
@@ -130,6 +143,14 @@ function extractArchive(archivePath, destDir) {
   });
 }
 
+function fileExistsAndNotEmpty(filePath) {
+  try {
+    return fs.existsSync(filePath) && fs.statSync(filePath).size > 0;
+  } catch (_) {
+    return false;
+  }
+}
+
 // Initialize TTS Engine (Download binaries and models if missing)
 async function initTtsEngine(callback) {
   if (callback) statusCallback = callback;
@@ -142,7 +163,7 @@ async function initTtsEngine(callback) {
 
   try {
     const binaryPath = getBinaryPath();
-    const binaryExists = fs.existsSync(binaryPath);
+    const binaryExists = fileExistsAndNotEmpty(binaryPath);
 
     // 1. Download Piper Binary
     if (!binaryExists) {
@@ -170,17 +191,17 @@ async function initTtsEngine(callback) {
       }
     }
 
-    // 2. Download Models
+    // 2. Download Models (re-download if empty/corrupted)
     for (const lang of Object.keys(MODELS)) {
       const m = MODELS[lang];
       const modelPath = path.join(piperDir, m.file);
       const configPath = path.join(piperDir, m.file + '.json');
 
-      if (!fs.existsSync(modelPath)) {
+      if (!fileExistsAndNotEmpty(modelPath)) {
         setStatus(`downloading_model_${lang}`, 0, `Downloading ${lang.toUpperCase()} voice model...`);
         await downloadFile(m.onnx, modelPath);
       }
-      if (!fs.existsSync(configPath)) {
+      if (!fileExistsAndNotEmpty(configPath)) {
         setStatus(`downloading_config_${lang}`, 0, `Downloading ${lang.toUpperCase()} voice config...`);
         await downloadFile(m.json, configPath);
       }
@@ -251,7 +272,7 @@ async function generatePhraseIfNeeded(text, lang) {
   const filename = getPhraseFilename(text, lang);
   const targetPath = path.join(cacheDir, filename);
 
-  if (fs.existsSync(targetPath)) {
+  if (fileExistsAndNotEmpty(targetPath)) {
     return filename; // Already cached
   }
 
@@ -291,19 +312,19 @@ async function preGenerateVocab() {
     for (const char of alphabet) {
       // ID Letter
       const idPath = path.join(cacheDir, `id_letter_${char}.wav`);
-      if (!fs.existsSync(idPath)) {
+      if (!fileExistsAndNotEmpty(idPath)) {
         await generateWav(`Antrian ${idLetters[char]}`, 'id', idPath);
       }
       
       // EN Letter
       const enPath = path.join(cacheDir, `en_letter_${char}.wav`);
-      if (!fs.existsSync(enPath)) {
+      if (!fileExistsAndNotEmpty(enPath)) {
         await generateWav(`Queue ${char}`, 'en', enPath);
       }
       
       // ZH Letter
       const zhPath = path.join(cacheDir, `zh_letter_${char}.wav`);
-      if (!fs.existsSync(zhPath)) {
+      if (!fileExistsAndNotEmpty(zhPath)) {
         await generateWav(`排队号码 ${zhLetters[char]}`, 'zh', zhPath);
       }
     }
@@ -319,7 +340,7 @@ async function preGenerateVocab() {
 
     for (const key of Object.keys(idNumbers)) {
       const targetPath = path.join(cacheDir, `id_${key}.wav`);
-      if (!fs.existsSync(targetPath)) {
+      if (!fileExistsAndNotEmpty(targetPath)) {
         await generateWav(idNumbers[key], 'id', targetPath);
       }
     }
@@ -337,7 +358,7 @@ async function preGenerateVocab() {
 
     for (const key of Object.keys(enNumbers)) {
       const targetPath = path.join(cacheDir, `en_${key}.wav`);
-      if (!fs.existsSync(targetPath)) {
+      if (!fileExistsAndNotEmpty(targetPath)) {
         await generateWav(enNumbers[key], 'en', targetPath);
       }
     }
@@ -351,7 +372,7 @@ async function preGenerateVocab() {
 
     for (const key of Object.keys(zhNumbers)) {
       const targetPath = path.join(cacheDir, `zh_${key}.wav`);
-      if (!fs.existsSync(targetPath)) {
+      if (!fileExistsAndNotEmpty(targetPath)) {
         await generateWav(zhNumbers[key], 'zh', targetPath);
       }
     }
@@ -371,7 +392,7 @@ async function preGenerateVocab() {
 
     for (const w of staticWords) {
       const targetPath = path.join(cacheDir, `${w.key}.wav`);
-      if (!fs.existsSync(targetPath)) {
+      if (!fileExistsAndNotEmpty(targetPath)) {
         await generateWav(w.text, w.lang, targetPath);
       }
     }

@@ -560,10 +560,27 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber) {
   
   const files = [];
 
-  const getDeskWordFile = (word, lang) => {
+  const getDeskWordFile = async (word, lang) => {
+    const cleanWord = word.trim().toLowerCase();
+    
+    // Map standard words directly to static vocabulary files to avoid redundant TTS generation
+    if (lang === 'id' && cleanWord === 'loket') return 'id_loket.wav';
+    if (lang === 'en' && cleanWord === 'counter') return 'en_counter.wav';
+    if (lang === 'zh' && cleanWord === '柜台') return 'zh_counter.wav';
+    
+    // Custom phrase generation
     const crypto = require('crypto');
-    const hash = crypto.createHash('md5').update(word.toLowerCase()).digest('hex');
-    return `${lang}_phrase_${hash}.wav`;
+    const hash = crypto.createHash('md5').update(cleanWord).digest('hex');
+    const filename = `${lang}_phrase_${hash}.wav`;
+    
+    try {
+      const ttsGenerator = require('./tts-generator');
+      await ttsGenerator.generatePhraseIfNeeded(word, lang);
+    } catch (err) {
+      console.error(`[WebSocket Server] Dynamic TTS phrase generation failed for "${word}" (${lang}):`, err.message);
+    }
+    
+    return filename;
   };
 
   // 1. Indonesian
@@ -573,7 +590,7 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber) {
   idNumTokens.forEach(t => files.push(`id_${t}.wav`));
   files.push('id_silakan_menuju.wav');
   if (deskWord) {
-    files.push(getDeskWordFile(deskWord, 'id'));
+    files.push(await getDeskWordFile(deskWord, 'id'));
   } else {
     files.push('id_loket.wav');
   }
@@ -590,7 +607,7 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber) {
   files.push('en_please_proceed_to.wav');
   if (deskWord) {
     const enWord = deskWord.replace(/loket/i, 'counter');
-    files.push(getDeskWordFile(enWord, 'en'));
+    files.push(await getDeskWordFile(enWord, 'en'));
   } else {
     files.push('en_counter.wav');
   }
@@ -610,7 +627,7 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber) {
       .replace(/loket/i, '柜台')
       .replace(/customer\s*service/i, '客户服务')
       .replace(/teller/i, '出纳柜台');
-    files.push(getDeskWordFile(zhWord, 'zh'));
+    files.push(await getDeskWordFile(zhWord, 'zh'));
   } else {
     files.push('zh_counter.wav');
   }
