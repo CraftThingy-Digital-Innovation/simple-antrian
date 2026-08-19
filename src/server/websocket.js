@@ -487,7 +487,7 @@ async function handleClientAction(action, ws) {
 async function triggerWhatsAppQueueReminder(serviceId, currentNumber) {
   const targetSeq = currentNumber + 3;
   // Cari apakah ada antrian waiting dengan nomor sequence ini untuk hari ini
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('sv-SE');
   const dbModule = require('./db');
   
   const targetTicket = await dbModule.searchTickets('', 'waiting', serviceId, today);

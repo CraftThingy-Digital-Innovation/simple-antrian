@@ -169,9 +169,9 @@ async function resetAllQueues() {
 
 // Dapatkan tiket hari ini / tanggal tertentu
 function getTickets(dateStr = null) {
-  const filterDate = dateStr || new Date().toISOString().split('T')[0];
+  const filterDate = dateStr || new Date().toLocaleDateString('sv-SE');
   return all(
-    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE date(t.created_at) = date(?) ORDER BY t.created_at ASC",
+    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE date(t.created_at, 'localtime') = date(?) ORDER BY t.created_at ASC",
     [filterDate]
   );
 }
@@ -179,14 +179,14 @@ function getTickets(dateStr = null) {
 // Dapatkan tiket waiting
 function getWaitingTickets() {
   return all(
-    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.status = 'waiting' ORDER BY t.number_sequence ASC"
+    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.status = 'waiting' AND date(t.created_at, 'localtime') = date('now', 'localtime') ORDER BY t.number_sequence ASC"
   );
 }
 
 // Dapatkan tiket yang dipanggil saat ini
 function getCallingTickets() {
   return all(
-    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.status = 'calling' ORDER BY t.called_at DESC"
+    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.status = 'calling' AND date(t.created_at, 'localtime') = date('now', 'localtime') ORDER BY t.called_at DESC"
   );
 }
 
@@ -196,9 +196,9 @@ async function createTicket(serviceId, name, phone) {
   if (!service) throw new Error("Service not found");
 
   // Dapatkan sequence terakhir untuk hari ini
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('sv-SE');
   const lastTicket = await get(
-    "SELECT MAX(number_sequence) as max_seq FROM tickets WHERE service_id = ? AND date(created_at) = date(?)",
+    "SELECT MAX(number_sequence) as max_seq FROM tickets WHERE service_id = ? AND date(created_at, 'localtime') = date(?)",
     [serviceId, today]
   );
 
@@ -337,25 +337,25 @@ async function saveSetting(key, value) {
 // ==================== STATISTIK ====================
 
 async function getDailyStats(dateStr = null) {
-  const dateFilter = dateStr || new Date().toISOString().split('T')[0];
+  const dateFilter = dateStr || new Date().toLocaleDateString('sv-SE');
 
-  const total = await get("SELECT COUNT(*) as count FROM tickets WHERE date(created_at) = date(?)", [dateFilter]);
-  const completed = await get("SELECT COUNT(*) as count FROM tickets WHERE date(created_at) = date(?) AND status = 'completed'", [dateFilter]);
-  const skipped = await get("SELECT COUNT(*) as count FROM tickets WHERE date(created_at) = date(?) AND status = 'skipped'", [dateFilter]);
-  const waiting = await get("SELECT COUNT(*) as count FROM tickets WHERE date(created_at) = date(?) AND status = 'waiting'", [dateFilter]);
+  const total = await get("SELECT COUNT(*) as count FROM tickets WHERE date(created_at, 'localtime') = date(?)", [dateFilter]);
+  const completed = await get("SELECT COUNT(*) as count FROM tickets WHERE date(created_at, 'localtime') = date(?) AND status = 'completed'", [dateFilter]);
+  const skipped = await get("SELECT COUNT(*) as count FROM tickets WHERE date(created_at, 'localtime') = date(?) AND status = 'skipped'", [dateFilter]);
+  const waiting = await get("SELECT COUNT(*) as count FROM tickets WHERE date(created_at, 'localtime') = date(?) AND status = 'waiting'", [dateFilter]);
 
   // Rata-rata waktu tunggu (dari created_at ke called_at dalam detik)
   const avgWait = await get(`
     SELECT AVG(strftime('%s', called_at) - strftime('%s', created_at)) as avg_wait 
     FROM tickets 
-    WHERE date(created_at) = date(?) AND called_at IS NOT NULL
+    WHERE date(created_at, 'localtime') = date(?) AND called_at IS NOT NULL
   `, [dateFilter]);
 
   // Rata-rata waktu pelayanan (dari called_at ke completed_at dalam detik)
   const avgService = await get(`
     SELECT AVG(strftime('%s', completed_at) - strftime('%s', called_at)) as avg_serve 
     FROM tickets 
-    WHERE date(created_at) = date(?) AND status = 'completed' AND called_at IS NOT NULL
+    WHERE date(created_at, 'localtime') = date(?) AND status = 'completed' AND called_at IS NOT NULL
   `, [dateFilter]);
 
   // Statistik per layanan
@@ -369,15 +369,15 @@ async function getDailyStats(dateStr = null) {
       SUM(CASE WHEN t.status = 'skipped' THEN 1 ELSE 0 END) as skipped,
       SUM(CASE WHEN t.status = 'waiting' THEN 1 ELSE 0 END) as waiting
     FROM services s
-    LEFT JOIN tickets t ON s.id = t.service_id AND date(t.created_at) = date(?)
+    LEFT JOIN tickets t ON s.id = t.service_id AND date(t.created_at, 'localtime') = date(?)
     GROUP BY s.id
   `, [dateFilter]);
 
   // Statistik per jam untuk chart
   const hourlyStats = await all(`
-    SELECT strftime('%H', created_at) as hour, COUNT(*) as count 
+    SELECT strftime('%H', created_at, 'localtime') as hour, COUNT(*) as count 
     FROM tickets 
-    WHERE date(created_at) = date(?) 
+    WHERE date(created_at, 'localtime') = date(?) 
     GROUP BY hour 
     ORDER BY hour ASC
   `, [dateFilter]);

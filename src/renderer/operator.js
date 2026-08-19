@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
 
   // Load awal tab statistik dengan tanggal hari ini
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('sv-SE');
   document.getElementById('stats-date').value = today;
   document.getElementById('search-date').value = today;
   loadStats(today);
@@ -629,12 +629,12 @@ function renderQueueState(state) {
   }
 
   services.forEach(srv => {
-    // Cari apakah ada tiket sedang dipanggil untuk layanan ini
-    const activeCall = callingTickets.find(t => t.service_id === srv.id);
-    const activeNumber = activeCall ? activeCall.ticket_number : (srv.prefix + String(srv.current_number).padStart(3, '0'));
-    
     // Ambil default nomor loket dari memori lokal
     const currentDesk = localDeskSettings[srv.id] || 'Loket 1';
+
+    // Cari apakah ada tiket sedang dipanggil untuk layanan dan loket ini
+    const activeCall = callingTickets.find(t => t.service_id === srv.id && t.desk_number === currentDesk);
+    const activeNumber = activeCall ? activeCall.ticket_number : (srv.prefix + String(srv.current_number).padStart(3, '0'));
 
     const card = document.createElement('div');
     card.className = `glass-panel service-calling-card animate-slide-in ${activeCall ? 'animate-call-blink' : ''}`;
@@ -675,6 +675,7 @@ function renderQueueState(state) {
     });
     deskInput.addEventListener('change', () => {
       sendAction('SYNC_DESK_NAMES', { deskNames: Object.values(localDeskSettings) });
+      sendAction('GET_STATE'); // Memicu re-fetch agar kartu antrian aktif loket baru langsung terupdate
     });
   });
 
