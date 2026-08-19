@@ -378,6 +378,7 @@ function renderTtsStatus(statusInfo) {
   
   if (status === 'ready' || status === 'error') {
     if (status === 'ready') {
+      banner.style.display = 'flex';
       document.getElementById('tts-status-icon').innerText = '✅';
       document.getElementById('tts-status-title').innerText = 'Layanan Suara Offline Siap';
       document.getElementById('tts-status-desc').innerText = 'Model suara offline (TTS) berhasil dimuat.';

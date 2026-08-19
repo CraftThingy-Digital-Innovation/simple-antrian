@@ -19,6 +19,7 @@ if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir);
 let statusCallback = null;
 let isInitializing = false;
 let isReady = false;
+let lastStatus = { status: 'idle', progress: 0, message: 'Not started.' };
 
 // Config URLs
 const BINARY_URLS = {
@@ -55,8 +56,9 @@ function getBinaryPath() {
 // Set status and notify
 function setStatus(status, progress = 0, message = '') {
   console.log(`[TTS Engine] ${status} - ${progress}% - ${message}`);
+  lastStatus = { status, progress, message };
   if (statusCallback) {
-    statusCallback({ status, progress, message });
+    statusCallback(lastStatus);
   }
 }
 
@@ -249,7 +251,13 @@ function generateWav(text, lang, outputPath) {
       if (code === 0 && fs.existsSync(outputPath)) {
         resolve(outputPath);
       } else {
-        reject(new Error(`Piper exited with code ${code}`));
+        let errorMsg = `Piper exited with code ${code}`;
+        if (code === 3221225781 || code === -1073741515) {
+          errorMsg = `Piper crashed (exit code ${code}). PC Anda belum terinstal Microsoft Visual C++ Redistributable. Silakan unduh dan instal vc_redist.x64 dari situs resmi Microsoft.`;
+        } else if (code === 3221225595 || code === -1073741701) {
+          errorMsg = `Piper crashed (exit code ${code}). Kemungkinan sistem operasi Windows Anda adalah 32-bit (x86), sedangkan Piper membutuhkan Windows 64-bit (x64).`;
+        }
+        reject(new Error(errorMsg));
       }
     });
 
@@ -400,6 +408,7 @@ async function preGenerateVocab() {
     setStatus('ready', 100, 'TTS audio vocabulary generation complete.');
   } catch (err) {
     console.error('[TTS Engine] Failed pre-generating standard vocabulary:', err.message);
+    setStatus('error', 0, `Generasi audio gagal: ${err.message}. Periksa dependensi sistem.`);
   }
 }
 
@@ -409,5 +418,6 @@ module.exports = {
   getPhraseFilename,
   isReady: () => isReady,
   isInitializing: () => isInitializing,
+  getLastStatus: () => lastStatus,
   cacheDir
 };

@@ -74,6 +74,12 @@ function startWebSocketServer(port) {
     // Kirim data awal (inisialisasi state) ke client yang baru terhubung
     try {
       await sendStateToClient(ws);
+      // Kirim status TTS terkini
+      const currentTtsStatus = ttsGenerator.getLastStatus();
+      ws.send(JSON.stringify({
+        type: 'TTS_GEN_STATUS',
+        payload: currentTtsStatus
+      }));
     } catch (err) {
       console.error('Error sending initial state:', err);
     }
@@ -373,6 +379,12 @@ async function handleClientAction(action, ws) {
         broadcast({
           type: 'TTS_SETTING_UPDATE',
           payload: { enabled }
+        });
+        // Kirim status TTS engine terkini ke seluruh klien agar progress bar muncul
+        const currentTtsStatus = ttsGenerator.getLastStatus();
+        broadcast({
+          type: 'TTS_GEN_STATUS',
+          payload: currentTtsStatus
         });
         ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Pengaturan Suara (TTS) berhasil disimpan!' } }));
         break;
