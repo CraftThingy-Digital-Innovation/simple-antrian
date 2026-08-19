@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pilih Mode - SimpleAntrian</title>
+  <link rel="stylesheet" href="index.css">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .select-mode-container {
+      max-width: 850px;
+      width: 100%;
+      text-align: center;
+      padding: 40px;
+      animation: fadeIn 0.5s ease-out;
+    }
+    
+    .select-mode-header {
+      margin-bottom: 40px;
+    }
+    
+    .select-mode-header h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: var(--accent-primary-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+    }
+    
+    .select-mode-header p {
+      color: var(--text-secondary);
+      font-size: 1.1rem;
+    }
+    
+    .modes-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-bottom: 30px;
+    }
+    
+    .mode-card {
+      padding: 40px 30px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      transform: translateY(0);
+      transition: all var(--transition-normal);
+      border: 1px solid var(--border-glass);
+    }
+    
+    .mode-card:hover {
+      transform: translateY(-8px);
+      background: var(--bg-glass-hover);
+      border-color: rgba(99, 102, 241, 0.4);
+      box-shadow: 0 15px 40px rgba(99, 102, 241, 0.15);
+    }
+    
+    .mode-card-icon {
+      font-size: 3.5rem;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 50%;
+      transition: transform var(--transition-fast);
+    }
+    
+    .mode-card:hover .mode-card-icon {
+      transform: scale(1.1);
+    }
+    
+    .mode-card-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    
+    .mode-card-desc {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      flex-grow: 1;
+    }
+    
+    .btn-select {
+      width: 100%;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      margin-top: 15px;
+    }
+    
+    .mode-server .btn-select {
+      background: var(--accent-primary-gradient);
+      color: white;
+    }
+    
+    .mode-server:hover .btn-select {
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+    }
+    
+    .mode-client .btn-select {
+      background: var(--accent-success-gradient);
+      color: white;
+    }
+    
+    .mode-client:hover .btn-select {
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div class="glass-panel select-mode-container">
+    <div class="select-mode-header">
+      <h1>SimpleAntrian</h1>
+      <p>Pilih mode operasional untuk memulai aplikasi antrian</p>
+    </div>
+    
+    <div class="modes-grid">
+      <!-- SERVER CARD -->
+      <div class="glass-panel mode-card mode-server" onclick="chooseMode('server')">
+        <div class="mode-card-icon">🖥️</div>
+        <div class="mode-card-title">Server Mode</div>
+        <div class="mode-card-desc">
+          Komputer ini bertindak sebagai **pusat data**. Menyimpan database lokal (SQLite), menjalankan WebSocket server, memproses nomor antrian, dan menghubungkan integrasi WhatsApp. Layar display pelanggan lain akan terhubung ke komputer ini.
+        </div>
+        <button class="btn-select">Jalankan Sebagai Server</button>
+      </div>
+      
+      <!-- CLIENT CARD -->
+      <div class="glass-panel mode-card mode-client" onclick="chooseMode('client')">
+        <div class="mode-card-icon">💻</div>
+        <div class="mode-card-title">Client Mode</div>
+        <div class="mode-card-desc">
+          Komputer ini bertindak sebagai **operator pembantu atau display saja**. Komputer ini tidak menyimpan database melainkan terhubung secara nirkabel ke komputer Server di jaringan lokal yang sama untuk sinkronisasi antrian.
+        </div>
+        <button class="btn-select">Jalankan Sebagai Client</button>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    async function chooseMode(mode) {
+      const serverName = mode === 'server' ? 'Server Antrian' : '';
+      const port = '8080';
+      
+      try {
+        const res = await window.api.saveModeSettings({ mode, serverName, port });
+        if (res.success) {
+          window.location.href = 'operator.html';
+        }
+      } catch (err) {
+        alert('Gagal menyimpan mode operasional: ' + err.message);
+      }
+    }
+  </script>
+</body>
+</html>

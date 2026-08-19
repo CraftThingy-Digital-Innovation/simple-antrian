@@ -5,8 +5,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "pack": "electron-packager . SimpleAntrian --platform=win32 --arch=x64 --out=dist --overwrite --ignore=\"^/(dist|data|\\.git)($|/)\"",
-    "pack-linux": "electron-packager . SimpleAntrian --platform=linux --arch=x64 --out=dist --overwrite --ignore=\"^/(dist|data|\\.git)($|/)\""
+    "pack": "electron-packager . SimpleAntrian --platform=win32 --arch=x64 --out=dist --overwrite --ignore=\"^/(dist|data|\\.git)($|/)\" && node post-build.js win32",
+    "pack-linux": "electron-packager . SimpleAntrian --platform=linux --arch=x64 --out=dist --overwrite --ignore=\"^/(dist|data|\\.git)($|/)\" && node post-build.js linux"
   },
   "keywords": [
     "antrian",

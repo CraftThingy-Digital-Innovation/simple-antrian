@@ -73,7 +73,7 @@ app.whenReady().then(async () => {
     currentMode = 'server';
     console.log("[Mode Overridden] Dipaksa berjalan sebagai SERVER karena parameter command line.");
   } else {
-    currentMode = settings.app_mode || 'server';
+    currentMode = settings.app_mode || 'select-mode';
   }
 
   // 3. Jalankan service sesuai mode
@@ -115,7 +115,11 @@ function createMainWindow() {
     title: "SimpleAntrian - Operator Panel"
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'src/renderer/operator.html'));
+  if (currentMode === 'select-mode') {
+    mainWindow.loadFile(path.join(__dirname, 'src/renderer/select-mode.html'));
+  } else {
+    mainWindow.loadFile(path.join(__dirname, 'src/renderer/operator.html'));
+  }
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -136,6 +140,15 @@ async function startServicesBasedOnMode(settings) {
   const wsPort = parseInt(settings.port || '8080');
   const serverUuid = settings.server_uuid;
   const serverName = settings.server_name || 'Server Antrian';
+
+  if (currentMode === 'select-mode') {
+    // Mode pemilihan: Pastikan semua service mati
+    websocket.stopWebSocketServer();
+    discovery.stopBroadcaster();
+    discovery.stopDiscoveryListener();
+    whatsapp.stopWhatsAppClient();
+    return;
+  }
 
   if (currentMode === 'server') {
     // Stop Client discovery
