@@ -311,9 +311,8 @@ async function handleClientAction(action, ws) {
 
       case 'COMPLETE': {
         const { ticketId } = payload;
-        // Ambil info tiket sebelum diselesaikan untuk tahu layanan dan loketnya
-        const ticket = await db.get("SELECT * FROM tickets WHERE id = ?", [ticketId]);
-        await db.completeTicket(ticketId);
+        // Ambil info tiket sebelum diselesaikan untuk tahu layanan dan loketnya (completeTicket mengembalikan data tiket)
+        const ticket = await db.completeTicket(ticketId);
 
         if (ticket) {
           const { service_id, desk_number } = ticket;
