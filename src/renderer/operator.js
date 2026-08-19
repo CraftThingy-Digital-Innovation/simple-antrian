@@ -7,6 +7,7 @@ let servicesList = [];
 let localDeskSettings = {}; // Menyimpan nomor loket per layanan, misal: { teller: 'Loket 1' }
 let currentTxId = '';
 let currentLogoBase64 = '';
+let ttsBannerTimeout = null;
 
 function generateTxId() {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -369,10 +370,15 @@ function handleWebSocketMessage(message) {
   }
 }
 
-// Render status download/generasi model suara offline TTS
 function renderTtsStatus(statusInfo) {
   const banner = document.getElementById('tts-status-banner');
   if (!banner) return;
+
+  // Hapus timeout penyembunyian banner sebelumnya jika ada status baru yang masuk
+  if (ttsBannerTimeout) {
+    clearTimeout(ttsBannerTimeout);
+    ttsBannerTimeout = null;
+  }
 
   const { status, progress, message } = statusInfo;
   
@@ -384,8 +390,10 @@ function renderTtsStatus(statusInfo) {
       document.getElementById('tts-status-desc').innerText = 'Model suara offline (TTS) berhasil dimuat.';
       document.getElementById('tts-status-progress').style.width = '100%';
       document.getElementById('tts-status-percent').innerText = '100%';
-      setTimeout(() => {
+      
+      ttsBannerTimeout = setTimeout(() => {
         banner.style.display = 'none';
+        ttsBannerTimeout = null;
       }, 5000);
     } else {
       document.getElementById('tts-status-icon').innerText = '❌';
