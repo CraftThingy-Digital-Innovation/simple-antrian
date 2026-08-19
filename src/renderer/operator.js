@@ -65,6 +65,20 @@ async function initSystemInfo() {
     currentMode = info.mode;
     serverPort = info.port || 8080;
     
+    // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
+    document.getElementById('lbl-app-version').innerText = `v${info.appVersion}`;
+    window.api.onAppUpdateAvailable((updateInfo) => {
+      const banner = document.getElementById('app-update-banner');
+      const lblNew = document.getElementById('lbl-new-app-version');
+      const btnDownload = document.getElementById('btn-download-update');
+      
+      lblNew.innerText = `v${updateInfo.latest}`;
+      banner.style.display = 'block';
+      btnDownload.onclick = () => {
+        window.open(updateInfo.url, '_blank');
+      };
+    });
+    
     // Tampilkan mode di UI
     const badgeMode = document.getElementById('badge-mode');
     badgeMode.innerText = currentMode === 'server' ? 'Server Mode' : 'Client Mode';
@@ -627,6 +641,23 @@ function setupEventListeners() {
     if (confirmReset) {
       sendAction('RESET_ALL');
       showToast('Seluruh data antrian hari ini telah di-reset.', 'success');
+    }
+  });
+
+  // Cek Pembaruan Aplikasi dari GitHub
+  const btnCheckAppUpdate = document.getElementById('btn-check-app-update');
+  btnCheckAppUpdate.addEventListener('click', async () => {
+    showToast('Mengecek pembaruan aplikasi di GitHub...', 'info');
+    btnCheckAppUpdate.disabled = true;
+    btnCheckAppUpdate.innerText = 'Mengecek...';
+    try {
+      await window.api.checkAppUpdates();
+      showToast('Pengecekan pembaruan aplikasi selesai.', 'success');
+    } catch (err) {
+      showToast('Gagal mengecek pembaruan: ' + err.message, 'error');
+    } finally {
+      btnCheckAppUpdate.disabled = false;
+      btnCheckAppUpdate.innerText = '🔄 Cek Pembaruan Aplikasi';
     }
   });
 }

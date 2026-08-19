@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld('api', {
   closeDisplayWindow: () => ipcRenderer.invoke('close-display-window'),
   isDisplayWindowOpen: () => ipcRenderer.invoke('is-display-window-open'),
   performWaUpdate: () => ipcRenderer.invoke('wa-perform-update'),
+  checkAppUpdates: () => ipcRenderer.invoke('check-app-updates'),
+  onAppUpdateAvailable: (callback) => {
+    ipcRenderer.removeAllListeners('app-update-available');
+    ipcRenderer.on('app-update-available', (event, info) => callback(info));
+  },
 
   // UDP Discovery (Client Mode)
   onServersUpdated: (callback) => {

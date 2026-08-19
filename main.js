@@ -70,6 +70,8 @@ function createMainWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+    // Cek pembaruan aplikasi dari GitHub secara otomatis pada startup
+    setTimeout(checkAppUpdates, 3000);
   });
 
   mainWindow.on('closed', () => {
@@ -120,12 +122,14 @@ async function startServicesBasedOnMode(settings) {
 // Info Sistem & Mode
 ipcMain.handle('get-system-info', async () => {
   const settings = await db.getSettings();
+  const appVersion = require('./package.json').version;
   return {
     mode: currentMode,
     serverUuid: settings.server_uuid,
     serverName: settings.server_name,
     port: settings.port,
-    localIp: discovery.getLocalIp()
+    localIp: discovery.getLocalIp(),
+    appVersion: appVersion
   };
 });
 
@@ -277,3 +281,53 @@ ipcMain.handle('import-data', async () => {
 });
 
 ipcMain.handle('wa-perform-update', () => whatsapp.performLibraryUpdate());
+
+ipcMain.handle('check-app-updates', async () => {
+  checkAppUpdates();
+  return { success: true };
+});
+
+// Mengecek pembaruan aplikasi dari repositori GitHub organisasi craftthingy
+function checkAppUpdates() {
+  const https = require('https');
+  const options = {
+    hostname: 'api.github.com',
+    path: '/repos/craftthingy/simple-antrian/releases/latest',
+    method: 'GET',
+    headers: {
+      'User-Agent': 'simple-antrian-app'
+    }
+  };
+
+  https.get(options, (res) => {
+    let data = '';
+    res.on('data', (chunk) => {
+      data += chunk;
+    });
+
+    res.on('end', () => {
+      if (res.statusCode !== 200) return;
+      try {
+        const release = JSON.parse(data);
+        const latestVersion = release.tag_name.replace(/^v/, '');
+        const appVersion = require('./package.json').version;
+
+        if (latestVersion !== appVersion) {
+          console.log(`[App Update] Pembaruan SimpleAntrian tersedia: v${appVersion} -> v${latestVersion}`);
+          if (mainWindow) {
+            mainWindow.webContents.send('app-update-available', {
+              current: appVersion,
+              latest: latestVersion,
+              url: release.html_url,
+              body: release.body
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Gagal parsing data update github:', err);
+      }
+    });
+  }).on('error', (err) => {
+    console.warn('[App Update] Gagal mengecek update GitHub:', err.message);
+  });
+}

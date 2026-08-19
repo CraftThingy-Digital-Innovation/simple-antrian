@@ -718,6 +718,35 @@
             </button>
           </div>
         </section>
+
+        <!-- Tentang Aplikasi -->
+        <section class="glass-panel config-section">
+          <h3 class="config-title">Tentang Aplikasi</h3>
+          <div style="display: flex; flex-direction: column; gap: 15px; font-size: 0.9rem; line-height: 1.5;">
+            <div>Dibuat Oleh: <strong>CraftThingy Digital Innovation</strong></div>
+            <div>Nama Pembuat: <strong>Alif Nurhidayat</strong></div>
+            <div>Versi Aplikasi: <strong id="lbl-app-version">v1.0.0</strong></div>
+            
+            <!-- Banner Pembaruan GitHub -->
+            <div id="app-update-banner" style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid var(--accent-warning); padding: 12px; border-radius: 8px;">
+              <div style="color: var(--accent-warning); font-weight: 700; margin-bottom: 6px;">Pembaruan Tersedia!</div>
+              <div style="font-size: 0.8rem; margin-bottom: 10px;">Versi <span id="lbl-new-app-version">v...</span> telah dirilis. Silakan unduh versi terbaru di GitHub.</div>
+              <button class="btn btn-warning" id="btn-download-update" style="padding: 6px 12px; font-size: 0.8rem;">
+                📥 Unduh di GitHub
+              </button>
+            </div>
+
+            <div style="border-top: 1px solid var(--border-glass); padding-top: 15px; display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-weight: 600; color: var(--text-secondary);">Kontak Support:</span>
+              <div>📧 Email: <a href="mailto:alifnurhidayatwork@gmail.com" style="color: #818cf8; text-decoration: none;">alifnurhidayatwork@gmail.com</a></div>
+              <div>📞 No. HP: <a href="tel:081368898090" style="color: #818cf8; text-decoration: none;">081368898090</a></div>
+            </div>
+
+            <button class="btn btn-secondary" id="btn-check-app-update" style="padding: 8px 16px; font-size: 0.85rem; align-self: flex-start; margin-top: 10px;">
+              🔄 Cek Pembaruan Aplikasi
+            </button>
+          </div>
+        </section>
       </div>
     </div>
 

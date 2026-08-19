@@ -1,7 +1,7 @@
 {
   "name": "simple-antrian",
   "version": "1.0.0",
-  "description": "Aplikasi Antrian Standalone dengan Dual Screen dan Client-Server Auto-Discovery",
+  "description": "Aplikasi Antrian Standalone Lintas Platform oleh CraftThingy Digital Innovation",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -15,7 +15,12 @@
     "standalone",
     "dual-screen"
   ],
-  "author": "Antigravity",
+  "author": {
+    "name": "Alif Nurhidayat (CraftThingy Digital Innovation)",
+    "email": "alifnurhidayatwork@gmail.com",
+    "phone": "081368898090"
+  },
+  "homepage": "https://github.com/craftthingy/simple-antrian",
   "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc14",
