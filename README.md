@@ -6,7 +6,7 @@ Aplikasi ini dibuat oleh **Alif Nurhidayat** di bawah naungan **CraftThingy Digi
 
 ---
 
-## 🌟 Fitur Utama
+### 🌟 Fitur Utama
 
 1. **Mode Proyeksi Layar Kedua (Dual Screen Mode)**:
    Aplikasi mendeteksi jumlah monitor terhubung. Jika monitor tambahan (extended monitor) terdeteksi, jendela display antrian pelanggan akan otomatis diproyeksikan secara *fullscreen* tanpa bingkai di monitor tersebut, sedangkan panel operator tetap terbuka di monitor utama.
@@ -16,31 +16,44 @@ Aplikasi ini dibuat oleh **Alif Nurhidayat** di bawah naungan **CraftThingy Digi
    * **Bebas Bentrok**: Setiap server menghasilkan UUID unik saat startup pertama kali. Sistem mendukung operasional beberapa pasang server dan client sekaligus di satu jaringan lokal (misal: 3 server dan 3 client) tanpa terjadi bentrokan data.
    * **Sinkronisasi WebSocket**: Sinkronisasi data tiket antrian dan panggilan loket berjalan secara instan (*real-time*) di seluruh client terhubung.
 
-3. **WhatsApp Lokal Terintegrasi (Tanpa Pihak Ketiga & Gratis)**:
+3. **Panggilan Suara Loket Multi-Bahasa (Indonesian, English, Chinese)**:
+   Sistem panggilan suara antrian (Text-To-Speech) memanggil nomor antrian secara berurutan dalam **3 bahasa sekaligus** (Bahasa Indonesia, Inggris, dan Mandarin/China) untuk meningkatkan kenyamanan dan aksesibilitas pelanggan dari berbagai latar belakang bahasa.
+
+4. **Tombol "Selesai" Panggil Otomatis (Complete & Call Next)**:
+   Meningkatkan efisiensi kerja operator. Ketika operator mengeklik tombol **✅ Selesai** (Complete), jika masih ada antrian yang menunggu pada layanan tersebut, sistem secara otomatis akan memanggil nomor antrian berikutnya secara instan tanpa perlu operator mengeklik tombol panggil secara manual.
+
+5. **WhatsApp Lokal Terintegrasi (Pairing Code & QR Code)**:
    Aplikasi menggunakan modul **Baileys** untuk terhubung langsung ke WhatsApp Web secara lokal.
-   * **Scan QR**: Operator cukup memindai QR Code di tab Settings langsung dari HP mereka. Sesi aman disimpan secara lokal di folder `data/wa-session`.
+   * **Kode Penyandingan (Pairing Code)**: Anda kini dapat menghubungkan nomor WhatsApp hanya dengan memasukkan nomor HP pada settings. Aplikasi akan meminta kode pairing 8-digit langsung dari server WhatsApp untuk dimasukkan pada menu Tautkan Perangkat di HP Anda.
+   * **Scan QR**: Mendukung koneksi standar dengan memindai QR Code di tab Settings. Sesi aman disimpan secara lokal di folder `data/wa-session`.
    * **Auto-Update Library**: Untuk mengantisipasi perubahan protokol WhatsApp Web di masa mendatang, aplikasi secara otomatis memeriksa versi terbaru `@whiskeysockets/baileys` di NPM Registry setiap kali startup. Jika terdeteksi versi baru, aplikasi akan unduh dan pasang secara senyap (*silent update*) di latar belakang sebelum menghubungkan layanan.
    * **Notifikasi Antrian**: Mengirimkan notifikasi WA otomatis saat tiket baru dibuat, saat antrian berjarak 3 nomor lagi dari antrian aktif (pengingat bersiap), dan saat nomor antrian tersebut dipanggil ke loket.
 
-4. **Layar Kiosk Pendaftaran Mandiri (Layar Ketiga / Client Ketiga)**:
+6. **Pengelola Teks Berjalan Interaktif (Running Text Manager)**:
+   * Menampilkan running text bergantian (cycling) pada bagian bawah layar display.
+   * Admin/Operator dapat menambah, menghapus, mengubah, atau mengatur urutan tampilan teks langsung dari tab Settings.
+   * Deteksi bahasa otomatis (ID/EN/ZH) dengan label badge khusus di layar display pelanggan.
+   * Durasi marquee dihitung secara dinamis dan proporsional sesuai dengan panjang karakter teks, memastikan teks panjang terbaca sepenuhnya sebelum berganti ke teks berikutnya.
+
+7. **Layar Kiosk Pendaftaran Mandiri (Layar Ketiga / Client Ketiga)**:
    * Menyediakan antarmuka pendaftaran mandiri (self-service) bagi pelanggan. Pelanggan dapat memasukkan nama & nomor WhatsApp secara mandiri lewat layar sentuh (touchscreen) dan langsung mencetak struk antrian.
    * Mendukung mode monitor ketiga di PC Server (dibuka otomatis fullscreen tanpa frame) atau di perangkat Client terpisah (tablet/PC pendaftaran) di area depan pintu masuk yang terhubung ke server utama via WebSockets.
 
-5. **Cetak Tiket Printer Thermal & Dot Matrix**:
+8. **Cetak Tiket Printer Thermal & Dot Matrix**:
    * Layout tiket terformat secara otomatis via CSS media query `@media print` sehingga pas di kertas printer kasir/thermal 58mm/80mm maupun printer dot-matrix.
    * Mendukung cetak otomatis saat tiket dibuat di Kiosk (hanya di printer Kiosk lokal berdasarkan ID transaksi unik) serta cetak ulang (reprint) manual dari panel operator untuk rekap data.
 
-6. **Database SQLite yang Tangguh & Anti-Corrupt**:
+9. **Database SQLite yang Tangguh & Anti-Corrupt**:
    Database lokal dikonfigurasi menggunakan mode **WAL (Write-Ahead Logging)** yang menjamin integritas data yang sangat aman dari korupsi data meskipun PC mengalami mati listrik tiba-tiba atau aplikasi dimatikan secara paksa. Semua data secara otomatis langsung disimpan (*auto-save*).
 
-7. **Pencarian, Filter, & Statistik Harian**:
-   * **Pencarian**: Cari tiket berdasarkan nomor antrian, nama pelanggan, atau nomor WA. Filter berdasarkan status tiket, kategori layanan, dan tanggal operasional.
-   * **Statistik Harian**: Menghitung total antrian, tiket dilayani, dilewati, dan sedang menunggu, lengkap dengan performa rata-rata waktu tunggu serta waktu pelayanan per hari yang dipilih.
+10. **Pencarian, Filter, & Statistik Harian**:
+    * **Pencarian**: Cari tiket berdasarkan nomor antrian, nama pelanggan, atau nomor WA. Filter berdasarkan status tiket, kategori layanan, dan tanggal operasional.
+    * **Statistik Harian**: Menghitung total antrian, tiket dilayani, dilewati, dan sedang menunggu, lengkap dengan performa rata-rata waktu tunggu serta waktu pelayanan per hari yang dipilih.
 
-8. **Utilitas Backup & Restore (SQL + CSV)**:
-   Ekspor seluruh database SQLite ke file backup eksternal sekali klik sekaligus menghasilkan laporan rekapitulasi data dalam format **CSV**, serta impor database (restore) instan.
+11. **Utilitas Backup & Restore (SQL + CSV)**:
+    Ekspor seluruh database SQLite ke file backup eksternal sekali klik sekaligus menghasilkan laporan rekapitulasi data dalam format **CSV**, serta impor database (restore) instan.
 
----
+------
 
 ## 📂 Struktur Proyek
 
