@@ -539,7 +539,7 @@ function renderQueueState(state) {
       </div>
 
       <div class="calling-actions-grid">
-        <button class="btn btn-primary" onclick="callNext('${srv.id}')">
+        <button class="btn btn-primary" onclick="${activeCall ? `recall('${activeCall.id}')` : `callNext('${srv.id}')`}">
           🔔 Panggil
         </button>
         <button class="btn btn-secondary" onclick="recall('${activeCall ? activeCall.id : ''}')" ${!activeCall ? 'disabled' : ''}>
