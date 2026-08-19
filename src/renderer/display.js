@@ -314,7 +314,7 @@ async function processNextAnnouncement() {
     await delay(300);
 
     // 2. Putar Pengumuman Suara
-    await playVoice(ticketNumber, deskNumber);
+    await playVoice(ticketNumber, deskNumber, voiceFiles);
   } catch (err) {
     console.error('Announcement playback error:', err);
   }
