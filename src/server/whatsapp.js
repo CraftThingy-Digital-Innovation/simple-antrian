@@ -99,12 +99,10 @@ async function startWhatsAppClient(options = {}) {
   connectionStatus = 'connecting';
   broadcastWaStatus();
 
-  // Silent update library Baileys jika ada versi baru
-  try {
-    await checkAndPerformSilentUpdate();
-  } catch (err) {
+  // Silent update library Baileys jika ada versi baru (non-blocking)
+  checkAndPerformSilentUpdate().catch(err => {
     console.warn('[Baileys Auto-Update] Gagal update atau sedang offline:', err.message);
-  }
+  });
 
   // Load modul ES Baileys secara dinamis (ESM tidak bisa di-require())
   if (!makeWASocket) {

@@ -92,7 +92,6 @@ async function initDb() {
 
   // Isi setting default
   const defaultSettings = [
-    { key: 'app_mode', value: 'server' },
     { key: 'server_name', value: 'Server Utama' },
     { key: 'server_uuid', value: require('crypto').randomUUID() },
     { key: 'port', value: '8080' },
