@@ -21,10 +21,9 @@ let isInitializing = false;
 let isReady = false;
 
 // Config URLs
-const PIPER_VERSION = 'v1.2.0';
 const BINARY_URLS = {
-  win32: `https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_windows_amd64.zip`,
-  linux: `https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_linux_amd64.tar.gz`
+  win32: 'https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip',
+  linux: 'https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz'
 };
 
 const MODELS = {
