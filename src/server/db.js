@@ -373,6 +373,15 @@ async function getDailyStats(dateStr = null) {
     GROUP BY s.id
   `, [dateFilter]);
 
+  // Statistik per jam untuk chart
+  const hourlyStats = await all(`
+    SELECT strftime('%H', created_at) as hour, COUNT(*) as count 
+    FROM tickets 
+    WHERE date(created_at) = date(?) 
+    GROUP BY hour 
+    ORDER BY hour ASC
+  `, [dateFilter]);
+
   return {
     date: dateFilter,
     summary: {
@@ -383,7 +392,8 @@ async function getDailyStats(dateStr = null) {
       avg_wait_seconds: Math.round(avgWait.avg_wait || 0),
       avg_service_seconds: Math.round(avgService.avg_serve || 0)
     },
-    services: serviceStats
+    services: serviceStats,
+    hourly: hourlyStats
   };
 }
 

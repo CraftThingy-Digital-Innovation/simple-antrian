@@ -8,6 +8,8 @@ let localDeskSettings = {}; // Menyimpan nomor loket per layanan, misal: { telle
 let currentTxId = '';
 let currentLogoBase64 = '';
 let ttsBannerTimeout = null;
+let hourlyChartInstance = null;
+let statusChartInstance = null;
 
 function generateTxId() {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -1234,6 +1236,115 @@ async function loadStats(dateStr) {
         <td style="color: var(--accent-secondary);">${srv.skipped || 0}</td>
       `;
       tbody.appendChild(tr);
+    });
+  }
+
+  // 1. Render Hourly Line Chart
+  const hourlyCtx = document.getElementById('stats-hourly-chart');
+  if (hourlyCtx) {
+    if (hourlyChartInstance) {
+      hourlyChartInstance.destroy();
+    }
+    
+    // Map hourly stats
+    const standardHours = ['08', '09', '10', '11', '12', '13', '14', '15', '16', '17'];
+    const hourlyCounts = standardHours.map(h => {
+      const match = stats.hourly ? stats.hourly.find(x => x.hour === h) : null;
+      return match ? match.count : 0;
+    });
+
+    hourlyChartInstance = new Chart(hourlyCtx, {
+      type: 'line',
+      data: {
+        labels: standardHours.map(h => `${h}:00`),
+        datasets: [{
+          label: 'Jumlah Antrian',
+          data: hourlyCounts,
+          borderColor: '#6366f1',
+          backgroundColor: 'rgba(99, 102, 241, 0.15)',
+          fill: true,
+          tension: 0.4,
+          borderWidth: 3,
+          pointBackgroundColor: '#6366f1',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1e293b',
+            titleColor: '#ffffff',
+            bodyColor: '#f8fafc',
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.1)'
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            ticks: { color: '#94a3b8' }
+          },
+          y: {
+            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            ticks: { 
+              color: '#94a3b8',
+              stepSize: 1,
+              precision: 0
+            },
+            min: 0
+          }
+        }
+      }
+    });
+  }
+
+  // 2. Render Status Doughnut Chart
+  const statusCtx = document.getElementById('stats-status-chart');
+  if (statusCtx) {
+    if (statusChartInstance) {
+      statusChartInstance.destroy();
+    }
+
+    statusChartInstance = new Chart(statusCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Selesai', 'Dilewati', 'Menunggu'],
+        datasets: [{
+          data: [stats.summary.completed, stats.summary.skipped, stats.summary.waiting],
+          backgroundColor: ['#10b981', '#f43f5e', '#6366f1'],
+          borderWidth: 3,
+          borderColor: '#0b0f19',
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              color: '#94a3b8',
+              padding: 15,
+              font: { size: 12 }
+            }
+          },
+          tooltip: {
+            backgroundColor: '#1e293b',
+            titleColor: '#ffffff',
+            bodyColor: '#f8fafc',
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.1)'
+          }
+        },
+        cutout: '65%'
+      }
     });
   }
 }

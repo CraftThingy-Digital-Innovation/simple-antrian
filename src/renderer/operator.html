@@ -552,6 +552,21 @@
         </div>
       </div>
 
+      <!-- Chart Row -->
+      <div class="glass-panel config-section" style="margin-top: 25px; margin-bottom: 25px;">
+        <h3 class="config-title">📈 Tren Kunjungan & Kesibukan Antrian</h3>
+        <div class="grid-2" style="gap: 25px; margin-top: 15px; align-items: start;">
+          <div style="position: relative; height: 320px; width: 100%;">
+            <h4 style="margin-bottom: 10px; font-size: 0.9rem; color: var(--text-secondary); text-align: center;">Grafik Jumlah Antrian per Jam</h4>
+            <canvas id="stats-hourly-chart"></canvas>
+          </div>
+          <div style="position: relative; height: 320px; width: 100%;">
+            <h4 style="margin-bottom: 10px; font-size: 0.9rem; color: var(--text-secondary); text-align: center;">Perbandingan Status Antrian</h4>
+            <canvas id="stats-status-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
       <!-- Detail Waktu Pelayanan & Grafik Sederhana -->
       <div class="grid-2">
         <section class="glass-panel config-section">
@@ -978,6 +993,7 @@
     }
   </script>
   
+  <script src="chart.js"></script>
   <script src="operator.js"></script>
 </body>
 </html>
