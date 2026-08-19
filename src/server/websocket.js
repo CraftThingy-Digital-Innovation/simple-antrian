@@ -319,6 +319,26 @@ async function handleClientAction(action, ws) {
         break;
       }
 
+      case 'GET_SETTINGS': {
+        const settings = await db.getSettings();
+        ws.send(JSON.stringify({ type: 'SETTINGS_RESPONSE', payload: settings }));
+        break;
+      }
+
+      case 'GET_STATS': {
+        const { dateStr } = payload;
+        const stats = await db.getDailyStats(dateStr);
+        ws.send(JSON.stringify({ type: 'STATS_RESPONSE', payload: stats }));
+        break;
+      }
+
+      case 'SEARCH_TICKETS': {
+        const { query, status, serviceId, dateStr } = payload;
+        const results = await db.searchTickets(query, status, serviceId, dateStr);
+        ws.send(JSON.stringify({ type: 'SEARCH_RESPONSE', payload: results }));
+        break;
+      }
+
       default:
         console.warn('Unknown action type:', type);
     }

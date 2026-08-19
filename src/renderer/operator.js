@@ -11,6 +11,50 @@ function generateTxId() {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
+// Callbacks map untuk menampung Promise resolve dari request WebSocket (Client Mode)
+const wsRequestCallbacks = {};
+
+async function getSettingsData() {
+  if (currentMode === 'client') {
+    return new Promise((resolve) => {
+      wsRequestCallbacks['SETTINGS_RESPONSE'] = resolve;
+      sendAction('GET_SETTINGS');
+    });
+  } else {
+    return await window.api.getSettings();
+  }
+}
+
+async function getServicesData() {
+  if (currentMode === 'client') {
+    return servicesList || [];
+  } else {
+    return await window.api.getServices();
+  }
+}
+
+async function getDailyStatsData(dateStr) {
+  if (currentMode === 'client') {
+    return new Promise((resolve) => {
+      wsRequestCallbacks['STATS_RESPONSE'] = resolve;
+      sendAction('GET_STATS', { dateStr });
+    });
+  } else {
+    return await window.api.getDailyStats(dateStr);
+  }
+}
+
+async function searchTicketsData(query, status, serviceId, dateStr) {
+  if (currentMode === 'client') {
+    return new Promise((resolve) => {
+      wsRequestCallbacks['SEARCH_RESPONSE'] = resolve;
+      sendAction('SEARCH_TICKETS', { query, status, serviceId, dateStr });
+    });
+  } else {
+    return await window.api.searchTickets(query, status, serviceId, dateStr);
+  }
+}
+
 // Inisialisasi Halaman
 document.addEventListener('DOMContentLoaded', async () => {
   // Load nomor loket yang tersimpan di localStorage
@@ -264,6 +308,27 @@ function handleWebSocketMessage(message) {
       showToast(`✅ Teks berjalan berhasil disimpan & diterapkan! (${payload.count} teks)`, 'success');
       break;
       
+    case 'SETTINGS_RESPONSE':
+      if (wsRequestCallbacks['SETTINGS_RESPONSE']) {
+        wsRequestCallbacks['SETTINGS_RESPONSE'](payload);
+        delete wsRequestCallbacks['SETTINGS_RESPONSE'];
+      }
+      break;
+
+    case 'STATS_RESPONSE':
+      if (wsRequestCallbacks['STATS_RESPONSE']) {
+        wsRequestCallbacks['STATS_RESPONSE'](payload);
+        delete wsRequestCallbacks['STATS_RESPONSE'];
+      }
+      break;
+
+    case 'SEARCH_RESPONSE':
+      if (wsRequestCallbacks['SEARCH_RESPONSE']) {
+        wsRequestCallbacks['SEARCH_RESPONSE'](payload);
+        delete wsRequestCallbacks['SEARCH_RESPONSE'];
+      }
+      break;
+
     case 'ERROR':
       showToast(payload.message, 'error');
       break;
@@ -883,7 +948,7 @@ async function triggerSearch() {
   const serviceId = document.getElementById('search-service').value;
   const dateStr = document.getElementById('search-date').value;
 
-  const results = await window.api.searchTickets(query, status, serviceId, dateStr);
+  const results = await searchTicketsData(query, status, serviceId, dateStr);
   const tbody = document.getElementById('search-tbody');
   tbody.innerHTML = '';
 
@@ -951,7 +1016,7 @@ window.printTicketHistory = function(ticketNumber, serviceName, customerName, cr
 
 // Muat Statistik Harian
 async function loadStats(dateStr) {
-  const stats = await window.api.getDailyStats(dateStr);
+  const stats = await getDailyStatsData(dateStr);
   
   // Update Widget
   document.getElementById('stats-total').innerText = stats.summary.total;
@@ -993,7 +1058,7 @@ async function loadStats(dateStr) {
 
 // Muat Konfigurasi pada Pengaturan
 async function loadSettings() {
-  const settings = await window.api.getSettings();
+  const settings = await getSettingsData();
   
   // App Mode UI
   document.getElementById('app-mode-select').value = settings.app_mode || 'server';
@@ -1009,7 +1074,7 @@ async function loadSettings() {
   sendAction('WA_STATUS');
 
   // Load Kategori Layanan Table
-  const services = await window.api.getServices();
+  const services = await getServicesData();
   const tbody = document.getElementById('services-tbody');
   tbody.innerHTML = '';
   
