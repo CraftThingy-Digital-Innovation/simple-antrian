@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SimpleAntrian - Operator Panel</title>
+  <link rel="stylesheet" href="index.css">
+  <style>
+    body {
+      display: flex;
+    }
+    
+    /* Sidebar Layout */
+    .sidebar {
+      width: 280px;
+      height: 100vh;
+      border-right: 1px solid var(--border-glass);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 30px;
+    }
+
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent-primary-gradient);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: white;
+      box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+    }
+
+    .brand-title {
+      font-weight: 700;
+      font-size: 1.25rem;
+      letter-spacing: -0.5px;
+    }
+
+    .nav-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .nav-item {
+      padding: 12px 16px;
+      border-radius: 10px;
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+    }
+
+    .nav-item.active {
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .sidebar-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .status-card {
+      padding: 14px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid var(--border-glass);
+    }
+
+    .status-title {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .status-value {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-success);
+    }
+
+    /* Main Content Layout */
+    .main-content {
+      flex: 1;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+
+    .tab-content {
+      display: none;
+      flex-direction: column;
+      gap: 30px;
+    }
+
+    .tab-content.active {
+      display: flex;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .page-title {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    /* Grid Layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+
+    /* Service Cards (Operator Calling Desk) */
+    .service-calling-card {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .calling-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-glass);
+      padding-bottom: 12px;
+    }
+
+    .calling-service-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .current-call-number {
+      font-size: 3rem;
+      font-weight: 800;
+      color: var(--accent-warning);
+      text-align: center;
+      margin: 10px 0;
+      text-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+    }
+
+    .desk-setting-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .desk-input {
+      width: 100px;
+      text-align: center;
+    }
+
+    .calling-actions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* Ticket Tables */
+    .table-container {
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border-glass);
+    }
+
+    .app-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .app-table th, .app-table td {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-glass);
+    }
+
+    .app-table th {
+      background: rgba(15, 23, 42, 0.4);
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .app-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .app-table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Stats Widget */
+    .stat-widget {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    .stat-value-big {
+      font-size: 2.25rem;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    /* Config Groups */
+    .config-section {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .config-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border-glass);
+      padding-bottom: 10px;
+      color: var(--text-primary);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-group label {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    /* Server list style in Client Mode */
+    .server-list-item {
+      padding: 16px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border-glass);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .server-info-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .server-info-ip {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div>
+      <div class="brand">
+        <div class="brand-icon">Q</div>
+        <div class="brand-title">SimpleAntrian</div>
+      </div>
+      <nav>
+        <ul class="nav-list">
+          <li class="nav-item active" data-tab="dashboard">
+            <span>📊</span> Dashboard
+          </li>
+          <li class="nav-item" data-tab="search">
+            <span>🔍</span> Cari & Filter
+          </li>
+          <li class="nav-item" data-tab="stats">
+            <span>📈</span> Statistik Harian
+          </li>
+          <li class="nav-item" data-tab="settings">
+            <span>⚙️</span> Pengaturan
+          </li>
+        </ul>
+      </nav>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="btn btn-secondary" id="btn-toggle-display">
+        📺 Proyeksi Layar
+      </button>
+      <div class="status-card">
+        <div class="status-title" id="network-status-title">Server Aktif</div>
+        <div class="status-value">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text">127.0.0.1:8080</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- TAB: DASHBOARD -->
+    <div class="tab-content active" id="tab-dashboard">
+      <div class="page-header">
+        <h1 class="page-title">Panggilan & Antrian</h1>
+        <div class="badge badge-waiting" id="badge-mode">Server Mode</div>
+      </div>
+
+      <!-- Pemanggilan Grid -->
+      <div class="grid-2" id="calling-grid">
+        <!-- JS akan men-generate kartu pemanggilan untuk masing-masing layanan -->
+        <div class="glass-panel service-calling-card" style="grid-column: span 2; text-align: center; padding: 40px;">
+          <h2 style="color: var(--text-secondary);">Loading Layanan...</h2>
+        </div>
+      </div>
+
+      <!-- Quick Add Ticket & Waiting Queue -->
+      <div class="grid-2">
+        <!-- Quick Ticket Maker -->
+        <section class="glass-panel config-section animate-slide-in">
+          <h3 class="config-title">Buat Tiket Baru (Quick Ticket)</h3>
+          
+          <div class="form-group">
+            <label for="quick-service">Pilih Layanan</label>
+            <select class="input-control" id="quick-service">
+              <!-- JS-populated -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="quick-name">Nama Pelanggan (Opsional)</label>
+            <input type="text" class="input-control" id="quick-name" placeholder="Contoh: Budi">
+          </div>
+
+          <div class="form-group">
+            <label for="quick-phone">No. WhatsApp (Opsional)</label>
+            <input type="tel" class="input-control" id="quick-phone" placeholder="Contoh: 08123456789">
+          </div>
+
+          <button class="btn btn-primary" id="btn-create-ticket" style="margin-top: 10px;">
+            ➕ Cetak & Buat Tiket
+          </button>
+        </section>
+
+        <!-- Waiting List -->
+        <section class="glass-panel config-section animate-slide-in">
+          <h3 class="config-title">Daftar Antrian Menunggu</h3>
+          <div class="table-container" style="max-height: 330px; overflow-y: auto;">
+            <table class="app-table" id="waiting-table">
+              <thead>
+                <tr>
+                  <th>No. Tiket</th>
+                  <th>Layanan</th>
+                  <th>Nama</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="waiting-tbody">
+                <tr>
+                  <td colspan="4" style="text-align: center; color: var(--text-muted);">Tidak ada antrian yang menunggu.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- TAB: SEARCH -->
+    <div class="tab-content" id="tab-search">
+      <div class="page-header">
+        <h1 class="page-title">Cari & Filter Antrian</h1>
+      </div>
+
+      <div class="glass-panel config-section">
+        <!-- Filter Row -->
+        <div class="grid-4">
+          <div class="form-group">
+            <label for="search-query">Cari Kata Kunci</label>
+            <input type="text" class="input-control" id="search-query" placeholder="Ketik No. Tiket / Nama / WA...">
+          </div>
+
+          <div class="form-group">
+            <label for="search-status">Filter Status</label>
+            <select class="input-control" id="search-status">
+              <option value="">Semua Status</option>
+              <option value="waiting">Menunggu (Waiting)</option>
+              <option value="calling">Dipanggil (Calling)</option>
+              <option value="completed">Selesai (Completed)</option>
+              <option value="skipped">Dilewati (Skipped)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="search-service">Filter Layanan</label>
+            <select class="input-control" id="search-service">
+              <option value="">Semua Layanan</option>
+              <!-- JS-populated -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="search-date">Filter Tanggal</label>
+            <input type="date" class="input-control" id="search-date">
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="btn-search-trigger" style="align-self: flex-start; margin-top: 10px;">
+          🔎 Cari Data
+        </button>
+
+        <div class="table-container" style="margin-top: 20px;">
+          <table class="app-table" id="search-table">
+            <thead>
+              <tr>
+                <th>No. Tiket</th>
+                <th>Layanan</th>
+                <th>Nama Pelanggan</th>
+                <th>No. WhatsApp</th>
+                <th>Status</th>
+                <th>Loket</th>
+                <th>Dibuat</th>
+                <th>Dipanggil</th>
+              </tr>
+            </thead>
+            <tbody id="search-tbody">
+              <tr>
+                <td colspan="8" style="text-align: center; color: var(--text-muted);">Silakan klik tombol Cari untuk menampilkan data.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: STATS -->
+    <div class="tab-content" id="tab-stats">
+      <div class="page-header">
+        <h1 class="page-title">Statistik Harian</h1>
+        <div class="form-group" style="flex-direction: row; align-items: center; gap: 10px;">
+          <label for="stats-date" style="white-space: nowrap;">Pilih Hari:</label>
+          <input type="date" class="input-control" id="stats-date" style="width: 180px;">
+        </div>
+      </div>
+
+      <!-- Widgets Summary -->
+      <div class="grid-4">
+        <div class="glass-panel stat-widget">
+          <div class="stat-label">Total Antrian</div>
+          <div class="stat-value-big" id="stats-total">0</div>
+        </div>
+        <div class="glass-panel stat-widget">
+          <div class="stat-label">Dilayani (Selesai)</div>
+          <div class="stat-value-big" id="stats-completed" style="color: var(--accent-success);">0</div>
+        </div>
+        <div class="glass-panel stat-widget">
+          <div class="stat-label">Dilewati (Skipped)</div>
+          <div class="stat-value-big" id="stats-skipped" style="color: var(--accent-secondary);">0</div>
+        </div>
+        <div class="glass-panel stat-widget">
+          <div class="stat-label">Sedang Menunggu</div>
+          <div class="stat-value-big" id="stats-waiting" style="color: var(--accent-primary);">0</div>
+        </div>
+      </div>
+
+      <!-- Detail Waktu Pelayanan & Grafik Sederhana -->
+      <div class="grid-2">
+        <section class="glass-panel config-section">
+          <h3 class="config-title">Efisiensi Pelayanan</h3>
+          <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 10px;">
+            <div>
+              <div class="stat-label">Rata-rata Waktu Tunggu (Tunggu -> Panggil)</div>
+              <div class="stat-value-big" id="stats-avg-wait" style="font-size: 1.75rem;">0m 0s</div>
+            </div>
+            <div>
+              <div class="stat-label">Rata-rata Waktu Pelayanan (Panggil -> Selesai)</div>
+              <div class="stat-value-big" id="stats-avg-serve" style="font-size: 1.75rem;">0m 0s</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="glass-panel config-section">
+          <h3 class="config-title">Ringkasan Per Layanan</h3>
+          <div class="table-container" style="margin-top: 10px;">
+            <table class="app-table">
+              <thead>
+                <tr>
+                  <th>Prefix</th>
+                  <th>Nama Layanan</th>
+                  <th>Total</th>
+                  <th>Selesai</th>
+                  <th>Dilewati</th>
+                </tr>
+              </thead>
+              <tbody id="stats-services-tbody">
+                <!-- JS-populated -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- TAB: SETTINGS -->
+    <div class="tab-content" id="tab-settings">
+      <div class="page-header">
+        <h1 class="page-title">Pengaturan Aplikasi</h1>
+      </div>
+
+      <div class="grid-2">
+        <!-- Mode Aplikasi (Server / Client) -->
+        <section class="glass-panel config-section">
+          <h3 class="config-title">Mode & Koneksi Jaringan</h3>
+          
+          <div class="form-group">
+            <label for="app-mode-select">Mode Operasi</label>
+            <select class="input-control" id="app-mode-select">
+              <option value="server">Server Mode (Tuan Rumah Database)</option>
+              <option value="client">Client Mode (Terhubung ke Server Lain)</option>
+            </select>
+          </div>
+
+          <!-- Bagian khusus Server -->
+          <div id="settings-server-group" style="display: flex; flex-direction: column; gap: 20px;">
+            <div class="form-group">
+              <label for="setting-server-name">Nama Server Antrian</label>
+              <input type="text" class="input-control" id="setting-server-name" placeholder="Contoh: Server Utama">
+            </div>
+            <div class="form-group">
+              <label for="setting-port">Port WebSocket Server</label>
+              <input type="number" class="input-control" id="setting-port" placeholder="Default: 8080">
+            </div>
+          </div>
+
+          <!-- Bagian khusus Client -->
+          <div id="settings-client-group" style="display: none; flex-direction: column; gap: 15px;">
+            <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;">Pilih Server untuk Dihubungkan</label>
+            <div id="discovered-servers-list" style="max-height: 200px; overflow-y: auto;">
+              <div style="text-align: center; color: var(--text-muted); padding: 15px;">Mencari server di jaringan lokal (UDP)...</div>
+            </div>
+            <div class="form-group" style="margin-top: 10px;">
+              <label for="client-manual-ip">Hubungkan Manual (IP Address)</label>
+              <div style="display: flex; gap: 10px;">
+                <input type="text" class="input-control" id="client-manual-ip" placeholder="Contoh: 192.168.1.100:8080">
+                <button class="btn btn-primary" id="btn-manual-connect">Hubungkan</button>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" id="btn-save-mode" style="margin-top: 10px;">
+            💾 Simpan Mode & Restart
+          </button>
+        </section>
+
+        <!-- Kategori Layanan (Hanya Server Mode) -->
+        <section class="glass-panel config-section" id="section-services-config">
+          <h3 class="config-title">Kategori Layanan</h3>
+          
+          <div class="table-container" style="max-height: 200px; overflow-y: auto;">
+            <table class="app-table">
+              <thead>
+                <tr>
+                  <th>Prefix</th>
+                  <th>Nama Layanan</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="services-tbody">
+                <!-- JS-populated -->
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 15px; border-top: 1px solid var(--border-glass); padding-top: 20px;">
+            <h4>Tambah Layanan Baru</h4>
+            <div class="grid-2" style="gap: 15px;">
+              <div class="form-group">
+                <label for="new-service-prefix">Prefix (A-Z)</label>
+                <input type="text" class="input-control" id="new-service-prefix" placeholder="Misal: C" maxlength="1">
+              </div>
+              <div class="form-group">
+                <label for="new-service-name">Nama Layanan</label>
+                <input type="text" class="input-control" id="new-service-name" placeholder="Misal: Kasir">
+              </div>
+            </div>
+            <button class="btn btn-secondary" id="btn-add-service">➕ Tambah Layanan</button>
+          </div>
+        </section>
+
+        <!-- Konfigurasi WhatsApp -->
+        <section class="glass-panel config-section">
+          <h3 class="config-title">WhatsApp Lokal Terintegrasi</h3>
+          
+          <div class="form-group" style="flex-direction: row; gap: 10px; align-items: center;">
+            <input type="checkbox" id="setting-wa-enabled" style="width: 18px; height: 18px;">
+            <label for="setting-wa-enabled" style="font-size: 0.95rem;">Aktifkan Notifikasi WhatsApp</label>
+          </div>
+
+          <!-- Panel Koneksi & QR Code -->
+          <div id="wa-connection-panel" style="display: flex; flex-direction: column; gap: 15px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; border: 1px solid var(--border-glass);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Status WhatsApp:</span>
+              <span id="wa-status-badge" class="badge badge-skipped">Terputus</span>
+            </div>
+            
+            <div id="wa-qr-container" style="display: none; flex-direction: column; align-items: center; gap: 10px; background: white; padding: 15px; border-radius: 10px; margin: 10px 0;">
+              <img id="wa-qr-img" src="" alt="Scan QR Code" style="width: 200px; height: 200px;">
+              <span style="font-size: 0.75rem; color: #000; font-weight: 700; text-align: center;">Pindai QR ini dari aplikasi WhatsApp Anda</span>
+            </div>
+
+            <div id="wa-details" style="display: none; font-size: 0.9rem; flex-direction: column; gap: 6px;">
+              <div>Nomor HP: <strong id="wa-details-number"></strong></div>
+            </div>
+
+            <button class="btn btn-danger" id="btn-wa-logout" style="display: none; padding: 8px 16px; font-size: 0.85rem;">
+              Putuskan Sambungan (Logout)
+            </button>
+          </div>
+
+          <!-- Pustaka Update Checker -->
+          <div id="wa-update-panel" style="background: rgba(99, 102, 241, 0.1); border: 1px dashed rgba(99, 102, 241, 0.3); padding: 12px; border-radius: 10px; font-size: 0.85rem; display: flex; flex-direction: column; gap: 8px;">
+            <div>Pustaka WhatsApp: <strong id="wa-version-lbl">v...</strong></div>
+            <div id="wa-update-alert" style="color: var(--accent-warning); font-weight: 700; display: none;">Versi baru tersedia: <span id="wa-latest-version-lbl">v...</span></div>
+            <button class="btn btn-secondary" id="btn-wa-update" style="padding: 6px 12px; font-size: 0.8rem; align-self: flex-start; display: none;">
+              ⚡ Perbarui Otomatis
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label for="setting-wa-template-wait">Template Pengingat (Tunggu 3 Antrian)</label>
+            <textarea class="input-control" id="setting-wa-template-wait" rows="2" style="resize: none;"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="setting-wa-template-call">Template Panggilan (Giliran Tiba)</label>
+            <textarea class="input-control" id="setting-wa-template-call" rows="2" style="resize: none;"></textarea>
+          </div>
+
+          <button class="btn btn-primary" id="btn-save-wa" style="margin-top: 10px;">
+            💾 Simpan Pengaturan WA
+          </button>
+        </section>
+
+        <!-- Impor/Ekspor & Reset (Hanya Server Mode) -->
+        <section class="glass-panel config-section" id="section-db-config">
+          <h3 class="config-title">Utilitas Database & Backup</h3>
+          <div style="display: flex; flex-direction: column; gap: 15px;">
+            <button class="btn btn-success" id="btn-export-db">
+              📤 Ekspor Database (Backup SQLite & CSV)
+            </button>
+            <button class="btn btn-warning" id="btn-import-db">
+              📥 Impor Database (Restore SQLite)
+            </button>
+            <button class="btn btn-danger" id="btn-reset-queues" style="margin-top: 20px;">
+              🗑️ Reset Seluruh Antrian Hari Ini
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- TOAST CONTAINER FOR NOTIFICATIONS -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- VOICE SPEECH / SPEECH SYNTHESIS ENGINE -->
+  <script>
+    // System notifications function
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `<span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span> <span>${message}</span>`;
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(15px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+  </script>
+  
+  <script src="operator.js"></script>
+</body>
+</html>
