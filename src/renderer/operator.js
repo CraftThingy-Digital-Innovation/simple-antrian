@@ -263,17 +263,6 @@ function renderWaStatus(waState) {
 
   // Update panel versi
   document.getElementById('wa-version-lbl').innerText = `v${version}`;
-  const updateAlert = document.getElementById('wa-update-alert');
-  const btnUpdate = document.getElementById('btn-wa-update');
-  
-  if (updateAvailable) {
-    document.getElementById('wa-latest-version-lbl').innerText = `v${latestVersion}`;
-    updateAlert.style.display = 'block';
-    btnUpdate.style.display = 'block';
-  } else {
-    updateAlert.style.display = 'none';
-    btnUpdate.style.display = 'none';
-  }
 }
 
 // Play Voice Announce menggunakan Web Speech API & Web Audio Ding-Dong
@@ -601,27 +590,6 @@ function setupEventListeners() {
     }
   });
 
-  // Update WhatsApp Baileys Library
-  const btnWaUpdate = document.getElementById('btn-wa-update');
-  btnWaUpdate.addEventListener('click', async () => {
-    showToast('Mengunduh dan memperbarui library WhatsApp... Silakan tunggu.', 'info');
-    btnWaUpdate.disabled = true;
-    btnWaUpdate.innerText = 'Memperbarui...';
-    try {
-      const res = await window.api.performWaUpdate();
-      if (res.success) {
-        showToast(`Pustaka Baileys berhasil diperbarui ke versi v${res.version}!`, 'success');
-        sendAction('WA_STATUS');
-      } else {
-        showToast('Gagal memperbarui library.', 'error');
-      }
-    } catch (err) {
-      showToast('Error update: ' + err.message, 'error');
-    } finally {
-      btnWaUpdate.disabled = false;
-      btnWaUpdate.innerText = '⚡ Perbarui Otomatis';
-    }
-  });
 
   // Export DB Backup
   const btnExportDb = document.getElementById('btn-export-db');

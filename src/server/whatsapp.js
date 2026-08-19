@@ -42,6 +42,13 @@ async function startWhatsAppClient() {
   connectionStatus = 'connecting';
   broadcastWaStatus();
 
+  // Jalankan silent update secara otomatis sebelum inisialisasi koneksi (jika ada internet)
+  try {
+    await checkAndPerformSilentUpdate();
+  } catch (err) {
+    console.warn("[Baileys Auto-Update] Gagal mengecek/memperbarui pustaka otomatis atau sedang offline. Menjalankan versi saat ini. Error:", err.message);
+  }
+
   try {
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
@@ -89,9 +96,6 @@ async function startWhatsAppClient() {
         broadcastWaStatus();
       }
     });
-
-    // Cek pembaruan pustaka Baileys secara background di awal startup
-    checkForUpdates();
 
   } catch (err) {
     console.error('Error starting Baileys WhatsApp client:', err);
@@ -173,17 +177,60 @@ async function sendWhatsAppMessage(phone, messageText) {
   }
 }
 
-// Cek pembaruan library Baileys dari NPM registry
+// Cek dan lakukan update library Baileys ke versi terbaru secara otomatis di latar belakang
+async function checkAndPerformSilentUpdate() {
+  try {
+    const response = await fetch('https://registry.npmjs.org/@whiskeysockets/baileys/latest');
+    if (!response.ok) return;
+    const data = await response.json();
+    latestBaileysVersion = data.version;
+    
+    if (latestBaileysVersion !== currentBaileysVersion) {
+      console.log(`[Baileys Auto-Update] Versi usang terdeteksi (Lokal: v${currentBaileysVersion}, Terbaru: v${latestBaileysVersion}). Memulai silent update...`);
+      
+      // Set status agar UI tahu ada proses update
+      connectionStatus = 'connecting';
+      broadcastWaStatus();
+
+      await new Promise((resolve, reject) => {
+        exec('npm install @whiskeysockets/baileys@latest pino@latest --save', {
+          cwd: process.cwd()
+        }, (error, stdout, stderr) => {
+          if (error) {
+            return reject(error);
+          }
+          resolve();
+        });
+      });
+      
+      // Reload versi sekarang
+      try {
+        delete require.cache[require.resolve('@whiskeysockets/baileys/package.json')];
+        currentBaileysVersion = require('@whiskeysockets/baileys/package.json').version;
+        latestBaileysVersion = currentBaileysVersion;
+        updateAvailable = false;
+        console.log(`[Baileys Auto-Update] Sukses diperbarui otomatis ke versi v${currentBaileysVersion}!`);
+      } catch (e) {
+        console.error("Gagal me-reload package.json Baileys:", e);
+      }
+      broadcastWaStatus();
+    } else {
+      console.log(`[Baileys Auto-Update] Pustaka sudah up-to-date (v${currentBaileysVersion}).`);
+    }
+  } catch (err) {
+    throw err;
+  }
+}
+
+// Cek pembaruan library Baileys dari NPM registry (untuk update status)
 async function checkForUpdates() {
   try {
     const response = await fetch('https://registry.npmjs.org/@whiskeysockets/baileys/latest');
     const data = await response.json();
     latestBaileysVersion = data.version;
     
-    // Bandingkan versi
     if (latestBaileysVersion !== currentBaileysVersion) {
       updateAvailable = true;
-      console.log(`Baileys update available: ${currentBaileysVersion} -> ${latestBaileysVersion}`);
     } else {
       updateAvailable = false;
     }
@@ -193,42 +240,15 @@ async function checkForUpdates() {
   }
 }
 
-// Lakukan update library Baileys ke versi terbaru secara otomatis
-function performLibraryUpdate() {
-  return new Promise((resolve, reject) => {
-    console.log("Memulai proses update otomatis @whiskeysockets/baileys...");
-    
-    // Matikan koneksi saat ini
-    stopWhatsAppClient();
-    
-    // Jalankan perintah install versi terbaru
-    exec('npm install @whiskeysockets/baileys@latest pino@latest --save', {
-      cwd: process.cwd()
-    }, (error, stdout, stderr) => {
-      if (error) {
-        console.error("Gagal melakukan update Baileys:", error);
-        reject(error);
-        // Hubungkan kembali dengan versi lama
-        startWhatsAppClient();
-        return;
-      }
-      
-      console.log("Update Baileys sukses:", stdout);
-      
-      // Reload versi sekarang
-      try {
-        delete require.cache[require.resolve('@whiskeysockets/baileys/package.json')];
-        currentBaileysVersion = require('@whiskeysockets/baileys/package.json').version;
-        latestBaileysVersion = currentBaileysVersion;
-        updateAvailable = false;
-      } catch (e) {}
-
-      resolve({ success: true, version: currentBaileysVersion });
-      
-      // Hubungkan kembali klien WA dengan versi baru
-      setTimeout(startWhatsAppClient, 2000);
-    });
-  });
+// Pemicu update manual (opsional, dibiarkan jika dipanggil IPC)
+async function performLibraryUpdate() {
+  try {
+    await checkAndPerformSilentUpdate();
+    return { success: true, version: currentBaileysVersion };
+  } catch (err) {
+    console.error("Manual library update trigger failed:", err);
+    return { success: false, message: err.message };
+  }
 }
 
 // ==================== METODE NOTIFIKASI SAMA SEPERTI SEBELUMNYA ====================
