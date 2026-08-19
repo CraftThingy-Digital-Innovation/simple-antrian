@@ -112,13 +112,26 @@ Untuk membuat folder aplikasi mandiri yang berisi seluruh executable binary:
   ```bash
   npm run pack
   ```
-  Hasil build dapat ditemukan di folder `dist/SimpleAntrian-win32-x64/`.
+  Hasil build dapat ditemukan di folder `dist/SimpleAntrian-win32-x64/`. Di dalamnya terdapat file shortcut siap pakai:
+  * **`Mulai-Server.bat`**: Menjalankan aplikasi langsung sebagai Server Node.
+  * **`Mulai-Client.bat`**: Menjalankan aplikasi langsung sebagai Client Node.
 
 * **Build untuk Linux (x64)**:
   ```bash
   npm run pack-linux
   ```
-  Hasil build dapat ditemukan di folder `dist/SimpleAntrian-linux-x64/`.
+  Hasil build dapat ditemukan di folder `dist/SimpleAntrian-linux-x64/`. Di dalamnya terdapat file shell script siap pakai:
+  * **`mulai-server.sh`**: Menjalankan aplikasi langsung sebagai Server.
+  * **`mulai-client.sh`**: Menjalankan aplikasi langsung sebagai Client.
+
+---
+
+## ⚙️ Parameter Startup (Command-Line Arguments)
+
+Anda dapat memaksa mode aplikasi saat dijalankan melalui terminal/shortcut tanpa bergantung pada pengaturan database:
+* **Force Client Mode**: Jalankan dengan parameter `--client` atau `-c` (Contoh: `SimpleAntrian.exe --client`).
+* **Force Server Mode**: Jalankan dengan parameter `--server` or `-s` (Contoh: `SimpleAntrian.exe --server`).
+* **Auto-Detect**: Jika nama file executable diubah dan mengandung kata `client` (misal: `SimpleAntrianClient.exe`), aplikasi akan otomatis mendeteksi dan langsung berjalan dalam **Mode Client**.
 
 ---
 
