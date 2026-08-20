@@ -634,8 +634,77 @@ function renderQueueState(state) {
 
     // Cari apakah ada tiket sedang dipanggil untuk layanan dan loket ini
     const activeCall = callingTickets.find(t => t.service_id === srv.id && t.desk_number === currentDesk);
+    
+    // Cari tiket berikutnya yang sedang menunggu untuk layanan ini
+    const nextWaiting = waitingTickets.find(t => t.service_id === srv.id);
+
     const activeNumber = activeCall ? activeCall.ticket_number : '—';
     const lastCalledText = srv.current_number > 0 ? `Terakhir: ${srv.prefix}${String(srv.current_number).padStart(3, '0')}` : 'Belum ada antrian';
+
+    let noticeHtml = '';
+    let actionsHtml = '';
+
+    if (activeCall) {
+      // Sedang memanggil tiket
+      noticeHtml = `
+        <div style="font-size: 0.85rem; color: #fbbf24; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.2); padding: 8px 12px; border-radius: 8px; font-weight: 600; text-align: center; margin-bottom: 12px; width: 100%;">
+          Sedang melayani antrian aktif
+        </div>
+      `;
+      actionsHtml = `
+        <div class="calling-actions-grid">
+          <button class="btn btn-primary" onclick="recall('${activeCall.id}')" style="grid-column: span 1;">
+            🔔 Panggil Ulang
+          </button>
+          <button class="btn btn-secondary" onclick="callSkipped('${srv.id}')" ${srv.skipped_count > 0 ? '' : 'disabled'}>
+            🔄 Terlewat ${srv.skipped_count > 0 ? `(${srv.skipped_count})` : ''}
+          </button>
+          <button class="btn btn-success" onclick="completeCall('${activeCall.id}')" style="grid-column: span 1;">
+            ✅ Selesai
+          </button>
+          <button class="btn btn-danger" onclick="skipCall('${activeCall.id}')" style="grid-column: span 1;">
+            ❌ Lewati
+          </button>
+        </div>
+      `;
+    } else {
+      // Standby (tidak ada panggilan aktif)
+      if (nextWaiting) {
+        noticeHtml = `
+          <div style="font-size: 0.9rem; color: #818cf8; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.25); padding: 8px 12px; border-radius: 8px; font-weight: 600; text-align: center; margin-bottom: 12px; width: 100%; display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Antrian Berikutnya</span>
+            <span style="font-size: 1.15rem; font-weight: 800; color: #ffffff;">${nextWaiting.ticket_number}</span>
+          </div>
+        `;
+        actionsHtml = `
+          <div class="calling-actions-grid" style="grid-template-columns: 2fr 1fr;">
+            <button class="btn btn-primary" onclick="callNext('${srv.id}')" style="padding: 12px 16px; font-weight: 700; font-size: 1.05rem; grid-column: span 1;">
+              🔔 Panggil ${nextWaiting.ticket_number}
+            </button>
+            <button class="btn btn-secondary" onclick="callSkipped('${srv.id}')" ${srv.skipped_count > 0 ? '' : 'disabled'} title="Panggil Antrian Terlewat" style="padding: 12px 16px; font-weight: 600; font-size: 1rem;">
+              🔄 ${srv.skipped_count > 0 ? `(${srv.skipped_count})` : ''}
+            </button>
+          </div>
+        `;
+      } else {
+        noticeHtml = `
+          <div style="font-size: 0.9rem; color: var(--text-muted); background: rgba(255, 255, 255, 0.02); border: 1px dashed rgba(255, 255, 255, 0.1); padding: 8px 12px; border-radius: 8px; font-weight: 500; text-align: center; margin-bottom: 12px; width: 100%; display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Antrian Berikutnya</span>
+            <span style="font-size: 1rem; font-weight: 600; color: var(--text-muted);">Tidak ada antrian</span>
+          </div>
+        `;
+        actionsHtml = `
+          <div class="calling-actions-grid" style="grid-template-columns: 2fr 1fr;">
+            <button class="btn btn-primary" disabled style="opacity: 0.4; cursor: not-allowed; padding: 12px 16px; font-weight: 600; font-size: 1rem; grid-column: span 1;">
+              🔔 Panggil
+            </button>
+            <button class="btn btn-secondary" onclick="callSkipped('${srv.id}')" ${srv.skipped_count > 0 ? '' : 'disabled'} title="Panggil Antrian Terlewat" style="padding: 12px 16px; font-weight: 600; font-size: 1rem;">
+              🔄 ${srv.skipped_count > 0 ? `(${srv.skipped_count})` : ''}
+            </button>
+          </div>
+        `;
+      }
+    }
 
     const card = document.createElement('div');
     card.className = `glass-panel service-calling-card animate-slide-in ${activeCall ? 'animate-call-blink' : ''}`;
@@ -654,20 +723,8 @@ function renderQueueState(state) {
         <input type="text" class="input-control desk-input" id="desk-input-${srv.id}" value="${currentDesk}">
       </div>
 
-      <div class="calling-actions-grid">
-        <button class="btn btn-primary" onclick="${activeCall ? `recall('${activeCall.id}')` : `callNext('${srv.id}')`}">
-          ${activeCall ? '🔔 Panggil Ulang' : '🔔 Panggil'}
-        </button>
-        <button class="btn btn-secondary" onclick="callSkipped('${srv.id}')" ${(!activeCall && srv.skipped_count > 0) ? '' : 'disabled'}>
-          🔄 Terlewat ${srv.skipped_count > 0 ? `(${srv.skipped_count})` : ''}
-        </button>
-        <button class="btn btn-success" onclick="completeCall('${activeCall ? activeCall.id : ''}')" ${!activeCall ? 'disabled' : ''}>
-          ✅ Selesai
-        </button>
-        <button class="btn btn-danger" onclick="skipCall('${activeCall ? activeCall.id : ''}')" ${!activeCall ? 'disabled' : ''}>
-          ❌ Lewati
-        </button>
-      </div>
+      ${noticeHtml}
+      ${actionsHtml}
     `;
     callingGrid.appendChild(card);
     
