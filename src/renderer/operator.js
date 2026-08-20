@@ -634,7 +634,8 @@ function renderQueueState(state) {
 
     // Cari apakah ada tiket sedang dipanggil untuk layanan dan loket ini
     const activeCall = callingTickets.find(t => t.service_id === srv.id && t.desk_number === currentDesk);
-    const activeNumber = activeCall ? activeCall.ticket_number : (srv.prefix + String(srv.current_number).padStart(3, '0'));
+    const activeNumber = activeCall ? activeCall.ticket_number : '—';
+    const lastCalledText = srv.current_number > 0 ? `Terakhir: ${srv.prefix}${String(srv.current_number).padStart(3, '0')}` : 'Belum ada antrian';
 
     const card = document.createElement('div');
     card.className = `glass-panel service-calling-card animate-slide-in ${activeCall ? 'animate-call-blink' : ''}`;
@@ -643,7 +644,10 @@ function renderQueueState(state) {
         <span class="calling-service-name">${srv.name} (Prefix: ${srv.prefix})</span>
         ${activeCall ? '<span class="badge badge-calling">Memanggil</span>' : '<span class="badge badge-waiting">Standby</span>'}
       </div>
-      <div class="current-call-number" id="call-number-${srv.id}">${activeNumber}</div>
+      <div class="current-call-number" id="call-number-${srv.id}" style="font-size: ${activeCall ? '3.5rem' : '2.5rem'}; transition: font-size 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 80px;">
+        <span>${activeNumber}</span>
+        ${!activeCall ? `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">${lastCalledText}</span>` : ''}
+      </div>
       
       <div class="desk-setting-row">
         <label for="desk-input-${srv.id}" style="font-size: 0.85rem; font-weight:600; color:var(--text-secondary);">Loket:</label>
