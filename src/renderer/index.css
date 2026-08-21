@@ -325,6 +325,13 @@ body::after {
 
 /* Pengaturan Cetak untuk Printer Thermal (Receipt) */
 @media print {
+  @page {
+    margin: 0;
+  }
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
   body * {
     display: none !important;
   }
