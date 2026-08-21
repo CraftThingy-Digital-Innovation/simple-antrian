@@ -208,13 +208,13 @@ async function initSystemInfo() {
     serverPort = info.port || 8080;
     
     // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
-    if (info.appVersion === '1.5.2') {
+    if (info.appVersion === '1.5.3') {
       document.getElementById('lbl-app-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Sukses Diperbarui)</span>`;
       document.getElementById('lbl-settings-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Terbaru)</span>`;
-      if (!localStorage.getItem('v152_update_notified')) {
+      if (!localStorage.getItem('v153_update_notified')) {
         setTimeout(() => {
-          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.5.2 secara otomatis!", "success");
-          localStorage.setItem('v152_update_notified', 'true');
+          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.5.3 secara otomatis!", "success");
+          localStorage.setItem('v153_update_notified', 'true');
         }, 2000);
       }
     } else {
@@ -750,9 +750,9 @@ function playDingDong() {
         osc.stop(audioCtx.currentTime + delay + duration);
       };
 
-      playTone(659.25, 0, 0.4); // E5
-      setTimeout(() => playTone(523.25, 0, 0.4), 250); // C5
-      setTimeout(() => playTone(783.99, 0, 0.5), 500); // G5
+      playTone(523.25, 0, 0.4); // C5
+      setTimeout(() => playTone(659.25, 0, 0.4), 200); // E5
+      setTimeout(() => playTone(783.99, 0, 0.5), 400); // G5
       
       setTimeout(() => {
         audioCtx.close();

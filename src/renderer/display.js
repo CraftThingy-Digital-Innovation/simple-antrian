@@ -439,10 +439,10 @@ function playDingDongChime() {
         osc.stop(audioCtx.currentTime + delay + duration);
       };
 
-      // Melodi Ding-Dong Elegan: E5 -> C5 -> G5
-      playTone(659.25, 0, 0.4); 
-      setTimeout(() => playTone(523.25, 0, 0.4), 250); 
-      setTimeout(() => playTone(783.99, 0, 0.5), 500); 
+      // Melodi Ding-Ding-Ding Elegan (Ascending Triad): C5 -> E5 -> G5
+      playTone(523.25, 0, 0.4); 
+      setTimeout(() => playTone(659.25, 0, 0.4), 200); 
+      setTimeout(() => playTone(783.99, 0, 0.5), 400); 
       
       setTimeout(() => {
         audioCtx.close();
