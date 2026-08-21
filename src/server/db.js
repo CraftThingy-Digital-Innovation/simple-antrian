@@ -120,7 +120,8 @@ async function initDb() {
     { key: 'display_logo', value: '' },
     { key: 'video_playlist', value: JSON.stringify([]) },
     { key: 'display_mode', value: 'queue' },
-    { key: 'mirror_window_name', value: '' }
+    { key: 'mirror_window_name', value: '' },
+    { key: 'mirror_crop_top', value: 'false' }
   ];
 
   for (const s of defaultSettings) {

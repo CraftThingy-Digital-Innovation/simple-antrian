@@ -190,6 +190,7 @@ async function getCurrentState() {
   const videoPlaylist = settings.video_playlist ? JSON.parse(settings.video_playlist) : [];
   const displayMode = settings.display_mode || 'queue';
   const mirrorWindowName = settings.mirror_window_name || '';
+  const mirrorCropTop = settings.mirror_crop_top === 'true';
   
   return {
     serverName: settings.server_name || 'Server Utama',
@@ -199,7 +200,8 @@ async function getCurrentState() {
     callingTickets,
     videoPlaylist,
     displayMode,
-    mirrorWindowName
+    mirrorWindowName,
+    mirrorCropTop
   };
 }
 
@@ -515,6 +517,20 @@ async function handleClientAction(action, ws) {
         broadcast({
           type: 'MIRROR_WINDOW_UPDATE',
           payload: { windowName }
+        });
+        await broadcastStateUpdate();
+        break;
+      }
+
+      case 'SAVE_MIRROR_CROP': {
+        const { crop } = payload;
+        const dbMod = require('./db');
+        await dbMod.saveSetting('mirror_crop_top', crop ? 'true' : 'false');
+        
+        // Broadcast ke semua client
+        broadcast({
+          type: 'MIRROR_CROP_UPDATE',
+          payload: { crop }
         });
         await broadcastStateUpdate();
         break;

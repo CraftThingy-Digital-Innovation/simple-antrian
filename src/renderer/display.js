@@ -87,7 +87,7 @@ function handleWebSocketMessage(message) {
         updateVideoPlaylist(payload.videoPlaylist);
       }
       if (typeof updateMirrorState === 'function') {
-        updateMirrorState(payload.displayMode, payload.mirrorWindowName);
+        updateMirrorState(payload.displayMode, payload.mirrorWindowName, payload.mirrorCropTop);
       }
       break;
 
@@ -119,7 +119,7 @@ function handleWebSocketMessage(message) {
         } catch (_) {}
       }
       if (typeof updateMirrorState === 'function') {
-        updateMirrorState(payload.display_mode || 'queue', payload.mirror_window_name || '');
+        updateMirrorState(payload.display_mode || 'queue', payload.mirror_window_name || '', payload.mirror_crop_top === 'true');
       }
       break;
 
@@ -709,7 +709,7 @@ function startClock() {
 let mirrorStream = null;
 let activeMirrorWindowName = '';
 
-async function updateMirrorState(displayMode, windowName) {
+async function updateMirrorState(displayMode, windowName, mirrorCropTop) {
   const container = document.getElementById('mirror-container');
   const video = document.getElementById('mirror-video-player');
   const placeholder = document.getElementById('mirror-placeholder');
@@ -717,6 +717,13 @@ async function updateMirrorState(displayMode, windowName) {
   const placeholderDesc = document.getElementById('mirror-placeholder-desc');
   
   if (!container || !video) return;
+  
+  // Terapkan efek potong atas jika diaktifkan
+  if (mirrorCropTop) {
+    video.classList.add('crop-browser');
+  } else {
+    video.classList.remove('crop-browser');
+  }
   
   if (displayMode !== 'mirror') {
     // Sembunyikan mirror dan hentikan stream jika ada

@@ -646,6 +646,13 @@ function renderQueueState(state) {
     }
   }
 
+  if (state.mirrorCropTop !== undefined) {
+    const checkCrop = document.getElementById('check-mirror-crop');
+    if (checkCrop) {
+      checkCrop.checked = state.mirrorCropTop;
+    }
+  }
+
   // Render server name if received from WebSocket server
   if (serverName) {
     const lbl = document.getElementById('status-server-name');
@@ -880,6 +887,13 @@ function setupEventListeners() {
   if (selectMirrorSource) {
     selectMirrorSource.addEventListener('change', () => {
       sendAction('SAVE_MIRROR_WINDOW', { windowName: selectMirrorSource.value });
+    });
+  }
+
+  const checkMirrorCrop = document.getElementById('check-mirror-crop');
+  if (checkMirrorCrop) {
+    checkMirrorCrop.addEventListener('change', () => {
+      sendAction('SAVE_MIRROR_CROP', { crop: checkMirrorCrop.checked });
     });
   }
 
@@ -1785,11 +1799,18 @@ async function loadMirrorSources() {
     
     // Set value dari setting aktif jika ada
     const settings = await getSettingsData();
-    if (settings && settings.mirror_window_name) {
-      select.value = settings.mirror_window_name;
-      const activeLabel = document.getElementById('mirror-active-window-name');
-      if (activeLabel) {
-        activeLabel.innerText = settings.mirror_window_name;
+    if (settings) {
+      if (settings.mirror_window_name) {
+        select.value = settings.mirror_window_name;
+        const activeLabel = document.getElementById('mirror-active-window-name');
+        if (activeLabel) {
+          activeLabel.innerText = settings.mirror_window_name;
+        }
+      }
+      
+      const checkCrop = document.getElementById('check-mirror-crop');
+      if (checkCrop) {
+        checkCrop.checked = settings.mirror_crop_top === 'true';
       }
     }
   } catch (err) {
