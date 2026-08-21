@@ -212,20 +212,78 @@ async function initSystemInfo() {
       const banner = document.getElementById('app-update-banner');
       const lblNew = document.getElementById('lbl-new-app-version');
       const btnDownload = document.getElementById('btn-download-update');
+      const btnAutoUpdate = document.getElementById('btn-auto-update');
       
       lblNew.innerText = `v${updateInfo.latest}`;
       banner.style.display = 'block';
+      
       btnDownload.onclick = () => {
         window.api.openExternalUrl(updateInfo.url);
       };
+
+      // Tampilkan tombol "Pasang Otomatis" jika URL unduhan tersedia
+      if (updateInfo.downloadUrl && btnAutoUpdate) {
+        btnAutoUpdate.style.display = 'inline-flex';
+        btnAutoUpdate.onclick = async () => {
+          if (await confirmDialog(`Apakah Anda yakin ingin mengunduh dan memasang versi v${updateInfo.latest} secara otomatis? Aplikasi akan ditutup sementara dan terbuka kembali setelah selesai.`)) {
+            // Sembunyikan tombol, tampilkan progress container
+            btnDownload.style.display = 'none';
+            btnAutoUpdate.style.display = 'none';
+            document.getElementById('update-progress-container').style.display = 'block';
+            
+            try {
+              const res = await window.api.performAppUpdate(updateInfo.downloadUrl);
+              if (!res.success) {
+                showToast(`Pembaruan gagal: ${res.message}`, 'error');
+                btnDownload.style.display = 'inline-flex';
+                btnAutoUpdate.style.display = 'inline-flex';
+                document.getElementById('update-progress-container').style.display = 'none';
+              }
+            } catch (err) {
+              showToast(`Pembaruan gagal: ${err.message}`, 'error');
+              btnDownload.style.display = 'inline-flex';
+              btnAutoUpdate.style.display = 'inline-flex';
+              document.getElementById('update-progress-container').style.display = 'none';
+            }
+          }
+        };
+      }
+
+      // Hubungkan listener progres pembaruan
+      window.api.onUpdateProgress((info) => {
+        const statusEl = document.getElementById('update-progress-status');
+        const percentEl = document.getElementById('update-progress-percent');
+        const barEl = document.getElementById('update-progress-bar');
+        
+        if (statusEl && percentEl && barEl) {
+          let statusText = 'Mempersiapkan...';
+          if (info.status === 'downloading') {
+            statusText = `Mengunduh (${info.percent}%)`;
+          } else if (info.status === 'extracting') {
+            statusText = 'Mengekstrak berkas...';
+          } else if (info.status === 'installing') {
+            statusText = 'Memasang pembaruan...';
+          }
+          
+          statusEl.innerText = statusText;
+          percentEl.innerText = `${info.percent}%`;
+          barEl.style.width = `${info.percent}%`;
+        }
+      });
 
       // Tampilkan toast notifikasi
       showToast(`Pembaruan aplikasi tersedia: v${updateInfo.latest}! Silakan periksa tab Pengaturan.`, 'info');
 
       // Tampilkan prompt konfirmasi agar user langsung menyadari adanya update
       setTimeout(async () => {
-        if (await confirmDialog(`Pembaruan Baru Tersedia!\n\nVersi v${updateInfo.latest} telah dirilis (versi Anda saat ini: v${info.appVersion}).\nApakah Anda ingin membuka halaman unduhan GitHub sekarang untuk memperbarui aplikasi?`)) {
-          window.api.openExternalUrl(updateInfo.url);
+        if (updateInfo.downloadUrl) {
+          if (await confirmDialog(`Pembaruan Baru Tersedia!\n\nVersi v${updateInfo.latest} telah dirilis (versi Anda saat ini: v${info.appVersion}).\nApakah Anda ingin memasang pembaruan ini secara otomatis sekarang?`)) {
+            btnAutoUpdate.click();
+          }
+        } else {
+          if (await confirmDialog(`Pembaruan Baru Tersedia!\n\nVersi v${updateInfo.latest} telah dirilis (versi Anda saat ini: v${info.appVersion}).\nApakah Anda ingin membuka halaman unduhan GitHub sekarang untuk memperbarui aplikasi?`)) {
+            window.api.openExternalUrl(updateInfo.url);
+          }
         }
       }, 1000);
     });

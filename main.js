@@ -504,6 +504,151 @@ ipcMain.handle('check-app-updates', async () => {
   return { success: true };
 });
 
+// Helper untuk mengunduh file dengan progress indicator
+function downloadFileWithProgress(url, dest, onProgress) {
+  return new Promise((resolve, reject) => {
+    const fs = require('fs');
+    const https = require('https');
+
+    const download = (targetUrl) => {
+      https.get(targetUrl, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          // Tangani redirect
+          download(res.headers.location);
+          return;
+        }
+
+        if (res.statusCode !== 200) {
+          reject(new Error(`Server merespon dengan status: ${res.statusCode}`));
+          return;
+        }
+
+        const totalBytes = parseInt(res.headers['content-length'], 10) || 0;
+        let receivedBytes = 0;
+        const fileStream = fs.createWriteStream(dest);
+
+        res.on('data', (chunk) => {
+          receivedBytes += chunk.length;
+          fileStream.write(chunk);
+          if (totalBytes > 0) {
+            const percent = Math.round((receivedBytes / totalBytes) * 100);
+            onProgress(percent);
+          }
+        });
+
+        res.on('end', () => {
+          fileStream.end();
+          resolve();
+        });
+
+        res.on('error', (err) => {
+          fileStream.destroy();
+          try {
+            if (fs.existsSync(dest)) fs.unlinkSync(dest);
+          } catch (_) {}
+          reject(err);
+        });
+      }).on('error', (err) => {
+        reject(err);
+      });
+    };
+
+    download(url);
+  });
+}
+
+// Handler IPC untuk melakukan auto-update mandiri (Windows)
+ipcMain.handle('perform-app-update', async (event, downloadUrl) => {
+  if (!downloadUrl) {
+    return { success: false, message: 'URL unduhan rilis tidak valid.' };
+  }
+
+  try {
+    const sendProgress = (status, percent) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-progress', { status, percent });
+      }
+    };
+
+    sendProgress('downloading', 0);
+
+    const tempDir = app.getPath('temp');
+    const zipPath = path.join(tempDir, 'SimpleAntrian-update.zip');
+    const extractDir = path.join(tempDir, 'SimpleAntrian-extracted');
+
+    // Hapus sisa unduhan lama
+    if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+    if (fs.existsSync(extractDir)) fs.rmSync(extractDir, { recursive: true, force: true });
+    fs.mkdirSync(extractDir, { recursive: true });
+
+    // 1. Download berkas zip
+    await downloadFileWithProgress(downloadUrl, zipPath, (percent) => {
+      sendProgress('downloading', percent);
+    });
+
+    sendProgress('extracting', 100);
+
+    // 2. Ekstrak berkas zip menggunakan PowerShell bawaan Windows
+    const { exec } = require('child_process');
+    const extractCmd = `powershell -Command "Expand-Archive -Force -Path '${zipPath}' -DestinationPath '${extractDir}'"`;
+
+    await new Promise((resolve, reject) => {
+      exec(extractCmd, (err, stdout, stderr) => {
+        if (err) {
+          console.error("Gagal mengekstrak update:", stderr);
+          reject(new Error("Gagal mengekstrak file zip update."));
+        } else {
+          resolve();
+        }
+      });
+    });
+
+    sendProgress('installing', 100);
+
+    // 3. Tulis batch script untuk mengganti berkas aplikasi lama dengan yang baru
+    const appDir = path.dirname(process.execPath);
+    const exeName = path.basename(process.execPath);
+    const batchPath = path.join(tempDir, 'simple-antrian-updater.bat');
+
+    // Script menunggu 2 detik agar proses SimpleAntrian.exe mati, memindahkan file baru ke appDir, lalu membukanya kembali
+    const batchContent = `@echo off
+title SimpleAntrian Updater
+echo Menunggu aplikasi ditutup...
+timeout /t 2 /nobreak > NUL
+
+echo Memasang pembaruan baru...
+robocopy "${extractDir}" "${appDir}" /E /MOVE /IS /IT /R:3 /W:1 > NUL
+
+echo Membuka kembali aplikasi...
+start "" "${path.join(appDir, exeName)}"
+
+:: Bersihkan file updater
+del "${zipPath}" > NUL
+(goto) 2>nul & del "%~f0"
+`;
+
+    fs.writeFileSync(batchPath, batchContent, 'utf-8');
+
+    // 4. Jalankan script updater secara independen (detached)
+    const { spawn } = require('child_process');
+    const child = spawn('cmd.exe', ['/c', batchPath], {
+      detached: true,
+      stdio: 'ignore'
+    });
+    child.unref();
+
+    // 5. Tutup aplikasi utama agar file-file tidak terkunci
+    setTimeout(() => {
+      app.quit();
+    }, 500);
+
+    return { success: true };
+  } catch (err) {
+    console.error("Gagal melakukan auto-update:", err);
+    return { success: false, message: err.message };
+  }
+});
+
 // Restart WhatsApp client dengan mode QR code
 ipcMain.handle('wa-start-qr', async () => {
   try {
@@ -566,12 +711,22 @@ function checkAppUpdates() {
 
         if (latestVersion !== appVersion) {
           console.log(`[App Update] Pembaruan SimpleAntrian tersedia: v${appVersion} -> v${latestVersion}`);
+          
+          // Cari asset zip Windows (.zip)
+          const winAsset = release.assets && release.assets.find(asset => 
+            asset.name.toLowerCase().includes('windows') || 
+            asset.name.toLowerCase().includes('win32') || 
+            asset.name.toLowerCase().endsWith('.zip')
+          );
+          const downloadUrl = winAsset ? winAsset.browser_download_url : null;
+
           if (mainWindow) {
             mainWindow.webContents.send('app-update-available', {
               current: appVersion,
               latest: latestVersion,
               url: release.html_url,
-              body: release.body
+              body: release.body,
+              downloadUrl: downloadUrl
             });
           }
         }

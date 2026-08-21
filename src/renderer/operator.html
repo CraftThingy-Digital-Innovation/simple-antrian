@@ -1023,14 +1023,30 @@
             <div>Nama Pembuat: <strong>Alif Nurhidayat</strong></div>
             <div>Versi Aplikasi: <strong id="lbl-app-version">v1.0.0</strong></div>
             
-            <!-- Banner Pembaruan GitHub -->
-            <div id="app-update-banner" style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid var(--accent-warning); padding: 12px; border-radius: 8px;">
-              <div style="color: var(--accent-warning); font-weight: 700; margin-bottom: 6px;">Pembaruan Tersedia!</div>
-              <div style="font-size: 0.8rem; margin-bottom: 10px;">Versi <span id="lbl-new-app-version">v...</span> telah dirilis. Silakan unduh versi terbaru di GitHub.</div>
-              <button class="btn btn-warning" id="btn-download-update" style="padding: 6px 12px; font-size: 0.8rem;">
-                📥 Unduh di GitHub
-              </button>
-            </div>
+             <!-- Banner Pembaruan GitHub -->
+             <div id="app-update-banner" style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid var(--accent-warning); padding: 12px; border-radius: 8px;">
+               <div style="color: var(--accent-warning); font-weight: 700; margin-bottom: 6px;">Pembaruan Tersedia!</div>
+               <div style="font-size: 0.8rem; margin-bottom: 10px;">Versi <span id="lbl-new-app-version">v...</span> telah dirilis.</div>
+               <div style="display: flex; gap: 8px; margin-top: 10px;">
+                 <button class="btn btn-warning" id="btn-download-update" style="padding: 6px 12px; font-size: 0.8rem;">
+                   🌐 Buka GitHub
+                 </button>
+                 <button class="btn btn-success" id="btn-auto-update" style="padding: 6px 12px; font-size: 0.8rem; display: none;">
+                   ⚡ Pasang Otomatis
+                 </button>
+               </div>
+               
+               <!-- Progress Bar Auto-Update -->
+               <div id="update-progress-container" style="display: none; margin-top: 12px;">
+                 <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 4px; color: var(--text-secondary);">
+                   <span id="update-progress-status">Mengunduh...</span>
+                   <span id="update-progress-percent">0%</span>
+                 </div>
+                 <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                   <div id="update-progress-bar" style="width: 0%; height: 100%; background: var(--accent-success-gradient); transition: width 0.1s;"></div>
+                 </div>
+               </div>
+             </div>
 
             <div style="border-top: 1px solid var(--border-glass); padding-top: 15px; display: flex; flex-direction: column; gap: 6px;">
               <span style="font-weight: 600; color: var(--text-secondary);">Kontak Support:</span>

@@ -28,6 +28,11 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.removeAllListeners('app-update-available');
     ipcRenderer.on('app-update-available', (event, info) => callback(info));
   },
+  performAppUpdate: (downloadUrl) => ipcRenderer.invoke('perform-app-update', downloadUrl),
+  onUpdateProgress: (callback) => {
+    ipcRenderer.removeAllListeners('update-progress');
+    ipcRenderer.on('update-progress', (event, info) => callback(info));
+  },
 
   // UDP Discovery (Client Mode)
   onServersUpdated: (callback) => {
