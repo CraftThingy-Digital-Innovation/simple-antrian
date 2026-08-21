@@ -208,13 +208,13 @@ async function initSystemInfo() {
     serverPort = info.port || 8080;
     
     // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
-    if (info.appVersion === '1.4.9') {
+    if (info.appVersion === '1.5.0') {
       document.getElementById('lbl-app-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Sukses Diperbarui)</span>`;
       document.getElementById('lbl-settings-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Terbaru)</span>`;
-      if (!localStorage.getItem('v149_update_notified')) {
+      if (!localStorage.getItem('v150_update_notified')) {
         setTimeout(() => {
-          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.4.9 secara otomatis!", "success");
-          localStorage.setItem('v149_update_notified', 'true');
+          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.5.0 secara otomatis!", "success");
+          localStorage.setItem('v150_update_notified', 'true');
         }, 2000);
       }
     } else {
@@ -841,16 +841,31 @@ function renderQueueState(state) {
     `;
   }
 
-  services.forEach(srv => {
-    // Ambil default nomor loket dari memori lokal
-    const currentDesk = localDeskSettings[srv.id] || 'Loket 1';
+    // Tentukan nomor loket
+    let currentDesk = localDeskSettings[srv.id];
+    const anyActiveCall = callingTickets.find(t => t.service_id === srv.id);
+    
+    if (!currentDesk) {
+      // Jika ada tiket aktif dipanggil untuk layanan ini, samakan nomor loketnya
+      if (anyActiveCall) {
+        currentDesk = anyActiveCall.desk_number;
+        localDeskSettings[srv.id] = currentDesk;
+        localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
+      } else {
+        currentDesk = srv.name;
+      }
+    }
 
     // Cari apakah ada tiket sedang dipanggil untuk layanan dan loket ini
     let activeCall = callingTickets.find(t => t.service_id === srv.id && t.desk_number === currentDesk);
     
-    // Jika tidak ditemukan karena nama loket diubah, cari berdasarkan activeTickets tracking
+    // Jika tidak ditemukan karena nama loket baru diubah di input, cari berdasarkan activeTickets tracking
     if (!activeCall && activeTickets[srv.id]) {
       activeCall = callingTickets.find(t => t.id === activeTickets[srv.id]);
+    }
+    // Atau jika ada panggilan aktif apa saja untuk layanan ini dan kita belum memiliki activeTickets terdaftar
+    if (!activeCall && anyActiveCall) {
+      activeCall = anyActiveCall;
     }
 
     if (activeCall) {
@@ -1020,20 +1035,38 @@ function renderQueueState(state) {
 
 window.callNext = function(serviceId) {
   const deskInput = document.getElementById(`desk-input-${serviceId}`);
-  const deskNumber = deskInput ? deskInput.value : 'Loket 1';
+  let deskNumber = '';
+  if (deskInput && deskInput.value) {
+    deskNumber = deskInput.value;
+  } else {
+    const srv = servicesList.find(s => s.id === serviceId);
+    deskNumber = srv ? srv.name : 'Loket 1';
+  }
   sendAction('CALL_NEXT', { serviceId, deskNumber });
 };
 
 window.callSkipped = function(serviceId) {
   const deskInput = document.getElementById(`desk-input-${serviceId}`);
-  const deskNumber = deskInput ? deskInput.value : 'Loket 1';
+  let deskNumber = '';
+  if (deskInput && deskInput.value) {
+    deskNumber = deskInput.value;
+  } else {
+    const srv = servicesList.find(s => s.id === serviceId);
+    deskNumber = srv ? srv.name : 'Loket 1';
+  }
   sendAction('CALL_SKIPPED', { serviceId, deskNumber });
 };
 
 window.recall = function(ticketId, serviceId) {
   if (!ticketId) return;
   const deskInput = document.getElementById(`desk-input-${serviceId}`);
-  const deskNumber = deskInput ? deskInput.value : 'Loket 1';
+  let deskNumber = '';
+  if (deskInput && deskInput.value) {
+    deskNumber = deskInput.value;
+  } else {
+    const srv = servicesList.find(s => s.id === serviceId);
+    deskNumber = srv ? srv.name : 'Loket 1';
+  }
   sendAction('RECALL', { ticketId, deskNumber });
 };
 
