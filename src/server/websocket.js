@@ -600,6 +600,15 @@ async function handleClientAction(action, ws) {
         break;
       }
 
+      case 'UPDATE_ACTIVE_TICKET_DESK': {
+        const { ticketId, deskNumber } = payload;
+        if (ticketId && deskNumber) {
+          await db.updateTicketDesk(ticketId, deskNumber);
+          await broadcastStateUpdate();
+        }
+        break;
+      }
+
       default:
         console.warn('Unknown action type:', type);
     }

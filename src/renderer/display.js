@@ -201,8 +201,8 @@ function renderDisplayState(state) {
     // Tiket yang paling baru dipanggil adalah yang pertama
     const currentTicket = callingTickets[0];
     
-    // Perbarui teks jika berbeda
-    if (mainNumberEl.innerText !== currentTicket.ticket_number || mainDisplayPanel.classList.contains('standby')) {
+    // Perbarui teks jika berbeda (nomor tiket atau nomor loket berubah)
+    if (mainNumberEl.innerText !== currentTicket.ticket_number || mainDeskEl.innerText !== currentTicket.desk_number || mainDisplayPanel.classList.contains('standby')) {
       mainDisplayPanel.classList.remove('standby');
       mainNumberEl.innerText = currentTicket.ticket_number;
       mainDeskEl.innerText = currentTicket.desk_number;

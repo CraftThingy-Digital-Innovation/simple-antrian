@@ -274,6 +274,12 @@ async function recallTicket(ticketId) {
   return get("SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.id = ?", [ticketId]);
 }
 
+// Update desk number untuk tiket tertentu
+async function updateTicketDesk(ticketId, deskNumber) {
+  await run("UPDATE tickets SET desk_number = ? WHERE id = ?", [deskNumber, ticketId]);
+  return get("SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.id = ?", [ticketId]);
+}
+
 // Selesaikan tiket
 async function completeTicket(ticketId) {
   const now = new Date().toISOString();
@@ -463,6 +469,7 @@ module.exports = {
   callNextTicket,
   callSkippedTicket,
   recallTicket,
+  updateTicketDesk,
   completeTicket,
   skipTicket,
   searchTickets,

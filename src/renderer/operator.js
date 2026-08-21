@@ -207,13 +207,13 @@ async function initSystemInfo() {
     serverPort = info.port || 8080;
     
     // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
-    if (info.appVersion === '1.4.6') {
+    if (info.appVersion === '1.4.7') {
       document.getElementById('lbl-app-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Sukses Diperbarui)</span>`;
       document.getElementById('lbl-settings-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Terbaru)</span>`;
-      if (!localStorage.getItem('v146_update_notified')) {
+      if (!localStorage.getItem('v147_update_notified')) {
         setTimeout(() => {
-          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.4.6 secara otomatis!", "success");
-          localStorage.setItem('v146_update_notified', 'true');
+          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.4.7 secara otomatis!", "success");
+          localStorage.setItem('v147_update_notified', 'true');
         }, 2000);
       }
     } else {
@@ -941,9 +941,14 @@ function renderQueueState(state) {
       localDeskSettings[srv.id] = e.target.value;
       localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
     });
-    deskInput.addEventListener('change', () => {
+    deskInput.addEventListener('change', (e) => {
+      const newDesk = e.target.value;
       sendAction('SYNC_DESK_NAMES', { deskNames: Object.values(localDeskSettings) });
-      sendAction('GET_STATE'); // Memicu re-fetch agar kartu antrian aktif loket baru langsung terupdate
+      if (activeCall) {
+        sendAction('UPDATE_ACTIVE_TICKET_DESK', { ticketId: activeCall.id, deskNumber: newDesk });
+      } else {
+        sendAction('GET_STATE'); // Memicu re-fetch agar kartu antrian aktif loket baru langsung terupdate
+      }
     });
   });
 
