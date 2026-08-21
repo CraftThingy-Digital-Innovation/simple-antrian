@@ -594,6 +594,7 @@ function initCanvasVisualizer() {
 // ==================== PLAYLIST VIDEO DISPLAY ====================
 let videoPlaylist = [];
 let currentVideoIndex = 0;
+let currentDisplayMode = 'queue';
 
 function updateVideoPlaylist(newPlaylist) {
   const playlist = Array.isArray(newPlaylist) ? newPlaylist : [];
@@ -603,28 +604,33 @@ function updateVideoPlaylist(newPlaylist) {
   if (playlistJson !== currentJson) {
     videoPlaylist = playlist;
     currentVideoIndex = 0;
-    playNextVideo();
+    syncVideoPlayers(currentDisplayMode);
   }
 }
 
-function playNextVideo() {
-  const videoPlayer = document.getElementById('display-video-player');
-  const videoCard = document.getElementById('video-card');
-  if (!videoPlayer || !videoCard) return;
+function syncVideoPlayers(displayMode) {
+  if (displayMode) {
+    currentDisplayMode = displayMode;
+  }
   
+  const sidebarCard = document.getElementById('video-card');
+  const sidebarPlayer = document.getElementById('display-video-player');
+  const fullscreenContainer = document.getElementById('video-fullscreen-container');
+  const fullscreenPlayer = document.getElementById('fullscreen-video-player');
+  const fullscreenPlaceholder = document.getElementById('fullscreen-video-placeholder');
+  
+  if (!sidebarPlayer || !fullscreenPlayer) return;
+  
+  // Jika playlist kosong, sembunyikan semua player
   if (videoPlaylist.length === 0) {
-    videoCard.style.display = 'none';
-    videoPlayer.src = '';
+    if (sidebarCard) sidebarCard.style.display = 'none';
+    if (fullscreenContainer) fullscreenContainer.style.display = 'none';
+    sidebarPlayer.pause();
+    sidebarPlayer.src = '';
+    fullscreenPlayer.pause();
+    fullscreenPlayer.src = '';
     return;
   }
-  
-  videoCard.style.display = 'block';
-  
-  if (currentVideoIndex >= videoPlaylist.length) {
-    currentVideoIndex = 0;
-  }
-  
-  const video = videoPlaylist[currentVideoIndex];
   
   // Tentukan host berdasarkan lokasi WebSocket
   let host = window.location.host;
@@ -637,36 +643,108 @@ function playNextVideo() {
     }
   }
   
+  // Pastikan indeks video valid
+  if (currentVideoIndex >= videoPlaylist.length) {
+    currentVideoIndex = 0;
+  }
+  const video = videoPlaylist[currentVideoIndex];
   const videoUrl = `http://${host}${video.url}`;
-  console.log(`[VideoPlayer] Playing video ${currentVideoIndex + 1}/${videoPlaylist.length}: ${videoUrl}`);
   
-  videoPlayer.src = videoUrl;
-  videoPlayer.load();
+  if (currentDisplayMode === 'video') {
+    // Mode Video Fullscreen
+    if (sidebarCard) sidebarCard.style.display = 'none';
+    sidebarPlayer.pause();
+    sidebarPlayer.src = '';
+    
+    if (fullscreenContainer) fullscreenContainer.style.display = 'flex';
+    if (fullscreenPlaceholder) fullscreenPlaceholder.style.display = 'none';
+    
+    // Play video jika belum memutar URL yang benar
+    if (fullscreenPlayer.src !== videoUrl) {
+      console.log(`[FullscreenPlayer] Playing video ${currentVideoIndex + 1}/${videoPlaylist.length}: ${videoUrl}`);
+      fullscreenPlayer.src = videoUrl;
+      fullscreenPlayer.load();
+      
+      // Fullscreen video plays with sound! (unmuted)
+      fullscreenPlayer.muted = false;
+      
+      const playPromise = fullscreenPlayer.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.warn("Failed to autoplay fullscreen video, skipping to next:", error);
+          setTimeout(() => {
+            currentVideoIndex++;
+            syncVideoPlayers();
+          }, 3000);
+        });
+      }
+    }
+  } else if (currentDisplayMode === 'queue') {
+    // Mode Antrian Standar
+    if (fullscreenContainer) fullscreenContainer.style.display = 'none';
+    fullscreenPlayer.pause();
+    fullscreenPlayer.src = '';
+    
+    if (sidebarCard) sidebarCard.style.display = 'block';
+    
+    if (sidebarPlayer.src !== videoUrl) {
+      console.log(`[SidebarPlayer] Playing video ${currentVideoIndex + 1}/${videoPlaylist.length}: ${videoUrl}`);
+      sidebarPlayer.src = videoUrl;
+      sidebarPlayer.load();
+      
+      // Sidebar video plays muted!
+      sidebarPlayer.muted = true;
+      
+      const playPromise = sidebarPlayer.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.warn("Failed to autoplay sidebar video, skipping to next:", error);
+          setTimeout(() => {
+            currentVideoIndex++;
+            syncVideoPlayers();
+          }, 3000);
+        });
+      }
+    }
+  } else {
+    // Mode Mirroring atau lainnya, pause semua
+    if (sidebarCard) sidebarCard.style.display = 'none';
+    if (fullscreenContainer) fullscreenContainer.style.display = 'none';
+    sidebarPlayer.pause();
+    sidebarPlayer.src = '';
+    fullscreenPlayer.pause();
+    fullscreenPlayer.src = '';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const sidebarPlayer = document.getElementById('display-video-player');
+  const fullscreenPlayer = document.getElementById('fullscreen-video-player');
   
-  const playPromise = videoPlayer.play();
-  if (playPromise !== undefined) {
-    playPromise.catch(error => {
-      console.warn("Failed to autoplay video, retrying next in playlist:", error);
+  if (sidebarPlayer) {
+    sidebarPlayer.addEventListener('ended', () => {
+      currentVideoIndex++;
+      syncVideoPlayers();
+    });
+    sidebarPlayer.addEventListener('error', (e) => {
+      console.error("[SidebarPlayer] Error loading video file, skipping...", e);
       setTimeout(() => {
         currentVideoIndex++;
-        playNextVideo();
+        syncVideoPlayers();
       }, 3000);
     });
   }
   
-  currentVideoIndex++;
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  const videoPlayer = document.getElementById('display-video-player');
-  if (videoPlayer) {
-    videoPlayer.addEventListener('ended', () => {
-      playNextVideo();
+  if (fullscreenPlayer) {
+    fullscreenPlayer.addEventListener('ended', () => {
+      currentVideoIndex++;
+      syncVideoPlayers();
     });
-    videoPlayer.addEventListener('error', (e) => {
-      console.error("[VideoPlayer] Error loading video file, skipping...", e);
+    fullscreenPlayer.addEventListener('error', (e) => {
+      console.error("[FullscreenPlayer] Error loading video file, skipping...", e);
       setTimeout(() => {
-        playNextVideo();
+        currentVideoIndex++;
+        syncVideoPlayers();
       }, 3000);
     });
   }
@@ -710,6 +788,11 @@ let mirrorStream = null;
 let activeMirrorWindowName = '';
 
 async function updateMirrorState(displayMode, windowName, mirrorCropTop) {
+  // Sinkronkan pemutar video berdasarkan display mode yang aktif
+  if (typeof syncVideoPlayers === 'function') {
+    syncVideoPlayers(displayMode);
+  }
+
   const container = document.getElementById('mirror-container');
   const video = document.getElementById('mirror-video-player');
   const placeholder = document.getElementById('mirror-placeholder');

@@ -613,18 +613,25 @@ function renderQueueState(state) {
   // Update Mirroring UI state
   if (state.displayMode) {
     const btnQueue = document.getElementById('btn-mode-queue');
+    const btnVideo = document.getElementById('btn-mode-video');
     const btnMirror = document.getElementById('btn-mode-mirror');
     const statusText = document.getElementById('mirror-connection-status');
     
     if (btnQueue && btnMirror && statusText) {
+      if (btnQueue) btnQueue.className = 'btn btn-sm btn-secondary';
+      if (btnVideo) btnVideo.className = 'btn btn-sm btn-secondary';
+      if (btnMirror) btnMirror.className = 'btn btn-sm btn-secondary';
+      
       if (state.displayMode === 'mirror') {
-        btnQueue.className = 'btn btn-sm btn-secondary';
-        btnMirror.className = 'btn btn-sm btn-primary';
+        if (btnMirror) btnMirror.className = 'btn btn-sm btn-primary';
         statusText.innerText = 'Duplikasi Jendela';
         statusText.style.color = 'var(--accent-primary)';
+      } else if (state.displayMode === 'video') {
+        if (btnVideo) btnVideo.className = 'btn btn-sm btn-primary';
+        statusText.innerText = 'Video Fullscreen';
+        statusText.style.color = 'var(--accent-primary)';
       } else {
-        btnQueue.className = 'btn btn-sm btn-primary';
-        btnMirror.className = 'btn btn-sm btn-secondary';
+        if (btnQueue) btnQueue.className = 'btn btn-sm btn-primary';
         statusText.innerText = 'Layar Antrian';
         statusText.style.color = 'var(--accent-warning)';
       }
@@ -868,6 +875,7 @@ window.skipCall = function(ticketId) {
 function setupEventListeners() {
   // Mirror Controls Event Listeners
   const btnModeQueue = document.getElementById('btn-mode-queue');
+  const btnModeVideo = document.getElementById('btn-mode-video');
   const btnModeMirror = document.getElementById('btn-mode-mirror');
   const selectMirrorSource = document.getElementById('select-mirror-source');
   const btnRefreshMirror = document.getElementById('btn-refresh-mirror-sources');
@@ -875,6 +883,12 @@ function setupEventListeners() {
   if (btnModeQueue) {
     btnModeQueue.addEventListener('click', () => {
       sendAction('SAVE_DISPLAY_MODE', { mode: 'queue' });
+    });
+  }
+
+  if (btnModeVideo) {
+    btnModeVideo.addEventListener('click', () => {
+      sendAction('SAVE_DISPLAY_MODE', { mode: 'video' });
     });
   }
 

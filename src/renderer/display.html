@@ -313,6 +313,16 @@
     </div>
   </footer>
 
+  <!-- FULLSCREEN VIDEO CONTAINER -->
+  <div id="video-fullscreen-container" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 90; display: none; align-items: center; justify-content: center;">
+    <video id="fullscreen-video-player" style="width: 100%; height: 100%; object-fit: contain;" autoplay playsinline></video>
+    <div id="fullscreen-video-placeholder" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 15px; text-align: center; color: var(--text-secondary); font-family: sans-serif; z-index: 92;">
+      <div style="font-size: 3rem;">📹</div>
+      <div style="font-size: 1.5rem; font-weight: 700;">Playlist Video Kosong</div>
+      <div style="font-size: 1rem; color: var(--text-muted);">Silakan tambahkan file video di tab Pengaturan Operator.</div>
+    </div>
+  </div>
+
   <!-- FULLSCREEN MIRROR CONTAINER -->
   <div id="mirror-container" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 100; display: none; align-items: center; justify-content: center;">
     <video id="mirror-video-player" style="width: 100%; height: 100%; object-fit: contain;" autoplay playsinline></video>
