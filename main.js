@@ -557,10 +557,17 @@ function downloadFileWithProgress(url, dest, onProgress) {
   });
 }
 
-// Handler IPC untuk melakukan auto-update mandiri (Windows)
+// Handler IPC untuk melakukan auto-update mandiri (Windows & Linux)
 ipcMain.handle('perform-app-update', async (event, downloadUrl) => {
   if (!downloadUrl) {
     return { success: false, message: 'URL unduhan rilis tidak valid.' };
+  }
+
+  const isWin = process.platform === 'win32';
+  const isLinux = process.platform === 'linux';
+
+  if (!isWin && !isLinux) {
+    return { success: false, message: 'Platform sistem operasi tidak didukung untuk auto-update.' };
   }
 
   try {
@@ -573,30 +580,33 @@ ipcMain.handle('perform-app-update', async (event, downloadUrl) => {
     sendProgress('downloading', 0);
 
     const tempDir = app.getPath('temp');
-    const zipPath = path.join(tempDir, 'SimpleAntrian-update.zip');
+    const archiveName = isWin ? 'SimpleAntrian-update.zip' : 'SimpleAntrian-update.tar.gz';
+    const archivePath = path.join(tempDir, archiveName);
     const extractDir = path.join(tempDir, 'SimpleAntrian-extracted');
 
-    // Hapus sisa unduhan lama
-    if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+    // Hapus sisa unduhan lama jika ada
+    if (fs.existsSync(archivePath)) fs.unlinkSync(archivePath);
     if (fs.existsSync(extractDir)) fs.rmSync(extractDir, { recursive: true, force: true });
     fs.mkdirSync(extractDir, { recursive: true });
 
-    // 1. Download berkas zip
-    await downloadFileWithProgress(downloadUrl, zipPath, (percent) => {
+    // 1. Download berkas arsip rilis
+    await downloadFileWithProgress(downloadUrl, archivePath, (percent) => {
       sendProgress('downloading', percent);
     });
 
     sendProgress('extracting', 100);
 
-    // 2. Ekstrak berkas zip menggunakan PowerShell bawaan Windows
-    const { exec } = require('child_process');
-    const extractCmd = `powershell -Command "Expand-Archive -Force -Path '${zipPath}' -DestinationPath '${extractDir}'"`;
+    // 2. Ekstrak berkas menggunakan tar (bawaan Windows 10+ & Linux, aman dari antivirus)
+    const { exec, spawn } = require('child_process');
+    const extractCmd = isWin 
+      ? `tar -xf "${archivePath}" -C "${extractDir}"`
+      : `tar -xzf "${archivePath}" -C "${extractDir}"`;
 
     await new Promise((resolve, reject) => {
       exec(extractCmd, (err, stdout, stderr) => {
         if (err) {
           console.error("Gagal mengekstrak update:", stderr);
-          reject(new Error("Gagal mengekstrak file zip update."));
+          reject(new Error("Gagal mengekstrak berkas arsip update."));
         } else {
           resolve();
         }
@@ -605,13 +615,21 @@ ipcMain.handle('perform-app-update', async (event, downloadUrl) => {
 
     sendProgress('installing', 100);
 
-    // 3. Tulis batch script untuk mengganti berkas aplikasi lama dengan yang baru
+    // 3. Tentukan direktori aplikasi
     const appDir = path.dirname(process.execPath);
     const exeName = path.basename(process.execPath);
-    const batchPath = path.join(tempDir, 'simple-antrian-updater.bat');
 
-    // Script menunggu 2 detik agar proses SimpleAntrian.exe mati, memindahkan file baru ke appDir, lalu membukanya kembali
-    const batchContent = `@echo off
+    // Deteksi hak akses tulis ke folder aplikasi
+    let hasWriteAccess = true;
+    try {
+      fs.accessSync(appDir, fs.constants.W_OK);
+    } catch (_) {
+      hasWriteAccess = false;
+    }
+
+    if (isWin) {
+      const batchPath = path.join(tempDir, 'simple-antrian-updater.bat');
+      const batchContent = `@echo off
 title SimpleAntrian Updater
 echo Menunggu aplikasi ditutup...
 timeout /t 2 /nobreak > NUL
@@ -622,22 +640,67 @@ robocopy "${extractDir}" "${appDir}" /E /MOVE /IS /IT /R:3 /W:1 > NUL
 echo Membuka kembali aplikasi...
 start "" "${path.join(appDir, exeName)}"
 
-:: Bersihkan file updater
-del "${zipPath}" > NUL
+:: Bersihkan berkas sementara
+del "${archivePath}" > NUL
 (goto) 2>nul & del "%~f0"
 `;
+      fs.writeFileSync(batchPath, batchContent, 'utf-8');
 
-    fs.writeFileSync(batchPath, batchContent, 'utf-8');
+      if (hasWriteAccess) {
+        // Jalankan updater batch biasa
+        const child = spawn('cmd.exe', ['/c', batchPath], {
+          detached: true,
+          stdio: 'ignore'
+        });
+        child.unref();
+      } else {
+        // Perlu hak administrator: Jalankan dengan PowerShell (Verb RunAs) untuk memicu dialog UAC
+        console.log("[App Update] Folder terproteksi admin, meminta elevasi hak akses (UAC)...");
+        const elevateCmd = `powershell -Command "Start-Process cmd.exe -ArgumentList '/c \\"${batchPath}\\"' -Verb RunAs"`;
+        exec(elevateCmd, (err) => {
+          if (err) console.error("Gagal menjalankan updater dengan hak Administrator:", err);
+        });
+      }
 
-    // 4. Jalankan script updater secara independen (detached)
-    const { spawn } = require('child_process');
-    const child = spawn('cmd.exe', ['/c', batchPath], {
-      detached: true,
-      stdio: 'ignore'
-    });
-    child.unref();
+    } else {
+      // Linux shell script updater
+      const shPath = path.join(tempDir, 'simple-antrian-updater.sh');
+      const shContent = `#!/bin/bash
+echo "Menunggu aplikasi utama ditutup..."
+sleep 2
 
-    // 5. Tutup aplikasi utama agar file-file tidak terkunci
+echo "Memasang pembaruan..."
+cp -r "${extractDir}"/* "${appDir}"/
+
+echo "Membuka kembali aplikasi..."
+"${path.join(appDir, exeName)}" &
+
+# Bersihkan file arsip
+rm "${archivePath}"
+rm -- "$0"
+`;
+      fs.writeFileSync(shPath, shContent, 'utf-8');
+      fs.chmodSync(shPath, '755');
+
+      if (hasWriteAccess) {
+        // Jalankan updater shell biasa
+        const child = spawn('/bin/bash', [shPath], {
+          detached: true,
+          stdio: 'ignore'
+        });
+        child.unref();
+      } else {
+        // Perlu hak root: Gunakan pkexec (Polkit GUI sudo dialog bawaan Linux)
+        console.log("[App Update] Folder terproteksi root, memicu dialog pkexec...");
+        const child = spawn('pkexec', ['/bin/bash', shPath], {
+          detached: true,
+          stdio: 'ignore'
+        });
+        child.unref();
+      }
+    }
+
+    // 4. Tutup aplikasi utama agar berkas biner tidak terkunci
     setTimeout(() => {
       app.quit();
     }, 500);
