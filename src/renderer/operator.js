@@ -208,13 +208,13 @@ async function initSystemInfo() {
     serverPort = info.port || 8080;
     
     // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
-    if (info.appVersion === '1.4.8') {
+    if (info.appVersion === '1.4.9') {
       document.getElementById('lbl-app-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Sukses Diperbarui)</span>`;
       document.getElementById('lbl-settings-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Terbaru)</span>`;
-      if (!localStorage.getItem('v148_update_notified')) {
+      if (!localStorage.getItem('v149_update_notified')) {
         setTimeout(() => {
-          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.4.8 secara otomatis!", "success");
-          localStorage.setItem('v148_update_notified', 'true');
+          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.4.9 secara otomatis!", "success");
+          localStorage.setItem('v149_update_notified', 'true');
         }, 2000);
       }
     } else {
@@ -516,6 +516,11 @@ function handleWebSocketMessage(message) {
         currentLogoBase64 = '';
         document.getElementById('display-logo-preview').src = '';
         document.getElementById('display-logo-preview-container').style.display = 'none';
+      }
+      if (payload.theme) {
+        document.body.className = payload.theme === 'imigrasi' ? 'theme-imigrasi' : '';
+        const themeSelect = document.getElementById('setting-color-theme');
+        if (themeSelect) themeSelect.value = payload.theme;
       }
       break;
     }
@@ -1256,11 +1261,13 @@ function setupEventListeners() {
     btnSaveDisplayCustom.addEventListener('click', () => {
       const title = document.getElementById('setting-display-title').value.trim();
       const subtitle = document.getElementById('setting-display-subtitle').value.trim();
+      const theme = document.getElementById('setting-color-theme').value;
 
       sendAction('SAVE_DISPLAY_CUSTOM', {
         title: title || 'SimpleAntrian',
         subtitle: subtitle || 'Budayakan antri demi kenyamanan bersama. Silakan siapkan tiket Anda dan perhatikan panggilan layar.',
-        logo: currentLogoBase64
+        logo: currentLogoBase64,
+        theme: theme
       });
       showToast('Menyimpan pengaturan tampilan display...', 'info');
     });
@@ -1754,6 +1761,14 @@ async function loadSettings() {
     document.getElementById('display-logo-preview').src = '';
     document.getElementById('display-logo-preview-container').style.display = 'none';
   }
+
+  // Theme settings
+  const themeVal = settings.color_theme || 'default';
+  const themeSelect = document.getElementById('setting-color-theme');
+  if (themeSelect) {
+    themeSelect.value = themeVal;
+  }
+  document.body.className = themeVal === 'imigrasi' ? 'theme-imigrasi' : '';
 
   // Video Audio Settings UI
   const sidebarMutedCheckbox = document.getElementById('setting-video-sidebar-muted');

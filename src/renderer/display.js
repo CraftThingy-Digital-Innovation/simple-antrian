@@ -95,6 +95,9 @@ function handleWebSocketMessage(message) {
       if (typeof updateMirrorState === 'function') {
         updateMirrorState(payload.displayMode, payload.mirrorWindowName, payload.mirrorCropTop);
       }
+      if (payload.colorTheme !== undefined) {
+        document.body.className = payload.colorTheme === 'imigrasi' ? 'theme-imigrasi' : '';
+      }
       break;
 
     case 'ANNOUNCE_CALL':
@@ -133,6 +136,9 @@ function handleWebSocketMessage(message) {
       if (typeof updateMirrorState === 'function') {
         updateMirrorState(payload.display_mode || 'queue', payload.mirror_window_name || '', payload.mirror_crop_top === 'true');
       }
+      if (payload.color_theme !== undefined) {
+        document.body.className = payload.color_theme === 'imigrasi' ? 'theme-imigrasi' : '';
+      }
       break;
 
     case 'VIDEO_PLAYLIST_UPDATE':
@@ -146,12 +152,16 @@ function handleWebSocketMessage(message) {
         globalSettings.display_title = payload.title;
         globalSettings.display_subtitle = payload.subtitle;
         globalSettings.display_logo = payload.logo;
+        if (payload.theme) globalSettings.color_theme = payload.theme;
       }
       applyDisplayCustomization({
         display_title: payload.title,
         display_subtitle: payload.subtitle,
         display_logo: payload.logo
       });
+      if (payload.theme !== undefined) {
+        document.body.className = payload.theme === 'imigrasi' ? 'theme-imigrasi' : '';
+      }
       break;
 
     case 'TTS_SETTING_UPDATE':

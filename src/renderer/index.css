@@ -342,3 +342,46 @@ body::after {
     color: black !important;
   }
 }
+
+/* ==================== TEMA KANTOR IMIGRASI BENGKULU ==================== */
+
+/* Wisdom Blue & Dignity Gold */
+body.theme-imigrasi {
+  --bg-main: #021428;
+  --bg-glass: rgba(3, 26, 53, 0.75);
+  --bg-glass-hover: rgba(5, 34, 69, 0.85);
+  --border-glass: rgba(233, 193, 112, 0.18); /* Gold border hint */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #5a7596;
+  
+  --accent-primary: #e9c170; /* Dignity Gold */
+  --accent-primary-gradient: linear-gradient(135deg, #e9c170 0%, #bd944d 100%);
+  --accent-secondary: #f43f5e;
+  --accent-secondary-gradient: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  --accent-success: #10b981;
+  --accent-success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --accent-warning: #e9c170;
+  --accent-warning-gradient: linear-gradient(135deg, #e9c170 0%, #bd944d 100%);
+}
+
+/* Adjust glowing background orbs for Immigration Theme */
+body.theme-imigrasi::before {
+  background: rgba(233, 193, 112, 0.07) !important; /* Gold glow */
+}
+body.theme-imigrasi::after {
+  background: rgba(4, 54, 102, 0.15) !important; /* Wisdom Blue glow */
+}
+
+/* Inputs & Form Controls outline focus color in Immigration Theme */
+body.theme-imigrasi .input-control:focus {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 2px rgba(233, 193, 112, 0.25) !important;
+}
+
+/* Badges for Immigration Theme */
+body.theme-imigrasi .badge-waiting {
+  background: rgba(233, 193, 112, 0.12) !important;
+  color: #e9c170 !important;
+  border: 1px solid rgba(233, 193, 112, 0.25) !important;
+}

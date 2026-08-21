@@ -97,6 +97,15 @@ function connectWebSocket(url) {
           // Tangani state update untuk mendapatkan daftar layanan aktif
           currentServices = data.payload.services || [];
           renderKioskServices(currentServices);
+          if (data.payload.colorTheme !== undefined) {
+            document.body.className = data.payload.colorTheme === 'imigrasi' ? 'theme-imigrasi' : '';
+          }
+          break;
+
+        case 'DISPLAY_CUSTOM_UPDATE':
+          if (data.payload.theme !== undefined) {
+            document.body.className = data.payload.theme === 'imigrasi' ? 'theme-imigrasi' : '';
+          }
           break;
 
         case 'SERVICES_LIST':

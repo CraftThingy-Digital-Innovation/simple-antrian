@@ -123,7 +123,8 @@ async function initDb() {
     { key: 'mirror_window_name', value: '' },
     { key: 'mirror_crop_top', value: 'false' },
     { key: 'video_sidebar_muted', value: 'true' },
-    { key: 'video_fullscreen_muted', value: 'false' }
+    { key: 'video_fullscreen_muted', value: 'false' },
+    { key: 'color_theme', value: 'default' }
   ];
 
   for (const s of defaultSettings) {

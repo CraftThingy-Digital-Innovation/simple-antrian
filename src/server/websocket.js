@@ -193,6 +193,7 @@ async function getCurrentState() {
   const mirrorCropTop = settings.mirror_crop_top === 'true';
   const videoSidebarMuted = settings.video_sidebar_muted !== 'false'; // default true
   const videoFullscreenMuted = settings.video_fullscreen_muted === 'true'; // default false
+  const colorTheme = settings.color_theme || 'default';
   
   return {
     serverName: settings.server_name || 'Server Utama',
@@ -205,7 +206,8 @@ async function getCurrentState() {
     mirrorWindowName,
     mirrorCropTop,
     videoSidebarMuted,
-    videoFullscreenMuted
+    videoFullscreenMuted,
+    colorTheme
   };
 }
 
