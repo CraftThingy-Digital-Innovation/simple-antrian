@@ -5,12 +5,54 @@ const fs = require('fs');
 // Matikan Autoplay Policy agar audio bisa berputar otomatis tanpa interaksi user
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
+// Sanitasi data sensitif untuk telemetry log
+function sanitizeLogMessage(msg) {
+  if (typeof msg !== 'string') return msg;
+  let sanitized = msg;
+
+  // 1. Redact Kode Penyandingan WhatsApp (e.g. ABCD-1234 atau 8 digit kode penyandingan)
+  sanitized = sanitized.replace(/Kode Penyandingan:\s*([A-Za-z0-9]{4}-[A-Za-z0-9]{4})/gi, 'Kode Penyandingan: ****-****');
+  sanitized = sanitized.replace(/([A-Za-z0-9]{4}-[A-Za-z0-9]{4})/gi, (match) => {
+    if (/^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/.test(match)) {
+      return '****-****';
+    }
+    return match;
+  });
+
+  // 2. Redact Nomor Telepon (e.g. 08123456789, 628123456789, +628123456789)
+  // Ganti digit di tengah dengan asterisk, sisakan 3 digit depan dan 3 digit belakang (e.g. 081******789)
+  sanitized = sanitized.replace(/(?:\+?62|0)8[0-9]{8,11}/g, (phone) => {
+    if (phone.length >= 9) {
+      return phone.substring(0, 3) + '*'.repeat(phone.length - 6) + phone.substring(phone.length - 3);
+    }
+    return phone;
+  });
+
+  // 3. Redact Data Sensitif di dalam objek JSON/Payload (e.g. "phone":"...", "name":"...")
+  sanitized = sanitized.replace(/"phone"\s*:\s*"([^"]+)"/g, (match, p1) => {
+    const maskedPhone = p1.length >= 6 
+      ? p1.substring(0, 3) + '*'.repeat(p1.length - 6) + p1.substring(p1.length - 3)
+      : '***';
+    return `"phone":"${maskedPhone}"`;
+  });
+  sanitized = sanitized.replace(/"name"\s*:\s*"([^"]+)"/g, (match, p1) => {
+    if (p1.trim() === '') return match;
+    const maskedName = p1.length > 2 
+      ? p1.charAt(0) + '*'.repeat(p1.length - 2) + p1.charAt(p1.length - 1)
+      : '***';
+    return `"name":"${maskedName}"`;
+  });
+
+  return sanitized;
+}
+
 // Redirect console logs to a local file for debugging
 const debugLogPath = app ? path.join(app.getPath('userData'), 'app-debug.log') : path.join(__dirname, 'app-debug.log');
 const logStdout = process.stdout;
 
 console.log = function (...args) {
-  const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ') + '\n';
+  const rawMsg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ') + '\n';
+  const msg = sanitizeLogMessage(rawMsg);
   try {
     fs.appendFileSync(debugLogPath, `[LOG] ${new Date().toISOString()} - ${msg}`);
   } catch (e) {}
@@ -18,7 +60,8 @@ console.log = function (...args) {
 };
 
 console.error = function (...args) {
-  const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ') + '\n';
+  const rawMsg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ') + '\n';
+  const msg = sanitizeLogMessage(rawMsg);
   try {
     fs.appendFileSync(debugLogPath, `[ERR] ${new Date().toISOString()} - ${msg}`);
   } catch (e) {}
@@ -26,7 +69,8 @@ console.error = function (...args) {
 };
 
 console.warn = function (...args) {
-  const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ') + '\n';
+  const rawMsg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ') + '\n';
+  const msg = sanitizeLogMessage(rawMsg);
   try {
     fs.appendFileSync(debugLogPath, `[WRN] ${new Date().toISOString()} - ${msg}`);
   } catch (e) {}

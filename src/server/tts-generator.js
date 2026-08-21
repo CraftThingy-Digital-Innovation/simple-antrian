@@ -156,11 +156,41 @@ function fileExistsAndNotEmpty(filePath) {
 // Initialize TTS Engine (Download binaries and models if missing)
 async function initTtsEngine(callback) {
   if (callback) statusCallback = callback;
-  if (isReady) {
-    setStatus('ready', 100, 'TTS Engine is ready.');
-    return true;
+  
+  // 1. Salin berkas suara prebuilt jika cache kosong (Menghindari kebutuhan download/run Piper secara default)
+  let hasPrebuilt = false;
+  const prebuiltDir = path.join(__dirname, '..', 'assets', 'tts-prebuilt');
+  if (fs.existsSync(prebuiltDir)) {
+    try {
+      const prebuiltFiles = fs.readdirSync(prebuiltDir).filter(f => f.endsWith('.wav'));
+      if (prebuiltFiles.length > 0) {
+        let copyCount = 0;
+        for (const file of prebuiltFiles) {
+          const srcPath = path.join(prebuiltDir, file);
+          const destPath = path.join(cacheDir, file);
+          if (!fileExistsAndNotEmpty(destPath)) {
+            fs.copyFileSync(srcPath, destPath);
+            copyCount++;
+          }
+        }
+        if (copyCount > 0) {
+          console.log(`[TTS Engine] Menyalin ${copyCount} berkas suara bawaan (prebuilt) ke cache.`);
+        }
+        
+        // Periksa apakah berkas penting ada untuk menandai ready awal
+        const testFile = path.join(cacheDir, 'id_nomor_antrian.wav');
+        if (fs.existsSync(testFile)) {
+          hasPrebuilt = true;
+          isReady = true; // Tandai engine siap pakai menggunakan berkas prebuilt!
+          setStatus('ready', 100, 'TTS Engine siap menggunakan berkas suara bawaan.');
+        }
+      }
+    } catch (e) {
+      console.error("[TTS Engine] Gagal menyalin berkas suara bawaan:", e);
+    }
   }
-  if (isInitializing) return false;
+
+  if (isInitializing) return hasPrebuilt;
   isInitializing = true;
 
   try {
@@ -211,17 +241,20 @@ async function initTtsEngine(callback) {
 
     isReady = true;
     isInitializing = false;
-    setStatus('ready', 100, 'TTS Engine initialized successfully.');
+    setStatus('ready', 100, 'TTS Engine initialized successfully (Piper & Models ready).');
 
     // Clear old TTS cache so it regenerates at the new slower speed
     try {
       const files = fs.readdirSync(cacheDir);
       for (const file of files) {
-        fs.unlinkSync(path.join(cacheDir, file));
+        // Hapus hanya berkas frasa kustom (*_phrase_*.wav), jangan hapus berkas bawaan kita!
+        if (file.includes('_phrase_')) {
+          fs.unlinkSync(path.join(cacheDir, file));
+        }
       }
-      console.log("[TTS Engine] Cache cleared for regeneration at new slower speed.");
+      console.log("[TTS Engine] Custom phrase cache cleared.");
     } catch (e) {
-      console.error("[TTS Engine] Failed to clear TTS cache:", e);
+      console.error("[TTS Engine] Failed to clear custom TTS cache:", e);
     }
 
     // 3. Pre-generate vocab in background
@@ -230,6 +263,15 @@ async function initTtsEngine(callback) {
     return true;
   } catch (err) {
     isInitializing = false;
+    console.error("[TTS Engine] Gagal memuat/mendownload Piper engine:", err.message);
+    
+    // Jika ada berkas prebuilt, kita tetap set isReady = true agar suara bawaan bisa tetap diputar!
+    if (hasPrebuilt) {
+      isReady = true;
+      setStatus('ready', 100, 'TTS Engine aktif menggunakan berkas suara bawaan (Piper offline/download gagal).');
+      return true;
+    }
+    
     setStatus('error', 0, `Initialization failed: ${err.message}`);
     return false;
   }
@@ -298,6 +340,18 @@ async function generatePhraseIfNeeded(text, lang) {
   }
 
   try {
+    // Jika berkas tidak ada di cache, kita harus men-generate-nya menggunakan Piper.
+    // Pastikan biner Piper sudah terunduh & siap digunakan.
+    const binaryPath = getBinaryPath();
+    const binaryExists = fileExistsAndNotEmpty(binaryPath);
+    if (!binaryExists) {
+      console.log("[TTS Engine] Frasa kustom baru dideteksi. Mengunduh dan menginisialisasi Piper Engine...");
+      const success = await initTtsEngine(null, true);
+      if (!success) {
+        throw new Error("Gagal menginisialisasi Piper Engine untuk suara kustom.");
+      }
+    }
+
     await generateWav(text, lang, targetPath);
     console.log(`[TTS Engine] Generated custom phrase audio: ${filename}`);
     return filename;
