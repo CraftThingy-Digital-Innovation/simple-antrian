@@ -124,7 +124,8 @@ async function initDb() {
     { key: 'mirror_crop_top', value: 'false' },
     { key: 'video_sidebar_muted', value: 'true' },
     { key: 'video_fullscreen_muted', value: 'false' },
-    { key: 'color_theme', value: 'default' }
+    { key: 'color_theme', value: 'default' },
+    { key: 'multilang_enabled', value: 'false' }
   ];
 
   for (const s of defaultSettings) {

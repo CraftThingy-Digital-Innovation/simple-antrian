@@ -876,8 +876,13 @@
             <label for="setting-tts-enabled" style="font-size: 0.95rem; font-weight: 600; cursor: pointer;">Aktifkan Suara Panggilan Pelanggan</label>
           </div>
 
-          <div style="font-size: 0.8rem; color: var(--text-muted);">
-            Jika diaktifkan, nomor antrian akan dipanggil secara berurutan dalam 3 bahasa (Bahasa Indonesia, Inggris, dan Mandarin) pada layar display pelanggan.
+          <div class="form-group" id="setting-multilang-group" style="flex-direction: row; gap: 10px; align-items: center; margin-top: 10px; padding-left: 28px;">
+            <input type="checkbox" id="setting-multilang-enabled" style="width: 18px; height: 18px;">
+            <label for="setting-multilang-enabled" style="font-size: 0.9rem; font-weight: 600; cursor: pointer; color: var(--text-secondary);">Aktifkan Multi Bahasa (Inggris & Mandarin)</label>
+          </div>
+
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">
+            Panggilan suara default dibacakan dalam Bahasa Indonesia. Jika opsi Multi Bahasa diaktifkan, nomor antrian akan dipanggil berurutan dalam 3 bahasa (Bahasa Indonesia, Inggris, dan Mandarin) pada layar display.
           </div>
 
           <button class="btn btn-primary" id="btn-save-tts" style="margin-top: 10px; width: 100%;">

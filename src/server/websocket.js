@@ -454,13 +454,16 @@ async function handleClientAction(action, ws) {
       }
 
       case 'SAVE_TTS': {
-        const { enabled } = payload;
+        const { enabled, multilang } = payload;
         const dbMod = require('./db');
         await dbMod.saveSetting('tts_enabled', enabled);
+        if (multilang !== undefined) {
+          await dbMod.saveSetting('multilang_enabled', multilang);
+        }
         // Broadcast ke semua client
         broadcast({
           type: 'TTS_SETTING_UPDATE',
-          payload: { enabled }
+          payload: { enabled, multilang }
         });
         // Kirim status TTS engine terkini ke seluruh klien agar progress bar muncul
         const currentTtsStatus = ttsGenerator.getLastStatus();
@@ -469,6 +472,11 @@ async function handleClientAction(action, ws) {
           payload: currentTtsStatus
         });
         ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Pengaturan Suara (TTS) berhasil disimpan!' } }));
+        
+        // Memicu inisialisasi model TTS latar belakang jika multilang diaktifkan
+        try {
+          await ttsGenerator.initialize();
+        } catch (e) {}
         break;
       }
 
@@ -774,6 +782,9 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber) {
     return filename;
   };
 
+  const settings = await db.getSettings();
+  const isMultilang = settings.multilang_enabled === 'true';
+
   // 1. Indonesian
   files.push('id_nomor_antrian.wav');
   files.push(`id_letter_${prefix}.wav`);
@@ -790,41 +801,43 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber) {
     idDeskTokens.forEach(t => files.push(`id_${t}.wav`));
   }
 
-  // 2. English
-  files.push('en_queue_number.wav');
-  files.push(`en_letter_${prefix}.wav`);
-  const enNumTokens = getEnglishNumberTokens(num);
-  enNumTokens.forEach(t => files.push(`en_${t}.wav`));
-  files.push('en_please_proceed_to.wav');
-  if (deskWord) {
-    const enWord = deskWord.replace(/loket/i, 'counter');
-    files.push(await getDeskWordFile(enWord, 'en'));
-  } else {
-    files.push('en_counter.wav');
-  }
-  if (!isNaN(deskNum)) {
-    const enDeskTokens = getEnglishNumberTokens(deskNum);
-    enDeskTokens.forEach(t => files.push(`en_${t}.wav`));
-  }
+  if (isMultilang) {
+    // 2. English
+    files.push('en_queue_number.wav');
+    files.push(`en_letter_${prefix}.wav`);
+    const enNumTokens = getEnglishNumberTokens(num);
+    enNumTokens.forEach(t => files.push(`en_${t}.wav`));
+    files.push('en_please_proceed_to.wav');
+    if (deskWord) {
+      const enWord = deskWord.replace(/loket/i, 'counter');
+      files.push(await getDeskWordFile(enWord, 'en'));
+    } else {
+      files.push('en_counter.wav');
+    }
+    if (!isNaN(deskNum)) {
+      const enDeskTokens = getEnglishNumberTokens(deskNum);
+      enDeskTokens.forEach(t => files.push(`en_${t}.wav`));
+    }
 
-  // 3. Chinese
-  files.push('zh_queue_number.wav');
-  files.push(`zh_letter_${prefix}.wav`);
-  const zhNumTokens = getChineseNumberTokens(num);
-  zhNumTokens.forEach(t => files.push(`zh_${t}.wav`));
-  files.push('zh_please_proceed_to.wav');
-  if (deskWord) {
-    const zhWord = deskWord
-      .replace(/loket/i, '柜台')
-      .replace(/customer\s*service/i, '客户服务')
-      .replace(/teller/i, '出纳柜台');
-    files.push(await getDeskWordFile(zhWord, 'zh'));
-  } else {
-    files.push('zh_counter.wav');
-  }
-  if (!isNaN(deskNum)) {
-    const zhDeskTokens = getChineseNumberTokens(deskNum);
-    zhDeskTokens.forEach(t => files.push(`zh_${t}.wav`));
+    // 3. Chinese
+    files.push('zh_queue_number.wav');
+    files.push(`zh_letter_${prefix}.wav`);
+    const zhNumTokens = getChineseNumberTokens(num);
+    zhNumTokens.forEach(t => files.push(`zh_${t}.wav`));
+    files.push('zh_please_proceed_to.wav');
+    if (deskWord) {
+      const zhWord = deskWord
+        .replace(/loket/i, '柜台')
+        .replace(/customer\s*service/i, '客户服务')
+        .replace(/teller/i, '出纳柜台');
+      files.push(await getDeskWordFile(zhWord, 'zh'));
+    } else {
+      files.push('zh_counter.wav');
+    }
+    if (!isNaN(deskNum)) {
+      const zhDeskTokens = getChineseNumberTokens(deskNum);
+      zhDeskTokens.forEach(t => files.push(`zh_${t}.wav`));
+    }
   }
 
   return files;

@@ -208,13 +208,13 @@ async function initSystemInfo() {
     serverPort = info.port || 8080;
     
     // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
-    if (info.appVersion === '1.5.5') {
+    if (info.appVersion === '1.5.6') {
       document.getElementById('lbl-app-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Sukses Diperbarui)</span>`;
       document.getElementById('lbl-settings-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Terbaru)</span>`;
-      if (!localStorage.getItem('v155_update_notified')) {
+      if (!localStorage.getItem('v156_update_notified')) {
         setTimeout(() => {
-          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.5.5 secara otomatis!", "success");
-          localStorage.setItem('v155_update_notified', 'true');
+          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.5.6 secara otomatis!", "success");
+          localStorage.setItem('v156_update_notified', 'true');
         }, 2000);
       }
     } else {
@@ -1404,7 +1404,8 @@ function setupEventListeners() {
   if (btnSaveTts) {
     btnSaveTts.addEventListener('click', () => {
       const enabled = document.getElementById('setting-tts-enabled').checked ? 'true' : 'false';
-      sendAction('SAVE_TTS', { enabled });
+      const multilang = document.getElementById('setting-multilang-enabled').checked ? 'true' : 'false';
+      sendAction('SAVE_TTS', { enabled, multilang });
       showToast('Menyimpan pengaturan Text-to-Speech...', 'info');
     });
   }
@@ -1933,6 +1934,10 @@ async function loadSettings() {
   const ttsCheckbox = document.getElementById('setting-tts-enabled');
   if (ttsCheckbox) {
     ttsCheckbox.checked = settings.tts_enabled !== 'false';
+  }
+  const multilangCheckbox = document.getElementById('setting-multilang-enabled');
+  if (multilangCheckbox) {
+    multilangCheckbox.checked = settings.multilang_enabled === 'true';
   }
 
   // WA Settings UI

@@ -224,7 +224,12 @@ async function initTtsEngine(callback) {
     }
 
     // 2. Download Models (re-download if empty/corrupted)
-    for (const lang of Object.keys(MODELS)) {
+    const db = require('./db');
+    const settings = await db.getSettings();
+    const isMultilang = settings.multilang_enabled === 'true';
+    const activeLanguages = isMultilang ? Object.keys(MODELS) : ['id'];
+
+    for (const lang of activeLanguages) {
       const m = MODELS[lang];
       const modelPath = path.join(piperDir, m.file);
       const configPath = path.join(piperDir, m.file + '.json');
