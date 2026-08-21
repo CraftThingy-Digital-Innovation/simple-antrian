@@ -375,7 +375,10 @@ async function handleClientAction(action, ws) {
       }
 
       case 'RECALL': {
-        const { ticketId } = payload;
+        const { ticketId, deskNumber } = payload;
+        if (ticketId && deskNumber) {
+          await db.updateTicketDesk(ticketId, deskNumber);
+        }
         const recalledTicket = await db.recallTicket(ticketId);
         
         if (recalledTicket) {

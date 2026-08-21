@@ -5,6 +5,7 @@ let serverIp = 'localhost';
 let serverPort = 8080;
 let servicesList = [];
 let localDeskSettings = {}; // Menyimpan nomor loket per layanan, misal: { teller: 'Loket 1' }
+let activeTickets = {}; // Menyimpan ID tiket aktif saat ini per layanan untuk pelacakan dinamis
 let currentTxId = '';
 let currentLogoBase64 = '';
 let ttsBannerTimeout = null;
@@ -207,13 +208,13 @@ async function initSystemInfo() {
     serverPort = info.port || 8080;
     
     // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
-    if (info.appVersion === '1.4.7') {
+    if (info.appVersion === '1.4.8') {
       document.getElementById('lbl-app-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Sukses Diperbarui)</span>`;
       document.getElementById('lbl-settings-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Terbaru)</span>`;
-      if (!localStorage.getItem('v147_update_notified')) {
+      if (!localStorage.getItem('v148_update_notified')) {
         setTimeout(() => {
-          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.4.7 secara otomatis!", "success");
-          localStorage.setItem('v147_update_notified', 'true');
+          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.4.8 secara otomatis!", "success");
+          localStorage.setItem('v148_update_notified', 'true');
         }, 2000);
       }
     } else {
@@ -840,7 +841,18 @@ function renderQueueState(state) {
     const currentDesk = localDeskSettings[srv.id] || 'Loket 1';
 
     // Cari apakah ada tiket sedang dipanggil untuk layanan dan loket ini
-    const activeCall = callingTickets.find(t => t.service_id === srv.id && t.desk_number === currentDesk);
+    let activeCall = callingTickets.find(t => t.service_id === srv.id && t.desk_number === currentDesk);
+    
+    // Jika tidak ditemukan karena nama loket diubah, cari berdasarkan activeTickets tracking
+    if (!activeCall && activeTickets[srv.id]) {
+      activeCall = callingTickets.find(t => t.id === activeTickets[srv.id]);
+    }
+
+    if (activeCall) {
+      activeTickets[srv.id] = activeCall.id;
+    } else {
+      delete activeTickets[srv.id];
+    }
     
     // Cari tiket berikutnya yang sedang menunggu untuk layanan ini
     const nextWaiting = waitingTickets.find(t => t.service_id === srv.id);
@@ -860,7 +872,7 @@ function renderQueueState(state) {
       `;
       actionsHtml = `
         <div class="calling-actions-grid">
-          <button class="btn btn-primary" onclick="recall('${activeCall.id}')" style="grid-column: span 1;">
+          <button class="btn btn-primary" onclick="recall('${activeCall.id}', '${srv.id}')" style="grid-column: span 1;">
             🔔 Panggil Ulang
           </button>
           <button class="btn btn-secondary" onclick="callSkipped('${srv.id}')" ${srv.skipped_count > 0 ? '' : 'disabled'}>
@@ -1013,9 +1025,11 @@ window.callSkipped = function(serviceId) {
   sendAction('CALL_SKIPPED', { serviceId, deskNumber });
 };
 
-window.recall = function(ticketId) {
+window.recall = function(ticketId, serviceId) {
   if (!ticketId) return;
-  sendAction('RECALL', { ticketId });
+  const deskInput = document.getElementById(`desk-input-${serviceId}`);
+  const deskNumber = deskInput ? deskInput.value : 'Loket 1';
+  sendAction('RECALL', { ticketId, deskNumber });
 };
 
 window.completeCall = function(ticketId) {
