@@ -208,13 +208,13 @@ async function initSystemInfo() {
     serverPort = info.port || 8080;
     
     // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
-    if (info.appVersion === '1.5.1') {
+    if (info.appVersion === '1.5.2') {
       document.getElementById('lbl-app-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Sukses Diperbarui)</span>`;
       document.getElementById('lbl-settings-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Terbaru)</span>`;
-      if (!localStorage.getItem('v151_update_notified')) {
+      if (!localStorage.getItem('v152_update_notified')) {
         setTimeout(() => {
-          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.5.1 secara otomatis!", "success");
-          localStorage.setItem('v151_update_notified', 'true');
+          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.5.2 secara otomatis!", "success");
+          localStorage.setItem('v152_update_notified', 'true');
         }, 2000);
       }
     } else {
@@ -841,6 +841,7 @@ function renderQueueState(state) {
     `;
   }
 
+  services.forEach(srv => {
     // Tentukan nomor loket
     let currentDesk = localDeskSettings[srv.id];
     const anyActiveCall = callingTickets.find(t => t.service_id === srv.id);
