@@ -207,13 +207,13 @@ async function initSystemInfo() {
     serverPort = info.port || 8080;
     
     // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
-    if (info.appVersion === '1.4.4') {
+    if (info.appVersion === '1.4.5') {
       document.getElementById('lbl-app-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Sukses Diperbarui)</span>`;
       document.getElementById('lbl-settings-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Terbaru)</span>`;
-      if (!localStorage.getItem('v144_update_notified')) {
+      if (!localStorage.getItem('v145_update_notified')) {
         setTimeout(() => {
-          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.4.4 secara otomatis!", "success");
-          localStorage.setItem('v144_update_notified', 'true');
+          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.4.5 secara otomatis!", "success");
+          localStorage.setItem('v145_update_notified', 'true');
         }, 2000);
       }
     } else {

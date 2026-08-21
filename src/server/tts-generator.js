@@ -267,6 +267,8 @@ function generateWav(text, lang, outputPath) {
           errorMsg = `Piper crashed (exit code ${code}). PC Anda belum terinstal Microsoft Visual C++ Redistributable. Silakan unduh dan instal vc_redist.x64 dari situs resmi Microsoft.`;
         } else if (code === 3221225595 || code === -1073741701) {
           errorMsg = `Piper crashed (exit code ${code}). Kemungkinan sistem operasi Windows Anda adalah 32-bit (x86), sedangkan Piper membutuhkan Windows 64-bit (x64).`;
+        } else if (code === 3221226505 || code === -1073740791) {
+          errorMsg = `Piper crashed (exit code ${code} / 0xC0000409 - Stack Buffer Overrun). Kemungkinan berkas model suara (.onnx) atau konfigurasi (.json) rusak/korup saat diunduh. Silakan hapus folder "data/piper" lalu restart aplikasi untuk mengunduh ulang.`;
         }
         reject(new Error(errorMsg));
       }
