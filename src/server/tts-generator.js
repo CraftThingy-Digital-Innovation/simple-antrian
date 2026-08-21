@@ -213,6 +213,17 @@ async function initTtsEngine(callback) {
     isInitializing = false;
     setStatus('ready', 100, 'TTS Engine initialized successfully.');
 
+    // Clear old TTS cache so it regenerates at the new slower speed
+    try {
+      const files = fs.readdirSync(cacheDir);
+      for (const file of files) {
+        fs.unlinkSync(path.join(cacheDir, file));
+      }
+      console.log("[TTS Engine] Cache cleared for regeneration at new slower speed.");
+    } catch (e) {
+      console.error("[TTS Engine] Failed to clear TTS cache:", e);
+    }
+
     // 3. Pre-generate vocab in background
     setTimeout(preGenerateVocab, 1000);
 
@@ -240,7 +251,7 @@ function generateWav(text, lang, outputPath) {
     }
 
     const modelPath = path.join(piperDir, modelInfo.file);
-    const args = ['--model', modelPath, '--output_file', outputPath];
+    const args = ['--model', modelPath, '--output_file', outputPath, '-l', '1.1'];
 
     const child = spawn(binaryPath, args, { cwd: piperDir });
 

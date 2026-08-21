@@ -275,10 +275,9 @@ function runNextText() {
   const lang = detectLang(text);
   langBadge.innerText = lang;
 
-  // Hitung durasi marquee proporsional dengan panjang teks
-  // Asumsi: 60 karakter = 15 detik, minimum 12 detik
+  // Hitung durasi marquee proporsional dengan panjang teks (dibuat lebih lambat)
   const charCount = text.length;
-  const durationSec = Math.max(12, Math.round(charCount * 0.22));
+  const durationSec = Math.max(20, Math.round(charCount * 0.35));
   el.style.setProperty('--marquee-dur', `${durationSec}s`);
 
   // Reset animasi agar teks mulai dari kanan lagi
@@ -665,4 +664,37 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 3000);
     });
   }
+  
+  // Start the footer clock
+  startClock();
 });
+
+// Clock widget helper
+function startClock() {
+  const timeEl = document.getElementById('footer-time');
+  const dateEl = document.getElementById('footer-date');
+  if (!timeEl || !dateEl) return;
+  
+  const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  
+  function update() {
+    const now = new Date();
+    
+    // Format Time: HH:mm:ss
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    timeEl.innerText = `${hours}:${minutes}:${seconds}`;
+    
+    // Format Date: Hari, DD Bulan YYYY
+    const dayName = days[now.getDay()];
+    const date = now.getDate();
+    const monthName = months[now.getMonth()];
+    const year = now.getFullYear();
+    dateEl.innerText = `${dayName}, ${date} ${monthName} ${year}`;
+  }
+  
+  update();
+  setInterval(update, 1000);
+}
