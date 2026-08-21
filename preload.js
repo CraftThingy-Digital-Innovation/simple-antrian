@@ -44,6 +44,8 @@ contextBridge.exposeInMainWorld('api', {
   deleteService: (id) => ipcRenderer.invoke('delete-service', id),
   resetAllQueues: () => ipcRenderer.invoke('reset-all-queues'),
   openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
+  getShareableWindows: () => ipcRenderer.invoke('get-shareable-windows'),
+  findWindowIdByName: (name) => ipcRenderer.invoke('find-window-id-by-name', name),
 
   // WhatsApp Auth
   waStartQr: () => ipcRenderer.invoke('wa-start-qr'),

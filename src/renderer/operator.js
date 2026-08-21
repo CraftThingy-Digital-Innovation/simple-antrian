@@ -76,6 +76,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Setup event listeners
   setupEventListeners();
 
+  // Load awal list window untuk mirroring
+  loadMirrorSources();
+
   // Load awal tab statistik dengan tanggal hari ini
   const today = new Date().toLocaleDateString('sv-SE');
   document.getElementById('stats-date').value = today;
@@ -607,6 +610,42 @@ function renderQueueState(state) {
   const { services, waitingTickets, callingTickets, serverName } = state;
   servicesList = services;
 
+  // Update Mirroring UI state
+  if (state.displayMode) {
+    const btnQueue = document.getElementById('btn-mode-queue');
+    const btnMirror = document.getElementById('btn-mode-mirror');
+    const statusText = document.getElementById('mirror-connection-status');
+    
+    if (btnQueue && btnMirror && statusText) {
+      if (state.displayMode === 'mirror') {
+        btnQueue.className = 'btn btn-sm btn-secondary';
+        btnMirror.className = 'btn btn-sm btn-primary';
+        statusText.innerText = 'Duplikasi Jendela';
+        statusText.style.color = 'var(--accent-primary)';
+      } else {
+        btnQueue.className = 'btn btn-sm btn-primary';
+        btnMirror.className = 'btn btn-sm btn-secondary';
+        statusText.innerText = 'Layar Antrian';
+        statusText.style.color = 'var(--accent-warning)';
+      }
+    }
+  }
+
+  if (state.mirrorWindowName !== undefined) {
+    const activeLabel = document.getElementById('mirror-active-window-name');
+    const select = document.getElementById('select-mirror-source');
+    
+    if (activeLabel) {
+      activeLabel.innerText = state.mirrorWindowName || 'Tidak Ada Jendela Terpilih';
+    }
+    if (select && state.mirrorWindowName) {
+      const matchOpt = Array.from(select.options).find(opt => opt.value === state.mirrorWindowName);
+      if (matchOpt) {
+        select.value = state.mirrorWindowName;
+      }
+    }
+  }
+
   // Render server name if received from WebSocket server
   if (serverName) {
     const lbl = document.getElementById('status-server-name');
@@ -820,6 +859,36 @@ window.skipCall = function(ticketId) {
 // ==================== EVENT LISTENERS & SETUP ====================
 
 function setupEventListeners() {
+  // Mirror Controls Event Listeners
+  const btnModeQueue = document.getElementById('btn-mode-queue');
+  const btnModeMirror = document.getElementById('btn-mode-mirror');
+  const selectMirrorSource = document.getElementById('select-mirror-source');
+  const btnRefreshMirror = document.getElementById('btn-refresh-mirror-sources');
+
+  if (btnModeQueue) {
+    btnModeQueue.addEventListener('click', () => {
+      sendAction('SAVE_DISPLAY_MODE', { mode: 'queue' });
+    });
+  }
+
+  if (btnModeMirror) {
+    btnModeMirror.addEventListener('click', () => {
+      sendAction('SAVE_DISPLAY_MODE', { mode: 'mirror' });
+    });
+  }
+
+  if (selectMirrorSource) {
+    selectMirrorSource.addEventListener('change', () => {
+      sendAction('SAVE_MIRROR_WINDOW', { windowName: selectMirrorSource.value });
+    });
+  }
+
+  if (btnRefreshMirror) {
+    btnRefreshMirror.addEventListener('click', () => {
+      loadMirrorSources();
+    });
+  }
+
   // Proyeksi Display Window
   const btnToggleDisplay = document.getElementById('btn-toggle-display');
   btnToggleDisplay.addEventListener('click', async () => {
@@ -1690,4 +1759,42 @@ window.moveVideo = function(index, dir) {
   currentVideoPlaylist[newIndex] = temp;
   renderVideoPlaylist();
 };
+
+// ==================== WINDOW MIRRORING ====================
+async function loadMirrorSources() {
+  const select = document.getElementById('select-mirror-source');
+  if (!select) return;
+  
+  select.innerHTML = '<option value="">-- Memuat daftar jendela... --</option>';
+  
+  try {
+    const windows = await window.api.getShareableWindows();
+    select.innerHTML = '<option value="">-- Pilih Jendela/Aplikasi --</option>';
+    
+    // Urutkan alfabetis
+    windows.sort((a, b) => a.name.localeCompare(b.name));
+    
+    windows.forEach(win => {
+      if (win.name && win.name.trim()) {
+        const opt = document.createElement('option');
+        opt.value = win.name;
+        opt.innerText = win.name;
+        select.appendChild(opt);
+      }
+    });
+    
+    // Set value dari setting aktif jika ada
+    const settings = await getSettingsData();
+    if (settings && settings.mirror_window_name) {
+      select.value = settings.mirror_window_name;
+      const activeLabel = document.getElementById('mirror-active-window-name');
+      if (activeLabel) {
+        activeLabel.innerText = settings.mirror_window_name;
+      }
+    }
+  } catch (err) {
+    console.error("Gagal memuat jendela shareable:", err);
+    select.innerHTML = '<option value="">Gagal memuat daftar jendela</option>';
+  }
+}
 

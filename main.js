@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog, shell, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -417,6 +417,31 @@ ipcMain.handle('get-services', () => db.getServices());
 ipcMain.handle('add-service', (event, name, prefix) => db.addService(require('crypto').randomUUID().substring(0, 8), name, prefix));
 ipcMain.handle('delete-service', (event, id) => db.deleteService(id));
 ipcMain.handle('reset-all-queues', () => db.resetAllQueues());
+
+// Jendela Shareable & Window Mirroring
+ipcMain.handle('get-shareable-windows', async () => {
+  try {
+    const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
+    return sources.map(src => ({
+      id: src.id,
+      name: src.name
+    }));
+  } catch (err) {
+    console.error("Gagal mendapatkan daftar jendela shareable:", err);
+    return [];
+  }
+});
+
+ipcMain.handle('find-window-id-by-name', async (event, name) => {
+  try {
+    const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
+    const match = sources.find(src => src.name.toLowerCase().includes(name.toLowerCase()));
+    return match ? match.id : null;
+  } catch (err) {
+    console.error("Gagal mencari ID jendela berdasarkan nama:", err);
+    return null;
+  }
+});
 
 // Export & Import Handlers
 ipcMain.handle('export-data', async () => {

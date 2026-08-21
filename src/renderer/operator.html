@@ -452,6 +452,49 @@
           </div>
         </section>
       </div>
+
+      <!-- ===== LAYAR MIRROR DISPLAY CONTROL ===== -->
+      <section class="glass-panel config-section animate-slide-in" style="margin-top: 25px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px; margin-bottom: 16px;">
+          <h3 class="config-title" style="margin: 0; border: none; padding: 0;">🖥️ Duplikasi Layar (Window Mirroring)</h3>
+          
+          <!-- Mode Toggle: Antrian vs Mirror -->
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Tampilan Display:</span>
+            <div style="display: flex; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 8px; border: 1px solid var(--border-glass);">
+              <button class="btn btn-sm btn-secondary" id="btn-mode-queue" style="border-radius: 6px; padding: 6px 12px; margin-right: 4px;">📊 Antrian</button>
+              <button class="btn btn-sm btn-secondary" id="btn-mode-mirror" style="border-radius: 6px; padding: 6px 12px;">🖥️ Mirror Jendela</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="gap: 20px;">
+          <!-- Pilih Window Jendela -->
+          <div>
+            <div class="form-group">
+              <label for="select-mirror-source">Pilih Jendela / Aplikasi yang Akan Diduplikasi</label>
+              <div style="display: flex; gap: 8px;">
+                <select class="input-control" id="select-mirror-source" style="flex: 1;">
+                  <option value="">-- Memuat daftar jendela... --</option>
+                </select>
+                <button class="btn btn-secondary" id="btn-refresh-mirror-sources" style="padding: 12px 16px;">🔄</button>
+              </div>
+            </div>
+            
+            <div id="mirror-status-info" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 10px;">
+              Mode Display Aktif: <strong id="mirror-connection-status" style="color: var(--accent-warning);">Layar Antrian</strong>
+            </div>
+          </div>
+
+          <!-- Pratinjau Jendela Terpilih -->
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); border: 1px dashed var(--border-glass); border-radius: 12px; padding: 15px; height: 120px;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Jendela Target Terpilih:</div>
+            <div id="mirror-active-window-name" style="font-weight: 700; font-size: 0.95rem; color: var(--accent-primary); text-align: center; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; width: 100%;">
+              Tidak Ada Jendela Terpilih
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
 
     <!-- TAB: SEARCH -->

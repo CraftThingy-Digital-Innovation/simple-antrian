@@ -118,7 +118,9 @@ async function initDb() {
     { key: 'display_title', value: 'SimpleAntrian' },
     { key: 'display_subtitle', value: 'Budayakan antri demi kenyamanan bersama. \nSilakan siapkan tiket Anda dan perhatikan panggilan layar.' },
     { key: 'display_logo', value: '' },
-    { key: 'video_playlist', value: JSON.stringify([]) }
+    { key: 'video_playlist', value: JSON.stringify([]) },
+    { key: 'display_mode', value: 'queue' },
+    { key: 'mirror_window_name', value: '' }
   ];
 
   for (const s of defaultSettings) {

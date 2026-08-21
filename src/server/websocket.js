@@ -188,6 +188,8 @@ async function getCurrentState() {
   const callingTickets = await db.getCallingTickets();
   const settings = await db.getSettings();
   const videoPlaylist = settings.video_playlist ? JSON.parse(settings.video_playlist) : [];
+  const displayMode = settings.display_mode || 'queue';
+  const mirrorWindowName = settings.mirror_window_name || '';
   
   return {
     serverName: settings.server_name || 'Server Utama',
@@ -195,7 +197,9 @@ async function getCurrentState() {
     services,
     waitingTickets,
     callingTickets,
-    videoPlaylist
+    videoPlaylist,
+    displayMode,
+    mirrorWindowName
   };
 }
 
@@ -485,6 +489,34 @@ async function handleClientAction(action, ws) {
           payload: { playlist }
         });
         ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Playlist Video berhasil disimpan!' } }));
+        break;
+      }
+
+      case 'SAVE_DISPLAY_MODE': {
+        const { mode } = payload;
+        const dbMod = require('./db');
+        await dbMod.saveSetting('display_mode', mode);
+        
+        // Broadcast ke semua client
+        broadcast({
+          type: 'DISPLAY_MODE_UPDATE',
+          payload: { mode }
+        });
+        await broadcastStateUpdate();
+        break;
+      }
+
+      case 'SAVE_MIRROR_WINDOW': {
+        const { windowName } = payload;
+        const dbMod = require('./db');
+        await dbMod.saveSetting('mirror_window_name', windowName);
+        
+        // Broadcast ke semua client
+        broadcast({
+          type: 'MIRROR_WINDOW_UPDATE',
+          payload: { windowName }
+        });
+        await broadcastStateUpdate();
         break;
       }
 

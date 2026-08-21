@@ -86,6 +86,9 @@ function handleWebSocketMessage(message) {
       if (typeof updateVideoPlaylist === 'function') {
         updateVideoPlaylist(payload.videoPlaylist);
       }
+      if (typeof updateMirrorState === 'function') {
+        updateMirrorState(payload.displayMode, payload.mirrorWindowName);
+      }
       break;
 
     case 'ANNOUNCE_CALL':
@@ -114,6 +117,9 @@ function handleWebSocketMessage(message) {
         try {
           updateVideoPlaylist(JSON.parse(payload.video_playlist));
         } catch (_) {}
+      }
+      if (typeof updateMirrorState === 'function') {
+        updateMirrorState(payload.display_mode || 'queue', payload.mirror_window_name || '');
       }
       break;
 
@@ -697,4 +703,126 @@ function startClock() {
   
   update();
   setInterval(update, 1000);
+}
+
+// ==================== DUPLIKASI LAYAR (WINDOW MIRRORING) ====================
+let mirrorStream = null;
+let activeMirrorWindowName = '';
+
+async function updateMirrorState(displayMode, windowName) {
+  const container = document.getElementById('mirror-container');
+  const video = document.getElementById('mirror-video-player');
+  const placeholder = document.getElementById('mirror-placeholder');
+  const placeholderTitle = document.getElementById('mirror-placeholder-title');
+  const placeholderDesc = document.getElementById('mirror-placeholder-desc');
+  
+  if (!container || !video) return;
+  
+  if (displayMode !== 'mirror') {
+    // Sembunyikan mirror dan hentikan stream jika ada
+    container.style.display = 'none';
+    stopMirrorStream();
+    activeMirrorWindowName = '';
+    return;
+  }
+  
+  // Tampilkan mirror container
+  container.style.display = 'flex';
+  
+  if (!windowName) {
+    stopMirrorStream();
+    placeholder.style.display = 'flex';
+    placeholderTitle.innerText = 'Menunggu Jendela Terpilih';
+    placeholderDesc.innerText = 'Silakan pilih jendela aplikasi di Operator Panel.';
+    activeMirrorWindowName = '';
+    return;
+  }
+  
+  // Jika jendela terpilih berubah atau belum terhubung, hubungkan!
+  if (activeMirrorWindowName !== windowName) {
+    stopMirrorStream();
+    activeMirrorWindowName = windowName;
+    
+    placeholder.style.display = 'flex';
+    placeholderTitle.innerText = 'Mencari Jendela...';
+    placeholderDesc.innerText = `Menghubungkan ke: "${windowName}"`;
+    
+    await tryConnectMirrorStream(windowName);
+  }
+}
+
+async function tryConnectMirrorStream(windowName) {
+  const video = document.getElementById('mirror-video-player');
+  const placeholder = document.getElementById('mirror-placeholder');
+  const placeholderTitle = document.getElementById('mirror-placeholder-title');
+  const placeholderDesc = document.getElementById('mirror-placeholder-desc');
+  
+  try {
+    const sourceId = await window.api.findWindowIdByName(windowName);
+    if (!sourceId) {
+      placeholder.style.display = 'flex';
+      placeholderTitle.innerText = 'Aplikasi Tidak Aktif';
+      placeholderDesc.innerText = `Harap buka aplikasi/jendela "${windowName}" di PC ini.`;
+      
+      // Jadwalkan pengecekan ulang setiap 3 detik sampai ketemu
+      setTimeout(() => {
+        if (activeMirrorWindowName === windowName && (!mirrorStream || !mirrorStream.active)) {
+          tryConnectMirrorStream(windowName);
+        }
+      }, 3000);
+      return;
+    }
+    
+    // Capture stream
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        mandatory: {
+          chromeMediaSource: 'desktop',
+          chromeMediaSourceId: sourceId,
+          minWidth: 1280,
+          maxWidth: 1920,
+          minHeight: 720,
+          maxHeight: 1080
+        }
+      }
+    });
+    
+    mirrorStream = stream;
+    video.srcObject = stream;
+    
+    // Mute video to prevent audio feedback
+    video.muted = true;
+    
+    video.play();
+    
+    // Sembunyikan placeholder setelah video aktif
+    placeholder.style.display = 'none';
+    console.log(`[Mirror] Berhasil menduplikasi jendela: ${windowName}`);
+    
+    // Deteksi jika stream mati (misal jendela ditutup)
+    stream.getVideoTracks()[0].onended = () => {
+      console.warn("[Mirror] Jendela ditutup oleh pengguna.");
+      stopMirrorStream();
+      tryConnectMirrorStream(windowName); // Coba cari kembali
+    };
+  } catch (err) {
+    console.error("[Mirror] Gagal menghubungkan stream:", err);
+    placeholder.style.display = 'flex';
+    placeholderTitle.innerText = 'Koneksi Gagal';
+    placeholderDesc.innerText = `Error: ${err.message}`;
+  }
+}
+
+function stopMirrorStream() {
+  const video = document.getElementById('mirror-video-player');
+  if (video) {
+    video.srcObject = null;
+  }
+  if (mirrorStream) {
+    try {
+      mirrorStream.getTracks().forEach(track => track.stop());
+    } catch (_) {}
+    mirrorStream = null;
+  }
 }
