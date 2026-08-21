@@ -208,13 +208,13 @@ async function initSystemInfo() {
     serverPort = info.port || 8080;
     
     // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
-    if (info.appVersion === '1.5.4') {
+    if (info.appVersion === '1.5.5') {
       document.getElementById('lbl-app-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Sukses Diperbarui)</span>`;
       document.getElementById('lbl-settings-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Terbaru)</span>`;
-      if (!localStorage.getItem('v154_update_notified')) {
+      if (!localStorage.getItem('v155_update_notified')) {
         setTimeout(() => {
-          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.5.4 secara otomatis!", "success");
-          localStorage.setItem('v154_update_notified', 'true');
+          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.5.5 secara otomatis!", "success");
+          localStorage.setItem('v155_update_notified', 'true');
         }, 2000);
       }
     } else {
@@ -824,39 +824,99 @@ function playAudioSequence(urls) {
   });
 }
 
-// Ding Dong Chime menggunakan Web Audio API (Tanpa asset file audio!)
+// Generate WAV Chime secara dinamis di memori untuk bypass proteksi autoplay Web Audio API
+function generateChimeWavBlob() {
+  const sampleRate = 11025;
+  const duration = 1.0; // 1 detik total
+  const numSamples = Math.floor(sampleRate * duration);
+  const buffer = new Uint8Array(44 + numSamples);
+  
+  // WAV Header (44 bytes)
+  buffer[0] = 0x52; buffer[1] = 0x49; buffer[2] = 0x46; buffer[3] = 0x46; // "RIFF"
+  const size = 36 + numSamples;
+  buffer[4] = size & 0xff;
+  buffer[5] = (size >> 8) & 0xff;
+  buffer[6] = (size >> 16) & 0xff;
+  buffer[7] = (size >> 24) & 0xff;
+  buffer[8] = 0x57; buffer[9] = 0x41; buffer[10] = 0x56; buffer[11] = 0x45; // "WAVE"
+  buffer[12] = 0x66; buffer[13] = 0x6d; buffer[14] = 0x74; buffer[15] = 0x20; // "fmt "
+  buffer[16] = 16; buffer[17] = 0; buffer[18] = 0; buffer[19] = 0;
+  buffer[20] = 1; buffer[21] = 0;
+  buffer[22] = 1; buffer[23] = 0;
+  buffer[24] = sampleRate & 0xff;
+  buffer[25] = (sampleRate >> 8) & 0xff;
+  buffer[26] = (sampleRate >> 16) & 0xff;
+  buffer[27] = (sampleRate >> 24) & 0xff;
+  buffer[28] = sampleRate & 0xff;
+  buffer[29] = (sampleRate >> 8) & 0xff;
+  buffer[30] = (sampleRate >> 16) & 0xff;
+  buffer[31] = (sampleRate >> 24) & 0xff;
+  buffer[32] = 1; buffer[33] = 0;
+  buffer[34] = 8; buffer[35] = 0;
+  buffer[36] = 0x64; buffer[37] = 0x61; buffer[38] = 0x74; buffer[39] = 0x61; // "data"
+  buffer[40] = numSamples & 0xff;
+  buffer[41] = (numSamples >> 8) & 0xff;
+  buffer[42] = (numSamples >> 16) & 0xff;
+  buffer[43] = (numSamples >> 24) & 0xff;
+  
+  // Nada bel: C5 (523.25 Hz), E5 (659.25 Hz), G5 (783.99 Hz)
+  const fC5 = 523.25;
+  const fE5 = 659.25;
+  const fG5 = 783.99;
+  
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    let signal = 0;
+    
+    // Nada 1: C5 (mulai 0.0s, durasi 0.4s)
+    if (t >= 0 && t < 0.4) {
+      const amp = 0.25 * Math.exp(-6 * t);
+      signal += amp * Math.sin(2 * Math.PI * fC5 * t);
+    }
+    // Nada 2: E5 (mulai 0.2s, durasi 0.4s)
+    if (t >= 0.2 && t < 0.6) {
+      const amp = 0.25 * Math.exp(-6 * (t - 0.2));
+      signal += amp * Math.sin(2 * Math.PI * fE5 * (t - 0.2));
+    }
+    // Nada 3: G5 (mulai 0.4s, durasi 0.5s)
+    if (t >= 0.4 && t < 0.9) {
+      const amp = 0.3 * Math.exp(-5 * (t - 0.4));
+      signal += amp * Math.sin(2 * Math.PI * fG5 * (t - 0.4));
+    }
+    
+    signal = Math.max(-1.0, Math.min(1.0, signal));
+    buffer[44 + i] = Math.floor((signal + 1.0) * 127.5);
+  }
+  
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+// Ding Dong Chime menggunakan HTML5 Audio (Bypass autoplay block)
 function playDingDong() {
   return new Promise((resolve) => {
     try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const wavBlob = generateChimeWavBlob();
+      const blobUrl = URL.createObjectURL(wavBlob);
+      const audio = new Audio(blobUrl);
       
-      const playTone = (freq, delay, duration) => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
-        
-        gain.gain.setValueAtTime(0, audioCtx.currentTime + delay);
-        gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + delay + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + delay + duration);
-        
-        osc.start(audioCtx.currentTime + delay);
-        osc.stop(audioCtx.currentTime + delay + duration);
-      };
-
-      playTone(523.25, 0, 0.4); // C5
-      setTimeout(() => playTone(659.25, 0, 0.4), 200); // E5
-      setTimeout(() => playTone(783.99, 0, 0.5), 400); // G5
-      
-      setTimeout(() => {
-        audioCtx.close();
+      audio.onended = () => {
+        URL.revokeObjectURL(blobUrl);
         resolve();
-      }, 1000);
+      };
+      
+      audio.onerror = (err) => {
+        console.error('HTML5 Chime playback failed:', err);
+        URL.revokeObjectURL(blobUrl);
+        resolve();
+      };
+      
+      audio.play().catch(err => {
+        console.error('HTML5 Chime autoplay error:', err);
+        URL.revokeObjectURL(blobUrl);
+        resolve();
+      });
     } catch (e) {
-      resolve(); // Tetap selesaikan jika Web Audio gagal
+      resolve();
     }
   });
 }
