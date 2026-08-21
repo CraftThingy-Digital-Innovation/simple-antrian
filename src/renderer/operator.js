@@ -207,7 +207,17 @@ async function initSystemInfo() {
     serverPort = info.port || 8080;
     
     // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
-    document.getElementById('lbl-app-version').innerText = `v${info.appVersion}`;
+    if (info.appVersion === '1.4.4') {
+      document.getElementById('lbl-app-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Sukses Diperbarui)</span>`;
+      if (!localStorage.getItem('v144_update_notified')) {
+        setTimeout(() => {
+          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.4.4 secara otomatis!", "success");
+          localStorage.setItem('v144_update_notified', 'true');
+        }, 2000);
+      }
+    } else {
+      document.getElementById('lbl-app-version').innerText = `v${info.appVersion}`;
+    }
     window.api.onAppUpdateAvailable(async (updateInfo) => {
       const banner = document.getElementById('app-update-banner');
       const lblNew = document.getElementById('lbl-new-app-version');
