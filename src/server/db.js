@@ -121,7 +121,9 @@ async function initDb() {
     { key: 'video_playlist', value: JSON.stringify([]) },
     { key: 'display_mode', value: 'queue' },
     { key: 'mirror_window_name', value: '' },
-    { key: 'mirror_crop_top', value: 'false' }
+    { key: 'mirror_crop_top', value: 'false' },
+    { key: 'video_sidebar_muted', value: 'true' },
+    { key: 'video_fullscreen_muted', value: 'false' }
   ];
 
   for (const s of defaultSettings) {

@@ -83,6 +83,12 @@ function handleWebSocketMessage(message) {
   switch (type) {
     case 'STATE_UPDATE':
       renderDisplayState(payload);
+      if (payload.videoSidebarMuted !== undefined) {
+        videoSidebarMuted = payload.videoSidebarMuted;
+      }
+      if (payload.videoFullscreenMuted !== undefined) {
+        videoFullscreenMuted = payload.videoFullscreenMuted;
+      }
       if (typeof updateVideoPlaylist === 'function') {
         updateVideoPlaylist(payload.videoPlaylist);
       }
@@ -113,6 +119,12 @@ function handleWebSocketMessage(message) {
     case 'SETTINGS_RESPONSE':
       globalSettings = payload;
       applyDisplayCustomization(payload);
+      if (payload.video_sidebar_muted !== undefined) {
+        videoSidebarMuted = payload.video_sidebar_muted !== 'false';
+      }
+      if (payload.video_fullscreen_muted !== undefined) {
+        videoFullscreenMuted = payload.video_fullscreen_muted === 'true';
+      }
       if (typeof updateVideoPlaylist === 'function' && payload.video_playlist) {
         try {
           updateVideoPlaylist(JSON.parse(payload.video_playlist));
@@ -595,6 +607,8 @@ function initCanvasVisualizer() {
 let videoPlaylist = [];
 let currentVideoIndex = 0;
 let currentDisplayMode = 'queue';
+let videoSidebarMuted = true;
+let videoFullscreenMuted = false;
 
 function updateVideoPlaylist(newPlaylist) {
   const playlist = Array.isArray(newPlaylist) ? newPlaylist : [];
@@ -659,14 +673,14 @@ function syncVideoPlayers(displayMode) {
     if (fullscreenContainer) fullscreenContainer.style.display = 'flex';
     if (fullscreenPlaceholder) fullscreenPlaceholder.style.display = 'none';
     
+    // Set status mute secara dinamis dari pengaturan
+    fullscreenPlayer.muted = videoFullscreenMuted;
+    
     // Play video jika belum memutar URL yang benar
     if (fullscreenPlayer.src !== videoUrl) {
       console.log(`[FullscreenPlayer] Playing video ${currentVideoIndex + 1}/${videoPlaylist.length}: ${videoUrl}`);
       fullscreenPlayer.src = videoUrl;
       fullscreenPlayer.load();
-      
-      // Fullscreen video plays with sound! (unmuted)
-      fullscreenPlayer.muted = false;
       
       const playPromise = fullscreenPlayer.play();
       if (playPromise !== undefined) {
@@ -687,13 +701,13 @@ function syncVideoPlayers(displayMode) {
     
     if (sidebarCard) sidebarCard.style.display = 'block';
     
+    // Set status mute secara dinamis dari pengaturan
+    sidebarPlayer.muted = videoSidebarMuted;
+    
     if (sidebarPlayer.src !== videoUrl) {
       console.log(`[SidebarPlayer] Playing video ${currentVideoIndex + 1}/${videoPlaylist.length}: ${videoUrl}`);
       sidebarPlayer.src = videoUrl;
       sidebarPlayer.load();
-      
-      // Sidebar video plays muted!
-      sidebarPlayer.muted = true;
       
       const playPromise = sidebarPlayer.play();
       if (playPromise !== undefined) {

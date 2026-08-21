@@ -1139,7 +1139,15 @@ function setupEventListeners() {
       sendAction('SAVE_VIDEO_PLAYLIST', {
         playlist: currentVideoPlaylist
       });
-      showToast('Menyimpan playlist video...', 'info');
+      
+      const sidebarMuted = document.getElementById('setting-video-sidebar-muted').checked;
+      const fullscreenMuted = document.getElementById('setting-video-fullscreen-muted').checked;
+      sendAction('SAVE_VIDEO_AUDIO_SETTINGS', {
+        sidebarMuted,
+        fullscreenMuted
+      });
+      
+      showToast('Menyimpan playlist dan pengaturan suara video...', 'info');
     });
   }
 
@@ -1573,6 +1581,16 @@ async function loadSettings() {
     currentLogoBase64 = '';
     document.getElementById('display-logo-preview').src = '';
     document.getElementById('display-logo-preview-container').style.display = 'none';
+  }
+
+  // Video Audio Settings UI
+  const sidebarMutedCheckbox = document.getElementById('setting-video-sidebar-muted');
+  if (sidebarMutedCheckbox) {
+    sidebarMutedCheckbox.checked = settings.video_sidebar_muted !== 'false';
+  }
+  const fullscreenMutedCheckbox = document.getElementById('setting-video-fullscreen-muted');
+  if (fullscreenMutedCheckbox) {
+    fullscreenMutedCheckbox.checked = settings.video_fullscreen_muted === 'true';
   }
 
   // Minta status WA terbaru ke WebSocket server

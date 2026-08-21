@@ -191,6 +191,8 @@ async function getCurrentState() {
   const displayMode = settings.display_mode || 'queue';
   const mirrorWindowName = settings.mirror_window_name || '';
   const mirrorCropTop = settings.mirror_crop_top === 'true';
+  const videoSidebarMuted = settings.video_sidebar_muted !== 'false'; // default true
+  const videoFullscreenMuted = settings.video_fullscreen_muted === 'true'; // default false
   
   return {
     serverName: settings.server_name || 'Server Utama',
@@ -201,7 +203,9 @@ async function getCurrentState() {
     videoPlaylist,
     displayMode,
     mirrorWindowName,
-    mirrorCropTop
+    mirrorCropTop,
+    videoSidebarMuted,
+    videoFullscreenMuted
   };
 }
 
@@ -533,6 +537,18 @@ async function handleClientAction(action, ws) {
           payload: { crop }
         });
         await broadcastStateUpdate();
+        break;
+      }
+
+      case 'SAVE_VIDEO_AUDIO_SETTINGS': {
+        const { sidebarMuted, fullscreenMuted } = payload;
+        const dbMod = require('./db');
+        await dbMod.saveSetting('video_sidebar_muted', sidebarMuted ? 'true' : 'false');
+        await dbMod.saveSetting('video_fullscreen_muted', fullscreenMuted ? 'true' : 'false');
+        
+        // Broadcast state update agar sinkron
+        await broadcastStateUpdate();
+        ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Pengaturan Suara Video berhasil disimpan!' } }));
         break;
       }
 
