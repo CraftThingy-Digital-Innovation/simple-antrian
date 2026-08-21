@@ -1,6 +1,6 @@
 {
   "name": "simple-antrian",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Aplikasi Antrian Standalone Lintas Platform oleh CraftThingy Digital Innovation",
   "main": "main.js",
   "scripts": {
