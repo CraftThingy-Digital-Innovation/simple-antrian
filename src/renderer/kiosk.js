@@ -33,6 +33,25 @@ async function initKiosk() {
       } else {
         wsUrl = `ws://localhost:${serverPort}`;
       }
+
+      // Jalankan UDP Discovery Listener di Kiosk Client untuk auto-connect
+      window.api.onServersUpdated((servers) => {
+        if (servers.length > 0) {
+          const srv = servers[0];
+          const srvIpPort = `${srv.ip}:${srv.port}`;
+          const currentUrl = `ws://${srvIpPort}`;
+          
+          const lastSaved = localStorage.getItem('last_connected_server');
+          if (lastSaved !== srvIpPort) {
+            localStorage.setItem('last_connected_server', srvIpPort);
+          }
+          
+          if (!socket || socket.readyState === WebSocket.CLOSED) {
+            console.log(`[UDP Kiosk] Auto-connecting to discovered server: ${srvIpPort}`);
+            connectWebSocket(currentUrl);
+          }
+        }
+      });
     }
     
     connectWebSocket(wsUrl);
@@ -48,6 +67,12 @@ function connectWebSocket(url) {
   
   statusDot.innerText = 'Connecting...';
   statusDot.className = 'badge badge-waiting';
+
+  if (socket) {
+    try {
+      socket.close();
+    } catch (_) {}
+  }
 
   socket = new WebSocket(url);
 

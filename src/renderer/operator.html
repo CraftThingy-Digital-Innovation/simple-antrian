@@ -762,6 +762,37 @@
           </button>
         </section>
 
+        <!-- ===== PLAYLIST VIDEO DISPLAY ===== -->
+        <section class="glass-panel config-section" id="section-video-playlist-config">
+          <h3 class="config-title">📹 Playlist Video Layar Display</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+            Pilih dan atur urutan video yang akan diputar di layar display pelanggan. Video diputar tanpa suara (muted) secara otomatis.
+          </p>
+
+          <!-- Daftar video saat ini -->
+          <div id="video-playlist-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; max-height: 280px; overflow-y: auto; padding-right: 4px;">
+            <!-- JS-populated -->
+          </div>
+
+          <!-- Form tambah video baru -->
+          <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
+            <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Tambah Video Baru</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button type="button" class="btn btn-secondary" id="btn-browse-video" style="padding: 12px 16px; white-space: nowrap;">
+                📁 Pilih Berkas Video
+              </button>
+              <div style="flex: 1; font-size: 0.85rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="selected-video-path">
+                Belum ada file terpilih...
+              </div>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Format didukung: MP4, WebM, Ogg.</div>
+          </div>
+
+          <button class="btn btn-primary" id="btn-save-video-playlist" style="margin-top: 16px; width: 100%;">
+            💾 Simpan & Terapkan Playlist Video
+          </button>
+        </section>
+
         <!-- Suara Panggilan (Text-To-Speech) -->
         <section class="glass-panel config-section">
           <h3 class="config-title">🔊 Suara Panggilan (Text-to-Speech)</h3>

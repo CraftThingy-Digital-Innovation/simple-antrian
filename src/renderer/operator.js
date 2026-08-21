@@ -107,6 +107,7 @@ function setupTabs() {
       } else if (tabName === 'settings') {
         loadSettings();
         loadRunningTexts(); // refresh running texts setiap kali tab settings dibuka
+        loadVideoPlaylist(); // refresh video playlist setiap kali tab settings dibuka
       }
     });
   });
@@ -1012,6 +1013,39 @@ function setupEventListeners() {
     showToast('Menyimpan pengaturan WhatsApp...', 'info');
   });
 
+  // Pengaturan Playlist Video Layar Display
+  const btnBrowseVideo = document.getElementById('btn-browse-video');
+  const btnSaveVideoPlaylist = document.getElementById('btn-save-video-playlist');
+
+  if (btnBrowseVideo) {
+    btnBrowseVideo.addEventListener('click', async () => {
+      showToast('Membuka pemilih berkas video...', 'info');
+      try {
+        const res = await window.api.addVideoFile();
+        if (res.success && res.video) {
+          currentVideoPlaylist.push(res.video);
+          renderVideoPlaylist();
+          showToast(`Berhasil menambahkan video: ${res.video.originalName}`, 'success');
+        } else if (res.message) {
+          if (res.message !== 'Batal memilih video.') {
+            showToast(res.message, 'error');
+          }
+        }
+      } catch (err) {
+        showToast('Gagal menambahkan video: ' + err.message, 'error');
+      }
+    });
+  }
+
+  if (btnSaveVideoPlaylist) {
+    btnSaveVideoPlaylist.addEventListener('click', () => {
+      sendAction('SAVE_VIDEO_PLAYLIST', {
+        playlist: currentVideoPlaylist
+      });
+      showToast('Menyimpan playlist video...', 'info');
+    });
+  }
+
   // Tambah Teks Berjalan Baru
   const btnAddRunningText = document.getElementById('btn-add-running-text');
   if (btnAddRunningText) {
@@ -1584,5 +1618,76 @@ window.moveRunningText = function(index, dir) {
   currentRunningTexts[index] = currentRunningTexts[newIndex];
   currentRunningTexts[newIndex] = temp;
   renderRunningTextsList();
+};
+
+// ==================== CONFIG PLAYLIST VIDEO ====================
+let currentVideoPlaylist = [];
+
+/**
+ * Muat playlist video dari settings database dan render ke UI.
+ */
+async function loadVideoPlaylist() {
+  try {
+    const settings = await getSettingsData();
+    let playlist = [];
+    if (settings.video_playlist) {
+      try { playlist = JSON.parse(settings.video_playlist); } catch (_) {}
+    }
+    currentVideoPlaylist = Array.isArray(playlist) ? playlist : [];
+    renderVideoPlaylist();
+  } catch (err) {
+    showToast('Gagal memuat playlist video: ' + err.message, 'error');
+  }
+}
+
+/**
+ * Render daftar video di UI settings.
+ */
+function renderVideoPlaylist() {
+  const container = document.getElementById('video-playlist-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (currentVideoPlaylist.length === 0) {
+    container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:16px;">Belum ada video dalam playlist. Silakan tambah video di bawah.</div>`;
+    return;
+  }
+
+  currentVideoPlaylist.forEach((vid, index) => {
+    const item = document.createElement('div');
+    item.style.cssText = 'display:flex; gap:10px; align-items:center; background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:10px; padding:12px;';
+    item.innerHTML = `
+      <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:4px;">
+        <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">
+          ${vid.originalName}
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">
+          Path: ${vid.url}
+        </div>
+      </div>
+      <div style="display:flex; gap:6px; flex-shrink:0;">
+        <button class="btn btn-secondary" onclick="moveVideo(${index}, -1)" title="Geser ke atas" ${index === 0 ? 'disabled' : ''} style="padding:6px 10px; font-size:0.85rem;">▲</button>
+        <button class="btn btn-secondary" onclick="moveVideo(${index}, 1)" title="Geser ke bawah" ${index === currentVideoPlaylist.length - 1 ? 'disabled' : ''} style="padding:6px 10px; font-size:0.85rem;">▼</button>
+        <button class="btn btn-danger" onclick="removeVideo(${index})" title="Hapus" style="padding:6px 10px; font-size:0.85rem;">🗑️</button>
+      </div>
+    `;
+    container.appendChild(item);
+  });
+}
+
+/** Hapus video dari playlist di index tertentu */
+window.removeVideo = function(index) {
+  currentVideoPlaylist.splice(index, 1);
+  renderVideoPlaylist();
+};
+
+/** Pindahkan video ke atas/bawah */
+window.moveVideo = function(index, dir) {
+  const newIndex = index + dir;
+  if (newIndex < 0 || newIndex >= currentVideoPlaylist.length) return;
+  const temp = currentVideoPlaylist[index];
+  currentVideoPlaylist[index] = currentVideoPlaylist[newIndex];
+  currentVideoPlaylist[newIndex] = temp;
+  renderVideoPlaylist();
 };
 

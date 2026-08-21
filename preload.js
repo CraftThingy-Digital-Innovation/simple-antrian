@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('api', {
   openKioskWindow: () => ipcRenderer.invoke('open-kiosk-window'),
   closeKioskWindow: () => ipcRenderer.invoke('close-kiosk-window'),
   isKioskWindowOpen: () => ipcRenderer.invoke('is-kiosk-window-open'),
+  addVideoFile: () => ipcRenderer.invoke('add-video-file'),
   performWaUpdate: () => ipcRenderer.invoke('wa-perform-update'),
   checkAppUpdates: () => ipcRenderer.invoke('check-app-updates'),
   onAppUpdateAvailable: (callback) => {

@@ -102,6 +102,21 @@ app.on('window-all-closed', () => {
   }
 });
 
+// Helper to pipe console logs/errors from renderer processes (Chromium) to main process logs
+function captureWindowLogs(win, name) {
+  if (!win) return;
+  win.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    const levels = ['DEBUG', 'LOG', 'WARNING', 'ERROR'];
+    const lvl = levels[level] || 'LOG';
+    const cleanSource = sourceId ? path.basename(sourceId) : 'unknown';
+    if (lvl === 'ERROR') {
+      console.error(`[Renderer ${name} - ${lvl}] ${message} (at ${cleanSource}:${line})`);
+    } else {
+      console.log(`[Renderer ${name} - ${lvl}] ${message} (at ${cleanSource}:${line})`);
+    }
+  });
+}
+
 // Membuat Window Utama (Operator Panel)
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -117,6 +132,8 @@ function createMainWindow() {
     show: false,
     title: "SimpleAntrian - Operator Panel"
   });
+
+  captureWindowLogs(mainWindow, 'Operator');
 
   if (currentMode === 'select-mode') {
     mainWindow.loadFile(path.join(__dirname, 'src/renderer/select-mode.html'));
@@ -262,6 +279,7 @@ ipcMain.handle('open-display-window', () => {
   }
 
   displayWindow = new BrowserWindow(windowOptions);
+  captureWindowLogs(displayWindow, 'Display');
   displayWindow.loadFile(path.join(__dirname, 'src/renderer/display.html'));
 
   displayWindow.on('closed', () => {
@@ -285,7 +303,7 @@ ipcMain.handle('is-display-window-open', () => {
 });
 
 // Kiosk Mandiri (Layar Ketiga)
-ipcMain.handle('open-kiosk-window', () => {
+function openKioskWindow() {
   if (kioskWindow) {
     kioskWindow.focus();
     return true;
@@ -324,6 +342,7 @@ ipcMain.handle('open-kiosk-window', () => {
   }
 
   kioskWindow = new BrowserWindow(windowOptions);
+  captureWindowLogs(kioskWindow, 'Kiosk');
   kioskWindow.loadFile(path.join(__dirname, 'src/renderer/kiosk.html'));
 
   kioskWindow.on('closed', () => {
@@ -331,7 +350,9 @@ ipcMain.handle('open-kiosk-window', () => {
   });
 
   return true;
-});
+}
+
+ipcMain.handle('open-kiosk-window', () => openKioskWindow());
 
 ipcMain.handle('close-kiosk-window', () => {
   if (kioskWindow) {
@@ -344,6 +365,49 @@ ipcMain.handle('close-kiosk-window', () => {
 
 ipcMain.handle('is-kiosk-window-open', () => {
   return kioskWindow !== null;
+});
+
+// IPC Handler to pick and copy local video files to data/videos/
+ipcMain.handle('add-video-file', async () => {
+  if (!mainWindow) return { success: false, message: 'Window utama tidak ditemukan.' };
+  
+  const { filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Pilih Video untuk Playlist',
+    filters: [{ name: 'Videos', extensions: ['mp4', 'webm', 'ogg'] }],
+    properties: ['openFile']
+  });
+  
+  if (filePaths && filePaths.length > 0) {
+    const srcPath = filePaths[0];
+    const ext = path.extname(srcPath);
+    const baseName = path.basename(srcPath);
+    
+    const videoDir = app ? path.join(app.getPath('userData'), 'data', 'videos') : path.join(process.cwd(), 'data', 'videos');
+    if (!fs.existsSync(videoDir)) {
+      fs.mkdirSync(videoDir, { recursive: true });
+    }
+    
+    const crypto = require('crypto');
+    const uniqueFilename = `${crypto.randomUUID()}${ext}`;
+    const destPath = path.join(videoDir, uniqueFilename);
+    
+    try {
+      fs.copyFileSync(srcPath, destPath);
+      return {
+        success: true,
+        video: {
+          id: crypto.randomUUID().substring(0, 8),
+          originalName: baseName,
+          filename: uniqueFilename,
+          url: `/video/${uniqueFilename}`
+        }
+      };
+    } catch (err) {
+      console.error("Gagal menyalin video:", err);
+      return { success: false, message: `Gagal menyalin video: ${err.message}` };
+    }
+  }
+  return { success: false, message: 'Batal memilih video.' };
 });
 
 // Database Pass-through

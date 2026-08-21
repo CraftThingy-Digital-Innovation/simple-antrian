@@ -83,6 +83,9 @@ function handleWebSocketMessage(message) {
   switch (type) {
     case 'STATE_UPDATE':
       renderDisplayState(payload);
+      if (typeof updateVideoPlaylist === 'function') {
+        updateVideoPlaylist(payload.videoPlaylist);
+      }
       break;
 
     case 'ANNOUNCE_CALL':
@@ -107,6 +110,17 @@ function handleWebSocketMessage(message) {
     case 'SETTINGS_RESPONSE':
       globalSettings = payload;
       applyDisplayCustomization(payload);
+      if (typeof updateVideoPlaylist === 'function' && payload.video_playlist) {
+        try {
+          updateVideoPlaylist(JSON.parse(payload.video_playlist));
+        } catch (_) {}
+      }
+      break;
+
+    case 'VIDEO_PLAYLIST_UPDATE':
+      if (typeof updateVideoPlaylist === 'function') {
+        updateVideoPlaylist(payload.playlist);
+      }
       break;
 
     case 'DISPLAY_CUSTOM_UPDATE':
@@ -571,3 +585,84 @@ function initCanvasVisualizer() {
 
   animate();
 }
+
+// ==================== PLAYLIST VIDEO DISPLAY ====================
+let videoPlaylist = [];
+let currentVideoIndex = 0;
+
+function updateVideoPlaylist(newPlaylist) {
+  const playlist = Array.isArray(newPlaylist) ? newPlaylist : [];
+  const playlistJson = JSON.stringify(playlist);
+  const currentJson = JSON.stringify(videoPlaylist);
+  
+  if (playlistJson !== currentJson) {
+    videoPlaylist = playlist;
+    currentVideoIndex = 0;
+    playNextVideo();
+  }
+}
+
+function playNextVideo() {
+  const videoPlayer = document.getElementById('display-video-player');
+  const videoCard = document.getElementById('video-card');
+  if (!videoPlayer || !videoCard) return;
+  
+  if (videoPlaylist.length === 0) {
+    videoCard.style.display = 'none';
+    videoPlayer.src = '';
+    return;
+  }
+  
+  videoCard.style.display = 'block';
+  
+  if (currentVideoIndex >= videoPlaylist.length) {
+    currentVideoIndex = 0;
+  }
+  
+  const video = videoPlaylist[currentVideoIndex];
+  
+  // Tentukan host berdasarkan lokasi WebSocket
+  let host = window.location.host;
+  if (window.location.protocol === 'file:') {
+    const lastConnectedServer = localStorage.getItem('last_connected_server');
+    if (lastConnectedServer) {
+      host = lastConnectedServer;
+    } else {
+      host = 'localhost:8080';
+    }
+  }
+  
+  const videoUrl = `http://${host}${video.url}`;
+  console.log(`[VideoPlayer] Playing video ${currentVideoIndex + 1}/${videoPlaylist.length}: ${videoUrl}`);
+  
+  videoPlayer.src = videoUrl;
+  videoPlayer.load();
+  
+  const playPromise = videoPlayer.play();
+  if (playPromise !== undefined) {
+    playPromise.catch(error => {
+      console.warn("Failed to autoplay video, retrying next in playlist:", error);
+      setTimeout(() => {
+        currentVideoIndex++;
+        playNextVideo();
+      }, 3000);
+    });
+  }
+  
+  currentVideoIndex++;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const videoPlayer = document.getElementById('display-video-player');
+  if (videoPlayer) {
+    videoPlayer.addEventListener('ended', () => {
+      playNextVideo();
+    });
+    videoPlayer.addEventListener('error', (e) => {
+      console.error("[VideoPlayer] Error loading video file, skipping...", e);
+      setTimeout(() => {
+        playNextVideo();
+      }, 3000);
+    });
+  }
+});

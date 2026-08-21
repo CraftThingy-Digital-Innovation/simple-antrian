@@ -117,7 +117,8 @@ async function initDb() {
     { key: 'tts_enabled', value: 'true' },
     { key: 'display_title', value: 'SimpleAntrian' },
     { key: 'display_subtitle', value: 'Budayakan antri demi kenyamanan bersama. \nSilakan siapkan tiket Anda dan perhatikan panggilan layar.' },
-    { key: 'display_logo', value: '' }
+    { key: 'display_logo', value: '' },
+    { key: 'video_playlist', value: JSON.stringify([]) }
   ];
 
   for (const s of defaultSettings) {
@@ -133,8 +134,8 @@ async function initDb() {
 function getServices() {
   return all(`
     SELECT s.*, 
-      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'waiting' AND date(t.created_at) = date('now', 'localtime')) as waiting_count,
-      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'skipped' AND date(t.created_at) = date('now', 'localtime')) as skipped_count
+      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'waiting' AND date(t.created_at, 'localtime') = date('now', 'localtime')) as waiting_count,
+      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'skipped' AND date(t.created_at, 'localtime') = date('now', 'localtime')) as skipped_count
     FROM services s
     ORDER BY s.prefix ASC
   `);

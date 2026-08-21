@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
+const { app } = require('electron');
 const db = require('./db');
 const ttsGenerator = require('./tts-generator');
 
@@ -44,6 +45,50 @@ function startWebSocketServer(port) {
           res.writeHead(200, {
             'Content-Length': total,
             'Content-Type': 'audio/wav',
+            'Accept-Ranges': 'bytes'
+          });
+          fs.createReadStream(filePath).pipe(res);
+        }
+      } else {
+        res.writeHead(404);
+        res.end();
+      }
+    } else if (req.url.startsWith('/video/')) {
+      const filename = path.basename(req.url);
+      const videoDir = app ? path.join(app.getPath('userData'), 'data', 'videos') : path.join(process.cwd(), 'data', 'videos');
+      const filePath = path.join(videoDir, filename);
+      
+      if (fs.existsSync(filePath)) {
+        const stat = fs.statSync(filePath);
+        const total = stat.size;
+        const range = req.headers.range;
+        
+        const ext = path.extname(filePath).toLowerCase();
+        let contentType = 'video/mp4';
+        if (ext === '.webm') contentType = 'video/webm';
+        else if (ext === '.ogg') contentType = 'video/ogg';
+        
+        if (range) {
+          const parts = range.replace(/bytes=/, "").split("-");
+          const partialstart = parts[0];
+          const partialend = parts[1];
+          
+          const start = parseInt(partialstart, 10);
+          const end = partialend ? parseInt(partialend, 10) : total - 1;
+          const chunksize = (end - start) + 1;
+          
+          res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${total}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunksize,
+            'Content-Type': contentType
+          });
+          
+          fs.createReadStream(filePath, { start: start, end: end }).pipe(res);
+        } else {
+          res.writeHead(200, {
+            'Content-Length': total,
+            'Content-Type': contentType,
             'Accept-Ranges': 'bytes'
           });
           fs.createReadStream(filePath).pipe(res);
@@ -142,13 +187,15 @@ async function getCurrentState() {
   const waitingTickets = await db.getWaitingTickets();
   const callingTickets = await db.getCallingTickets();
   const settings = await db.getSettings();
+  const videoPlaylist = settings.video_playlist ? JSON.parse(settings.video_playlist) : [];
   
   return {
     serverName: settings.server_name || 'Server Utama',
     serverUuid: settings.server_uuid || '',
     services,
     waitingTickets,
-    callingTickets
+    callingTickets,
+    videoPlaylist
   };
 }
 
@@ -423,6 +470,21 @@ async function handleClientAction(action, ws) {
           payload: { title, subtitle, logo }
         });
         ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Pengaturan Tampilan berhasil disimpan!' } }));
+        break;
+      }
+
+      case 'SAVE_VIDEO_PLAYLIST': {
+        const { playlist } = payload;
+        if (!Array.isArray(playlist)) break;
+        const dbMod = require('./db');
+        await dbMod.saveSetting('video_playlist', JSON.stringify(playlist));
+        
+        // Broadcast ke semua client
+        broadcast({
+          type: 'VIDEO_PLAYLIST_UPDATE',
+          payload: { playlist }
+        });
+        ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Playlist Video berhasil disimpan!' } }));
         break;
       }
 
