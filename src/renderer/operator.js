@@ -208,19 +208,97 @@ async function initSystemInfo() {
     serverPort = info.port || 8080;
     
     // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
-    if (info.appVersion === '1.5.3') {
+    if (info.appVersion === '1.5.4') {
       document.getElementById('lbl-app-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Sukses Diperbarui)</span>`;
       document.getElementById('lbl-settings-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Terbaru)</span>`;
-      if (!localStorage.getItem('v153_update_notified')) {
+      if (!localStorage.getItem('v154_update_notified')) {
         setTimeout(() => {
-          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.5.3 secara otomatis!", "success");
-          localStorage.setItem('v153_update_notified', 'true');
+          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.5.4 secara otomatis!", "success");
+          localStorage.setItem('v154_update_notified', 'true');
         }, 2000);
       }
     } else {
       document.getElementById('lbl-app-version').innerText = `v${info.appVersion}`;
       document.getElementById('lbl-settings-version').innerText = `v${info.appVersion}`;
     }
+    // Floating Update Progress Modal variables & helpers
+    let updateProgressModal = null;
+
+    function showUpdateProgressModal(version) {
+      if (updateProgressModal) {
+        updateProgressModal.remove();
+      }
+      
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.style.zIndex = '10000';
+      
+      const content = document.createElement('div');
+      content.className = 'glass-panel modal-content animate-pop-in';
+      content.style.maxWidth = '400px';
+      content.style.textAlign = 'center';
+      content.style.padding = '28px';
+      
+      const title = document.createElement('h3');
+      title.innerText = `Memperbarui Aplikasi ke v${version}`;
+      title.style.fontSize = '1.2rem';
+      title.style.fontWeight = '800';
+      title.style.marginBottom = '16px';
+      title.style.color = 'var(--text-primary)';
+      
+      const statusText = document.createElement('div');
+      statusText.id = 'modal-update-status';
+      statusText.innerText = 'Menghubungkan ke server...';
+      statusText.style.fontSize = '0.9rem';
+      statusText.style.color = 'var(--text-secondary)';
+      statusText.style.marginBottom = '8px';
+      
+      const progressRow = document.createElement('div');
+      progressRow.style.display = 'flex';
+      progressRow.style.justifyContent = 'space-between';
+      progressRow.style.fontSize = '0.75rem';
+      progressRow.style.color = 'var(--text-muted)';
+      progressRow.style.marginBottom = '8px';
+      
+      const percentText = document.createElement('span');
+      percentText.id = 'modal-update-percent';
+      percentText.innerText = '0%';
+      
+      const barContainer = document.createElement('div');
+      barContainer.style.width = '100%';
+      barContainer.style.height = '8px';
+      barContainer.style.background = 'rgba(255,255,255,0.08)';
+      barContainer.style.borderRadius = '4px';
+      barContainer.style.overflow = 'hidden';
+      barContainer.style.border = '1px solid var(--border-glass)';
+      
+      const bar = document.createElement('div');
+      bar.id = 'modal-update-bar';
+      bar.style.width = '0%';
+      bar.style.height = '100%';
+      bar.style.background = 'var(--accent-success-gradient)';
+      bar.style.transition = 'width 0.1s ease';
+      
+      barContainer.appendChild(bar);
+      content.appendChild(title);
+      content.appendChild(statusText);
+      progressRow.appendChild(document.createTextNode('Progres'));
+      progressRow.appendChild(percentText);
+      content.appendChild(progressRow);
+      content.appendChild(barContainer);
+      overlay.appendChild(content);
+      document.body.appendChild(overlay);
+      
+      updateProgressModal = overlay;
+    }
+
+    function hideUpdateProgressModal() {
+      if (updateProgressModal) {
+        updateProgressModal.remove();
+        updateProgressModal = null;
+      }
+    }
+
     window.api.onAppUpdateAvailable(async (updateInfo) => {
       const banner = document.getElementById('app-update-banner');
       const lblNew = document.getElementById('lbl-new-app-version');
@@ -234,50 +312,69 @@ async function initSystemInfo() {
         window.api.openExternalUrl(updateInfo.url);
       };
 
+      const startAutoUpdate = async () => {
+        // Tampilkan modal progres pembaruan melayang
+        showUpdateProgressModal(updateInfo.latest);
+        
+        // Sembunyikan tombol-tombol update di banner pengaturan
+        btnDownload.style.display = 'none';
+        if (btnAutoUpdate) btnAutoUpdate.style.display = 'none';
+        document.getElementById('update-progress-container').style.display = 'block';
+        
+        try {
+          const res = await window.api.performAppUpdate(updateInfo.downloadUrl);
+          hideUpdateProgressModal();
+          if (!res.success) {
+            showToast(`Pembaruan gagal: ${res.message}`, 'error');
+            btnDownload.style.display = 'inline-flex';
+            if (btnAutoUpdate) btnAutoUpdate.style.display = 'inline-flex';
+            document.getElementById('update-progress-container').style.display = 'none';
+          }
+        } catch (err) {
+          hideUpdateProgressModal();
+          showToast(`Pembaruan gagal: ${err.message}`, 'error');
+          btnDownload.style.display = 'inline-flex';
+          if (btnAutoUpdate) btnAutoUpdate.style.display = 'inline-flex';
+          document.getElementById('update-progress-container').style.display = 'none';
+        }
+      };
+
       // Tampilkan tombol "Pasang Otomatis" jika URL unduhan tersedia
       if (updateInfo.downloadUrl && btnAutoUpdate) {
         btnAutoUpdate.style.display = 'inline-flex';
         btnAutoUpdate.onclick = async () => {
           if (await confirmDialog(`Apakah Anda yakin ingin mengunduh dan memasang versi v${updateInfo.latest} secara otomatis? Aplikasi akan ditutup sementara dan terbuka kembali setelah selesai.`)) {
-            // Sembunyikan tombol, tampilkan progress container
-            btnDownload.style.display = 'none';
-            btnAutoUpdate.style.display = 'none';
-            document.getElementById('update-progress-container').style.display = 'block';
-            
-            try {
-              const res = await window.api.performAppUpdate(updateInfo.downloadUrl);
-              if (!res.success) {
-                showToast(`Pembaruan gagal: ${res.message}`, 'error');
-                btnDownload.style.display = 'inline-flex';
-                btnAutoUpdate.style.display = 'inline-flex';
-                document.getElementById('update-progress-container').style.display = 'none';
-              }
-            } catch (err) {
-              showToast(`Pembaruan gagal: ${err.message}`, 'error');
-              btnDownload.style.display = 'inline-flex';
-              btnAutoUpdate.style.display = 'inline-flex';
-              document.getElementById('update-progress-container').style.display = 'none';
-            }
+            startAutoUpdate();
           }
         };
       }
 
       // Hubungkan listener progres pembaruan
       window.api.onUpdateProgress((info) => {
+        // 1. Update modal overlay jika sedang aktif
+        const mStatus = document.getElementById('modal-update-status');
+        const mPercent = document.getElementById('modal-update-percent');
+        const mBar = document.getElementById('modal-update-bar');
+        
+        let statusText = 'Mempersiapkan...';
+        if (info.status === 'downloading') {
+          statusText = `Mengunduh berkas pembaruan (${info.percent}%)...`;
+        } else if (info.status === 'extracting') {
+          statusText = 'Mengekstrak berkas pembaruan...';
+        } else if (info.status === 'installing') {
+          statusText = 'Memasang pembaruan & memuat ulang...';
+        }
+        
+        if (mStatus) mStatus.innerText = statusText;
+        if (mPercent) mPercent.innerText = `${info.percent}%`;
+        if (mBar) mBar.style.width = `${info.percent}%`;
+
+        // 2. Update status & progress bar di dalam tab Pengaturan (fallback/banner)
         const statusEl = document.getElementById('update-progress-status');
         const percentEl = document.getElementById('update-progress-percent');
         const barEl = document.getElementById('update-progress-bar');
         
         if (statusEl && percentEl && barEl) {
-          let statusText = 'Mempersiapkan...';
-          if (info.status === 'downloading') {
-            statusText = `Mengunduh (${info.percent}%)`;
-          } else if (info.status === 'extracting') {
-            statusText = 'Mengekstrak berkas...';
-          } else if (info.status === 'installing') {
-            statusText = 'Memasang pembaruan...';
-          }
-          
           statusEl.innerText = statusText;
           percentEl.innerText = `${info.percent}%`;
           barEl.style.width = `${info.percent}%`;
@@ -291,7 +388,7 @@ async function initSystemInfo() {
       setTimeout(async () => {
         if (updateInfo.downloadUrl) {
           if (await confirmDialog(`Pembaruan Baru Tersedia!\n\nVersi v${updateInfo.latest} telah dirilis (versi Anda saat ini: v${info.appVersion}).\nApakah Anda ingin memasang pembaruan ini secara otomatis sekarang?`)) {
-            btnAutoUpdate.click();
+            startAutoUpdate();
           }
         } else {
           if (await confirmDialog(`Pembaruan Baru Tersedia!\n\nVersi v${updateInfo.latest} telah dirilis (versi Anda saat ini: v${info.appVersion}).\nApakah Anda ingin membuka halaman unduhan GitHub sekarang untuk memperbarui aplikasi?`)) {
