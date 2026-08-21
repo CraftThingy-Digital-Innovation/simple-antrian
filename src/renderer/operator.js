@@ -15,6 +15,89 @@ function generateTxId() {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
+// Custom Asynchronous HTML Confirm Dialog to prevent Electron focus locks
+function confirmDialog(message) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '9999';
+    
+    const content = document.createElement('div');
+    content.className = 'glass-panel modal-content animate-pop-in';
+    content.style.maxWidth = '420px';
+    content.style.textAlign = 'center';
+    content.style.padding = '24px';
+    
+    const title = document.createElement('h3');
+    title.innerText = 'Konfirmasi';
+    title.style.fontSize = '1.3rem';
+    title.style.fontWeight = '800';
+    title.style.marginBottom = '12px';
+    title.style.color = 'var(--text-primary)';
+    
+    const text = document.createElement('p');
+    text.innerText = message;
+    text.style.fontSize = '0.95rem';
+    text.style.lineHeight = '1.5';
+    text.style.color = 'var(--text-secondary)';
+    text.style.marginBottom = '24px';
+    
+    const actions = document.createElement('div');
+    actions.style.display = 'flex';
+    actions.style.gap = '12px';
+    actions.style.justifyContent = 'center';
+    
+    const btnCancel = document.createElement('button');
+    btnCancel.className = 'btn btn-secondary';
+    btnCancel.innerText = 'Batal';
+    btnCancel.style.flex = '1';
+    btnCancel.style.padding = '10px 20px';
+    
+    const btnOk = document.createElement('button');
+    btnOk.className = 'btn btn-danger';
+    btnOk.innerText = 'Ya, Lanjutkan';
+    btnOk.style.flex = '1';
+    btnOk.style.padding = '10px 20px';
+    
+    actions.appendChild(btnCancel);
+    actions.appendChild(btnOk);
+    content.appendChild(title);
+    content.appendChild(text);
+    content.appendChild(actions);
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+    
+    // Trigger CSS transition
+    overlay.offsetHeight;
+    overlay.classList.add('active');
+    
+    const cleanup = (value) => {
+      overlay.classList.remove('active');
+      setTimeout(() => {
+        overlay.remove();
+        if (document.activeElement) {
+          document.activeElement.blur();
+        }
+      }, 300);
+      resolve(value);
+    };
+    
+    btnCancel.onclick = () => cleanup(false);
+    btnOk.onclick = () => cleanup(true);
+    
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        window.removeEventListener('keydown', handleKeyDown);
+        cleanup(false);
+      } else if (e.key === 'Enter') {
+        window.removeEventListener('keydown', handleKeyDown);
+        cleanup(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+  });
+}
+
 // Callbacks map untuk menampung Promise resolve dari request WebSocket (Client Mode)
 const wsRequestCallbacks = {};
 
@@ -125,7 +208,7 @@ async function initSystemInfo() {
     
     // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
     document.getElementById('lbl-app-version').innerText = `v${info.appVersion}`;
-    window.api.onAppUpdateAvailable((updateInfo) => {
+    window.api.onAppUpdateAvailable(async (updateInfo) => {
       const banner = document.getElementById('app-update-banner');
       const lblNew = document.getElementById('lbl-new-app-version');
       const btnDownload = document.getElementById('btn-download-update');
@@ -140,8 +223,8 @@ async function initSystemInfo() {
       showToast(`Pembaruan aplikasi tersedia: v${updateInfo.latest}! Silakan periksa tab Pengaturan.`, 'info');
 
       // Tampilkan prompt konfirmasi agar user langsung menyadari adanya update
-      setTimeout(() => {
-        if (confirm(`Pembaruan Baru Tersedia!\n\nVersi v${updateInfo.latest} telah dirilis (versi Anda saat ini: v${info.appVersion}).\nApakah Anda ingin membuka halaman unduhan GitHub sekarang untuk memperbarui aplikasi?`)) {
+      setTimeout(async () => {
+        if (await confirmDialog(`Pembaruan Baru Tersedia!\n\nVersi v${updateInfo.latest} telah dirilis (versi Anda saat ini: v${info.appVersion}).\nApakah Anda ingin membuka halaman unduhan GitHub sekarang untuk memperbarui aplikasi?`)) {
           window.api.openExternalUrl(updateInfo.url);
         }
       }, 1000);
@@ -1189,8 +1272,8 @@ function setupEventListeners() {
 
   // Logout WhatsApp
   const btnWaLogout = document.getElementById('btn-wa-logout');
-  btnWaLogout.addEventListener('click', () => {
-    if (confirm("Apakah Anda yakin ingin memutus sambungan WhatsApp?")) {
+  btnWaLogout.addEventListener('click', async () => {
+    if (await confirmDialog("Apakah Anda yakin ingin memutus sambungan WhatsApp?")) {
       sendAction('WA_LOGOUT');
       showToast('Memutus koneksi WhatsApp...', 'info');
     }
@@ -1282,7 +1365,7 @@ function setupEventListeners() {
   // Import DB Restore
   const btnImportDb = document.getElementById('btn-import-db');
   btnImportDb.addEventListener('click', async () => {
-    const confirmRestore = confirm("PERINGATAN: Mengimpor database akan menimpa seluruh data antrian saat ini! Apakah Anda yakin?");
+    const confirmRestore = await confirmDialog("PERINGATAN: Mengimpor database akan menimpa seluruh data antrian saat ini! Apakah Anda yakin?");
     if (!confirmRestore) return;
 
     showToast('Mengimpor database...', 'info');
@@ -1298,8 +1381,8 @@ function setupEventListeners() {
 
   // Reset Antrian Hari Ini
   const btnResetQueues = document.getElementById('btn-reset-queues');
-  btnResetQueues.addEventListener('click', () => {
-    const confirmReset = confirm("Apakah Anda yakin ingin mereset seluruh antrian hari ini kembali ke 0?");
+  btnResetQueues.addEventListener('click', async () => {
+    const confirmReset = await confirmDialog("Apakah Anda yakin ingin mereset seluruh antrian hari ini kembali ke 0?");
     if (confirmReset) {
       sendAction('RESET_ALL');
       showToast('Seluruh data antrian hari ini telah di-reset.', 'success');
@@ -1618,7 +1701,7 @@ async function loadSettings() {
 
 // Hapus Layanan
 window.deleteService = async function(id) {
-  if (confirm("Apakah Anda yakin ingin menghapus layanan ini? Ini juga akan menghapus seluruh data antrian di dalamnya.")) {
+  if (await confirmDialog("Apakah Anda yakin ingin menghapus layanan ini? Ini juga akan menghapus seluruh data antrian di dalamnya.")) {
     try {
       await window.api.deleteService(id);
       showToast('Layanan berhasil dihapus.', 'success');

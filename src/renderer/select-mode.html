@@ -157,6 +157,75 @@
   </div>
   
   <script>
+    function alertDialog(message) {
+      return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.style.zIndex = '9999';
+        
+        const content = document.createElement('div');
+        content.className = 'glass-panel modal-content animate-pop-in';
+        content.style.maxWidth = '400px';
+        content.style.textAlign = 'center';
+        content.style.padding = '24px';
+        
+        const title = document.createElement('h3');
+        title.innerText = 'Pemberitahuan';
+        title.style.fontSize = '1.3rem';
+        title.style.fontWeight = '800';
+        title.style.marginBottom = '12px';
+        title.style.color = 'var(--text-primary)';
+        
+        const text = document.createElement('p');
+        text.innerText = message;
+        text.style.fontSize = '0.95rem';
+        text.style.lineHeight = '1.5';
+        text.style.color = 'var(--text-secondary)';
+        text.style.marginBottom = '24px';
+        
+        const actions = document.createElement('div');
+        actions.style.display = 'flex';
+        actions.style.justifyContent = 'center';
+        
+        const btnOk = document.createElement('button');
+        btnOk.className = 'btn btn-primary';
+        btnOk.innerText = 'OK';
+        btnOk.style.width = '120px';
+        btnOk.style.padding = '10px 20px';
+        
+        actions.appendChild(btnOk);
+        content.appendChild(title);
+        content.appendChild(text);
+        content.appendChild(actions);
+        overlay.appendChild(content);
+        document.body.appendChild(overlay);
+        
+        overlay.offsetHeight;
+        overlay.classList.add('active');
+        
+        const cleanup = () => {
+          overlay.classList.remove('active');
+          setTimeout(() => {
+            overlay.remove();
+            if (document.activeElement) {
+              document.activeElement.blur();
+            }
+            resolve();
+          }, 300);
+        };
+        
+        btnOk.onclick = cleanup;
+        
+        const handleKeyDown = (e) => {
+          if (e.key === 'Escape' || e.key === 'Enter') {
+            window.removeEventListener('keydown', handleKeyDown);
+            cleanup();
+          }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+      });
+    }
+
     async function chooseMode(mode) {
       const serverName = mode === 'server' ? 'Server Antrian' : '';
       const port = '8080';
@@ -167,7 +236,7 @@
           window.location.href = 'operator.html';
         }
       } catch (err) {
-        alert('Gagal menyimpan mode operasional: ' + err.message);
+        await alertDialog('Gagal menyimpan mode operasional: ' + err.message);
       }
     }
   </script>

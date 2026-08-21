@@ -202,7 +202,8 @@ function renderDisplayState(state) {
     const currentTicket = callingTickets[0];
     
     // Perbarui teks jika berbeda
-    if (mainNumberEl.innerText !== currentTicket.ticket_number) {
+    if (mainNumberEl.innerText !== currentTicket.ticket_number || mainDisplayPanel.classList.contains('standby')) {
+      mainDisplayPanel.classList.remove('standby');
       mainNumberEl.innerText = currentTicket.ticket_number;
       mainDeskEl.innerText = currentTicket.desk_number;
       mainDisplayPanel.classList.add('animate-call-blink');
@@ -210,8 +211,9 @@ function renderDisplayState(state) {
     }
   } else {
     // Tidak ada panggilan aktif, tampilkan default/standby
+    mainDisplayPanel.classList.add('standby');
     mainNumberEl.innerText = '---';
-    mainDeskEl.innerText = 'Loket Standby';
+    mainDeskEl.innerText = 'Belum ada antrian';
   }
 
   // 2. Tampilkan Layanan Lain di Sidebar
@@ -242,7 +244,12 @@ function renderDisplayState(state) {
 function triggerCallAnimation(ticketNumber, deskNumber) {
   const numberEl = document.getElementById('lbl-call-number');
   const deskEl = document.getElementById('lbl-call-desk');
+  const mainDisplayPanel = document.getElementById('main-display-panel');
   
+  if (mainDisplayPanel) {
+    mainDisplayPanel.classList.remove('standby');
+  }
+
   numberEl.innerText = ticketNumber;
   deskEl.innerText = deskNumber;
 

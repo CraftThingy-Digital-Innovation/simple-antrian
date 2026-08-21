@@ -48,7 +48,7 @@
       font-size: 10rem;
       font-weight: 800;
       color: var(--accent-warning);
-      text-shadow: 0 0 40px rgba(245, 158, 11, 0.4);
+      text-shadow: 0 2px 10px rgba(245, 158, 11, 0.3), 0 0 25px rgba(245, 158, 11, 0.2);
       margin: 20px 0;
       letter-spacing: -2px;
       line-height: 1;
@@ -67,7 +67,7 @@
       font-size: 4rem;
       font-weight: 800;
       color: var(--accent-primary);
-      text-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+      text-shadow: 0 2px 8px rgba(99, 102, 241, 0.25), 0 0 20px rgba(99, 102, 241, 0.15);
       text-transform: uppercase;
       letter-spacing: 2px;
       margin-top: 10px;
@@ -247,7 +247,26 @@
     .scale-up {
       transform: scale(1.15);
       color: #fff !important;
-      text-shadow: 0 0 60px rgba(245, 158, 11, 0.8) !important;
+      text-shadow: 0 2px 12px rgba(245, 158, 11, 0.5), 0 0 35px rgba(245, 158, 11, 0.3) !important;
+    }
+
+    /* Standby Layout Styles */
+    .main-call-panel.standby .main-call-desk-label {
+      visibility: hidden;
+      margin-top: 0;
+      height: 0;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .main-call-panel.standby .main-call-desk {
+      font-size: 2.2rem;
+      color: var(--text-secondary);
+      text-shadow: none;
+      margin-top: 20px;
+      text-transform: none;
+      letter-spacing: 0.5px;
+      transition: all 0.3s ease;
     }
   </style>
 </head>
@@ -256,11 +275,11 @@
   <!-- MAIN AREA -->
   <div class="content-area">
     <!-- LEFT PANEL: Active Call Display -->
-    <div class="glass-panel main-call-panel" id="main-display-panel">
+    <div class="glass-panel main-call-panel standby" id="main-display-panel">
       <div class="main-call-label">Nomor Antrian</div>
       <div class="main-call-number" id="lbl-call-number">---</div>
       <div class="main-call-desk-label" id="lbl-desk-label">Silakan Menuju</div>
-      <div class="main-call-desk" id="lbl-call-desk">-</div>
+      <div class="main-call-desk" id="lbl-call-desk">Belum ada antrian</div>
     </div>
 
     <!-- RIGHT PANEL -->
