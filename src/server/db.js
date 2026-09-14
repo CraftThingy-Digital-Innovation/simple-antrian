@@ -127,7 +127,7 @@ async function initDb() {
     { key: 'color_theme', value: 'default' },
     { key: 'multilang_enabled', value: 'false' },
     { key: 'call_customer_name', value: 'true' },
-    { key: 'auto_call_next_on_complete', value: 'false' }
+    { key: 'auto_call_next_on_complete', value: 'true' }
   ];
 
   for (const s of defaultSettings) {
@@ -136,6 +136,39 @@ async function initDb() {
       await run("INSERT INTO settings (key, value) VALUES (?, ?)", [s.key, s.value]);
     }
   }
+
+  // Migrasi satu kali setting auto_call_next_on_complete ke 'true' agar tombol selesai otomatis memanggil antrian berikutnya
+  const migratedAutoCall = await get("SELECT * FROM settings WHERE key = 'v158_auto_call_migrated'");
+  if (!migratedAutoCall) {
+    await run("UPDATE settings SET value = 'true' WHERE key = 'auto_call_next_on_complete'");
+    await run("INSERT INTO settings (key, value) VALUES ('v158_auto_call_migrated', 'true')");
+  }
+
+  // Bersihkan tiket calling zombie dari sesi sebelumnya (jaga hanya 1 tiket calling terbaru per loket)
+  try {
+    await run(`
+      UPDATE tickets 
+      SET status = 'completed', completed_at = CURRENT_TIMESTAMP 
+      WHERE status = 'calling' 
+      AND id NOT IN (
+        SELECT id FROM (
+          SELECT id, ROW_NUMBER() OVER (PARTITION BY service_id, desk_number ORDER BY called_at DESC) as rn 
+          FROM tickets 
+          WHERE status = 'calling'
+        ) WHERE rn = 1
+      )
+    `);
+  } catch (_) {}
+
+  // Selesaikan tiket calling dari tanggal kemarin yang masih tertinggal
+  try {
+    await run(`
+      UPDATE tickets 
+      SET status = 'completed', completed_at = CURRENT_TIMESTAMP 
+      WHERE status = 'calling' 
+      AND date(created_at, 'localtime') < date('now', 'localtime')
+    `);
+  } catch (_) {}
 }
 
 // ==================== OPERASI LAYANAN (SERVICES) ====================
@@ -235,6 +268,20 @@ async function callNextTicket(serviceId, deskNumber) {
   if (!nextTicket) return null;
 
   const now = new Date().toISOString();
+
+  // Selesaikan tiket calling sebelumnya di loket ini agar tidak ada zombie calling
+  if (deskNumber) {
+    await run(
+      "UPDATE tickets SET status = 'completed', completed_at = ? WHERE desk_number = ? AND status = 'calling'",
+      [now, deskNumber]
+    );
+  } else {
+    await run(
+      "UPDATE tickets SET status = 'completed', completed_at = ? WHERE service_id = ? AND status = 'calling'",
+      [now, serviceId]
+    );
+  }
+
   await run(
     "UPDATE tickets SET status = 'calling', desk_number = ?, called_at = ? WHERE id = ?",
     [deskNumber, now, nextTicket.id]
@@ -259,12 +306,43 @@ async function callSkippedTicket(serviceId, deskNumber) {
   if (!nextSkipped) return null;
 
   const now = new Date().toISOString();
+
+  // Selesaikan tiket calling sebelumnya di loket ini
+  if (deskNumber) {
+    await run(
+      "UPDATE tickets SET status = 'completed', completed_at = ? WHERE desk_number = ? AND status = 'calling'",
+      [now, deskNumber]
+    );
+  } else {
+    await run(
+      "UPDATE tickets SET status = 'completed', completed_at = ? WHERE service_id = ? AND status = 'calling'",
+      [now, serviceId]
+    );
+  }
+
   await run(
     "UPDATE tickets SET status = 'calling', desk_number = ?, called_at = ? WHERE id = ?",
     [deskNumber, now, nextSkipped.id]
   );
 
   return get("SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.id = ?", [nextSkipped.id]);
+}
+
+// Selesaikan semua tiket yang berstatus calling untuk loket/layanan tertentu (mencegah zombie)
+async function completeCallingTicketsByDesk(deskNumber, serviceId = null) {
+  const now = new Date().toISOString();
+  if (deskNumber) {
+    await run(
+      "UPDATE tickets SET status = 'completed', completed_at = ? WHERE desk_number = ? AND status = 'calling'",
+      [now, deskNumber]
+    );
+  }
+  if (serviceId) {
+    await run(
+      "UPDATE tickets SET status = 'completed', completed_at = ? WHERE service_id = ? AND status = 'calling'",
+      [now, serviceId]
+    );
+  }
 }
 
 // Panggil ulang antrian (recall)
@@ -475,6 +553,7 @@ module.exports = {
   recallTicket,
   updateTicketDesk,
   completeTicket,
+  completeCallingTicketsByDesk,
   skipTicket,
   searchTickets,
   getSettings,

@@ -434,18 +434,29 @@ async function handleClientAction(action, ws) {
       }
 
       case 'COMPLETE': {
-        const { ticketId, autoCallNext } = payload;
+        const { ticketId, serviceId, deskNumber, autoCallNext } = payload;
         // Selesaikan tiket di database
-        const ticket = await db.completeTicket(ticketId);
+        let ticket = null;
+        if (ticketId) {
+          ticket = await db.completeTicket(ticketId);
+        }
 
-        // Periksa apakah auto-call diaktifkan di setting atau payload (default: false agar operator dapat memanggil secara manual saat siap)
         const settings = await db.getSettings();
-        const shouldAutoCall = autoCallNext === true || settings.auto_call_next_on_complete === 'true';
+        // Default auto-call adalah true kecuali jika dinonaktifkan di pengaturan
+        const isAutoCallEnabled = settings.auto_call_next_on_complete !== 'false';
+        const shouldAutoCall = autoCallNext !== undefined ? autoCallNext === true : isAutoCallEnabled;
 
-        if (shouldAutoCall && ticket) {
-          const { service_id, desk_number } = ticket;
+        const targetServiceId = (ticket && ticket.service_id) || serviceId;
+        const targetDesk = (ticket && ticket.desk_number) || deskNumber || 'Loket 1';
+
+        // Pastikan tidak ada tiket calling zombie tertinggal untuk desk ini
+        if (targetDesk) {
+          await db.completeCallingTicketsByDesk(targetDesk, targetServiceId);
+        }
+
+        if (shouldAutoCall && targetServiceId) {
           // Cari apakah ada antrian berikutnya untuk layanan yang sama
-          const calledTicket = await db.callNextTicket(service_id, desk_number);
+          const calledTicket = await db.callNextTicket(targetServiceId, targetDesk);
           if (calledTicket) {
             await broadcastStateUpdate();
             
@@ -459,7 +470,7 @@ async function handleClientAction(action, ws) {
             } catch (e) {}
 
             try {
-              await triggerWhatsAppQueueReminder(service_id, calledTicket.number_sequence);
+              await triggerWhatsAppQueueReminder(targetServiceId, calledTicket.number_sequence);
             } catch (e) {}
             break;
           }
@@ -851,10 +862,10 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName)
   const idNumTokens = getIndonesianNumberTokens(num);
   idNumTokens.forEach(t => files.push(`id_${t}.wav`));
 
-  // Panggil Nama Pelanggan setelah nomor antrian jika ada & aktif
+  // Panggil Nama Pelanggan setelah nomor antrian jika ada & aktif (langsung panggil nama pengantri tanpa 'atas nama')
   if (isCallNameEnabled && cleanName) {
     try {
-      const namePhraseFile = await ttsGenerator.generatePhraseIfNeeded(`atas nama ${cleanName}`, 'id');
+      const namePhraseFile = await ttsGenerator.generatePhraseIfNeeded(cleanName, 'id');
       if (namePhraseFile) {
         files.push(namePhraseFile);
       }
@@ -883,7 +894,7 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName)
 
     if (isCallNameEnabled && cleanName) {
       try {
-        const enNameFile = await ttsGenerator.generatePhraseIfNeeded(`for ${cleanName}`, 'en');
+        const enNameFile = await ttsGenerator.generatePhraseIfNeeded(cleanName, 'en');
         if (enNameFile) files.push(enNameFile);
       } catch (_) {}
     }

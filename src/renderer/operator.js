@@ -1384,12 +1384,13 @@ function renderQueueState(state) {
   services.forEach(srv => {
     // Tentukan nomor loket
     let currentDesk = localDeskSettings[srv.id];
-    const anyActiveCall = callingTickets.find(t => t.service_id === srv.id);
+    // Ambil calling tickets untuk layanan ini (terurut dari yang paling baru dipanggil)
+    const serviceCallingTickets = callingTickets.filter(t => t.service_id === srv.id);
     
     if (!currentDesk) {
       // Jika ada tiket aktif dipanggil untuk layanan ini, samakan nomor loketnya
-      if (anyActiveCall && anyActiveCall.desk_number) {
-        currentDesk = anyActiveCall.desk_number;
+      if (serviceCallingTickets.length > 0 && serviceCallingTickets[0].desk_number) {
+        currentDesk = serviceCallingTickets[0].desk_number;
         localDeskSettings[srv.id] = currentDesk;
         localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
       } else {
@@ -1398,17 +1399,18 @@ function renderQueueState(state) {
     }
 
     // Cari apakah ada tiket sedang dipanggil untuk layanan dan loket ini
-    // 1. Cocokkan nomor loket yang terdaftar
-    let activeCall = callingTickets.find(t => t.service_id === srv.id && t.desk_number === currentDesk);
+    // 1. Cocokkan nomor loket yang terdaftar (case-insensitive & trimmed)
+    const normDesk = (currentDesk || '').trim().toLowerCase();
+    let activeCall = serviceCallingTickets.find(t => (t.desk_number || '').trim().toLowerCase() === normDesk);
     
     // 2. Jika tidak ditemukan karena nama loket baru diubah di input, cari berdasarkan activeTickets tracking
     if (!activeCall && activeTickets[srv.id]) {
-      activeCall = callingTickets.find(t => t.id === activeTickets[srv.id]);
+      activeCall = serviceCallingTickets.find(t => t.id === activeTickets[srv.id]);
     }
 
-    // 3. Fallback: jika ada tiket calling untuk layanan ini, langsung pasangkan dan sinkronkan desk
-    if (!activeCall && anyActiveCall) {
-      activeCall = anyActiveCall;
+    // 3. Fallback: jika ada tiket calling untuk layanan ini, pasangkan yang terbaru dan sinkronkan loket
+    if (!activeCall && serviceCallingTickets.length > 0) {
+      activeCall = serviceCallingTickets[0];
       if (activeCall.desk_number) {
         currentDesk = activeCall.desk_number;
         localDeskSettings[srv.id] = currentDesk;
@@ -1626,10 +1628,19 @@ window.recall = function(ticketId, serviceId) {
 
 window.completeCall = function(ticketId, serviceId) {
   if (!ticketId) return;
+  const deskInput = document.getElementById(`desk-input-${serviceId}`);
+  let deskNumber = '';
+  if (deskInput && deskInput.value) {
+    deskNumber = deskInput.value.trim();
+  } else {
+    deskNumber = localDeskSettings[serviceId] || 'Loket 1';
+  }
   if (serviceId && activeTickets[serviceId]) {
     delete activeTickets[serviceId];
   }
-  sendAction('COMPLETE', { ticketId });
+  const autoCallCheck = document.getElementById('setting-auto-call-next');
+  const autoCallNext = autoCallCheck ? autoCallCheck.checked : true;
+  sendAction('COMPLETE', { ticketId, serviceId, deskNumber, autoCallNext });
 };
 
 window.skipCall = function(ticketId, serviceId) {
@@ -2477,7 +2488,7 @@ async function loadSettings() {
   }
   const autoCallCheckbox = document.getElementById('setting-auto-call-next');
   if (autoCallCheckbox) {
-    autoCallCheckbox.checked = settings.auto_call_next_on_complete === 'true';
+    autoCallCheckbox.checked = settings.auto_call_next_on_complete !== 'false';
   }
 
   // WA Settings UI
