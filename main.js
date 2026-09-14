@@ -577,8 +577,7 @@ ipcMain.handle('import-data', async () => {
 ipcMain.handle('wa-perform-update', () => whatsapp.performLibraryUpdate());
 
 ipcMain.handle('check-app-updates', async () => {
-  checkAppUpdates();
-  return { success: true };
+  return await checkAppUpdates();
 });
 
 // Helper untuk mengunduh file dengan progress indicator
@@ -826,55 +825,72 @@ ipcMain.handle('open-external-url', (event, url) => {
 
 // Mengecek pembaruan aplikasi dari repositori GitHub organisasi CraftThingy-Digital-Innovation
 function checkAppUpdates() {
-  const https = require('https');
-  const options = {
-    hostname: 'api.github.com',
-    path: '/repos/CraftThingy-Digital-Innovation/simple-antrian/releases/latest',
-    method: 'GET',
-    headers: {
-      'User-Agent': 'simple-antrian-app'
-    }
-  };
-
-  https.get(options, (res) => {
-    let data = '';
-    res.on('data', (chunk) => {
-      data += chunk;
-    });
-
-    res.on('end', () => {
-      if (res.statusCode !== 200) return;
-      try {
-        const release = JSON.parse(data);
-        const latestVersion = release.tag_name.replace(/^v/, '');
-        const appVersion = require('./package.json').version;
-
-        if (latestVersion !== appVersion) {
-          console.log(`[App Update] Pembaruan SimpleAntrian tersedia: v${appVersion} -> v${latestVersion}`);
-          
-          // Cari asset zip Windows (.zip)
-          const winAsset = release.assets && release.assets.find(asset => 
-            asset.name.toLowerCase().includes('windows') || 
-            asset.name.toLowerCase().includes('win32') || 
-            asset.name.toLowerCase().endsWith('.zip')
-          );
-          const downloadUrl = winAsset ? winAsset.browser_download_url : null;
-
-          if (mainWindow) {
-            mainWindow.webContents.send('app-update-available', {
-              current: appVersion,
-              latest: latestVersion,
-              url: release.html_url,
-              body: release.body,
-              downloadUrl: downloadUrl
-            });
-          }
-        }
-      } catch (err) {
-        console.error('Gagal parsing data update github:', err);
+  return new Promise((resolve) => {
+    const https = require('https');
+    const options = {
+      hostname: 'api.github.com',
+      path: '/repos/CraftThingy-Digital-Innovation/simple-antrian/releases/latest',
+      method: 'GET',
+      headers: {
+        'User-Agent': 'simple-antrian-app'
       }
+    };
+
+    https.get(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        if (res.statusCode !== 200) {
+          resolve({ hasUpdate: false, message: `Server GitHub merespon dengan status ${res.statusCode}` });
+          return;
+        }
+        try {
+          const release = JSON.parse(data);
+          const latestVersion = release.tag_name ? release.tag_name.replace(/^v/, '') : '';
+          const appVersion = require('./package.json').version;
+
+          const isWin = process.platform === 'win32';
+          let downloadUrl = null;
+          if (release.assets && release.assets.length > 0) {
+            const asset = release.assets.find(a => {
+              const n = a.name.toLowerCase();
+              return isWin 
+                ? (n.includes('windows') || n.includes('win32') || n.endsWith('.zip'))
+                : (n.includes('linux') || n.endsWith('.tar.gz'));
+            });
+            if (asset) downloadUrl = asset.browser_download_url;
+          }
+
+          const hasUpdate = Boolean(latestVersion && latestVersion !== appVersion);
+
+          const updateInfo = {
+            hasUpdate,
+            current: appVersion,
+            latest: latestVersion,
+            url: release.html_url,
+            body: release.body || '',
+            downloadUrl: downloadUrl
+          };
+
+          if (hasUpdate) {
+            console.log(`[App Update] Pembaruan SimpleAntrian tersedia: v${appVersion} -> v${latestVersion}`);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('app-update-available', updateInfo);
+            }
+          }
+
+          resolve(updateInfo);
+        } catch (err) {
+          console.error('Gagal parsing data update github:', err);
+          resolve({ hasUpdate: false, message: err.message });
+        }
+      });
+    }).on('error', (err) => {
+      console.warn('[App Update] Gagal mengecek update GitHub:', err.message);
+      resolve({ hasUpdate: false, message: err.message });
     });
-  }).on('error', (err) => {
-    console.warn('[App Update] Gagal mengecek update GitHub:', err.message);
   });
 }

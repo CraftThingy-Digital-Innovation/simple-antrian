@@ -298,53 +298,254 @@ async function initSystemInfo() {
       }
     }
 
+    let updateAvailableModal = null;
+
+    async function startAutoUpdate(downloadUrl, latestVersion) {
+      // Tampilkan modal progres pembaruan melayang
+      showUpdateProgressModal(latestVersion);
+      
+      const btnDownload = document.getElementById('btn-download-update');
+      const btnAutoUpdate = document.getElementById('btn-auto-update');
+      if (btnDownload) btnDownload.style.display = 'none';
+      if (btnAutoUpdate) btnAutoUpdate.style.display = 'none';
+      const progressContainer = document.getElementById('update-progress-container');
+      if (progressContainer) progressContainer.style.display = 'block';
+      
+      try {
+        const res = await window.api.performAppUpdate(downloadUrl);
+        hideUpdateProgressModal();
+        if (!res.success) {
+          showToast(`Pembaruan gagal: ${res.message}`, 'error');
+          if (btnDownload) btnDownload.style.display = 'inline-flex';
+          if (btnAutoUpdate) btnAutoUpdate.style.display = 'inline-flex';
+          if (progressContainer) progressContainer.style.display = 'none';
+        }
+      } catch (err) {
+        hideUpdateProgressModal();
+        showToast(`Pembaruan gagal: ${err.message}`, 'error');
+        if (btnDownload) btnDownload.style.display = 'inline-flex';
+        if (btnAutoUpdate) btnAutoUpdate.style.display = 'inline-flex';
+        if (progressContainer) progressContainer.style.display = 'none';
+      }
+    }
+
+    // Modal khusus pemberitahuan pembaruan aplikasi
+    window.showUpdateAvailableModal = function(updateInfo) {
+      if (updateAvailableModal) {
+        updateAvailableModal.remove();
+        updateAvailableModal = null;
+      }
+
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.style.zIndex = '9999';
+
+      const content = document.createElement('div');
+      content.className = 'glass-panel modal-content animate-pop-in';
+      content.style.maxWidth = '520px';
+      content.style.width = '92%';
+      content.style.textAlign = 'left';
+      content.style.padding = '28px';
+
+      // Header
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.justifyContent = 'space-between';
+      header.style.alignItems = 'center';
+      header.style.marginBottom = '18px';
+
+      const titleGroup = document.createElement('div');
+      titleGroup.style.display = 'flex';
+      titleGroup.style.alignItems = 'center';
+      titleGroup.style.gap = '12px';
+
+      const icon = document.createElement('span');
+      icon.innerText = '🚀';
+      icon.style.fontSize = '2.2rem';
+
+      const titleTexts = document.createElement('div');
+      const title = document.createElement('h3');
+      title.innerText = 'Pembaruan Aplikasi Tersedia!';
+      title.style.fontSize = '1.25rem';
+      title.style.fontWeight = '800';
+      title.style.color = 'var(--text-primary)';
+      title.style.margin = '0';
+
+      const subtitle = document.createElement('div');
+      subtitle.innerText = 'SimpleAntrian versi baru telah dirilis di GitHub';
+      subtitle.style.fontSize = '0.82rem';
+      subtitle.style.color = 'var(--text-muted)';
+      subtitle.style.marginTop = '2px';
+
+      titleTexts.appendChild(title);
+      titleTexts.appendChild(subtitle);
+      titleGroup.appendChild(icon);
+      titleGroup.appendChild(titleTexts);
+
+      const btnClose = document.createElement('button');
+      btnClose.innerText = '✕';
+      btnClose.style.background = 'none';
+      btnClose.style.border = 'none';
+      btnClose.style.color = 'var(--text-muted)';
+      btnClose.style.fontSize = '1.2rem';
+      btnClose.style.cursor = 'pointer';
+      btnClose.style.padding = '4px 8px';
+
+      header.appendChild(titleGroup);
+      header.appendChild(btnClose);
+
+      // Version Comparison Box
+      const versionBox = document.createElement('div');
+      versionBox.style.display = 'flex';
+      versionBox.style.alignItems = 'center';
+      versionBox.style.justifyContent = 'space-around';
+      versionBox.style.background = 'rgba(0, 0, 0, 0.25)';
+      versionBox.style.border = '1px solid var(--border-glass)';
+      versionBox.style.borderRadius = '12px';
+      versionBox.style.padding = '14px 16px';
+      versionBox.style.marginBottom = '18px';
+
+      versionBox.innerHTML = `
+        <div style="text-align: center;">
+          <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Versi Saat Ini</div>
+          <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-secondary); margin-top: 2px;">v${escapeHtml(updateInfo.current || '1.0.0')}</div>
+        </div>
+        <div style="font-size: 1.4rem; color: var(--accent-primary); font-weight: bold;">➔</div>
+        <div style="text-align: center;">
+          <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Versi Terbaru</div>
+          <div style="font-weight: 800; font-size: 1.15rem; color: var(--accent-success); margin-top: 2px;">
+            v${escapeHtml(updateInfo.latest)} <span class="badge badge-completed" style="font-size: 0.65rem; padding: 2px 6px;">Tersedia</span>
+          </div>
+        </div>
+      `;
+
+      // Changelog area
+      const changelogContainer = document.createElement('div');
+      changelogContainer.style.marginBottom = '22px';
+
+      const changelogTitle = document.createElement('div');
+      changelogTitle.innerText = 'Catatan Pembaruan (Changelog):';
+      changelogTitle.style.fontSize = '0.85rem';
+      changelogTitle.style.fontWeight = '700';
+      changelogTitle.style.color = 'var(--text-secondary)';
+      changelogTitle.style.marginBottom = '8px';
+
+      const changelogBox = document.createElement('div');
+      changelogBox.style.maxHeight = '180px';
+      changelogBox.style.overflowY = 'auto';
+      changelogBox.style.background = 'rgba(0, 0, 0, 0.2)';
+      changelogBox.style.border = '1px solid var(--border-glass)';
+      changelogBox.style.borderRadius = '10px';
+      changelogBox.style.padding = '12px 16px';
+      changelogBox.style.fontSize = '0.82rem';
+      changelogBox.style.color = 'var(--text-muted)';
+      changelogBox.style.lineHeight = '1.6';
+
+      let bodyFormatted = '<div>• Peningkatan performa, stabilitas, dan fitur terbaru.</div>';
+      if (updateInfo.body && updateInfo.body.trim()) {
+        const rawLines = updateInfo.body.split('\n');
+        const bulletItems = [];
+        for (let l of rawLines) {
+          l = l.trim();
+          if (l.startsWith('* ') || l.startsWith('- ')) {
+            bulletItems.push(`<li>${escapeHtml(l.replace(/^[\*\-]\s*/, ''))}</li>`);
+          } else if (l.startsWith('## ') || l.startsWith('### ')) {
+            bulletItems.push(`<div style="font-weight: 700; color: var(--text-primary); margin-top: 8px; margin-bottom: 2px;">${escapeHtml(l.replace(/^#+\s*/, ''))}</div>`);
+          }
+        }
+        if (bulletItems.length > 0) {
+          bodyFormatted = `<ul style="margin: 0; padding-left: 18px;">${bulletItems.join('')}</ul>`;
+        } else {
+          bodyFormatted = `<div style="white-space: pre-wrap;">${escapeHtml(updateInfo.body.substring(0, 600))}</div>`;
+        }
+      }
+      changelogBox.innerHTML = bodyFormatted;
+
+      changelogContainer.appendChild(changelogTitle);
+      changelogContainer.appendChild(changelogBox);
+
+      // Actions
+      const actions = document.createElement('div');
+      actions.style.display = 'flex';
+      actions.style.gap = '10px';
+      actions.style.justifyContent = 'flex-end';
+      actions.style.alignItems = 'center';
+
+      const btnDismiss = document.createElement('button');
+      btnDismiss.className = 'btn btn-secondary';
+      btnDismiss.innerText = 'Nanti Saja';
+      btnDismiss.style.padding = '10px 18px';
+
+      const btnGithub = document.createElement('button');
+      btnGithub.className = 'btn btn-secondary';
+      btnGithub.innerText = '🌐 Buka GitHub';
+      btnGithub.style.padding = '10px 18px';
+
+      const btnInstall = document.createElement('button');
+      btnInstall.className = 'btn btn-primary';
+      btnInstall.style.background = 'var(--accent-success-gradient)';
+      btnInstall.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.35)';
+      btnInstall.style.fontWeight = '700';
+      btnInstall.style.padding = '10px 22px';
+      btnInstall.innerText = '⬇️ Pasang Pembaruan';
+
+      actions.appendChild(btnDismiss);
+      actions.appendChild(btnGithub);
+      if (updateInfo.downloadUrl) {
+        actions.appendChild(btnInstall);
+      }
+
+      content.appendChild(header);
+      content.appendChild(versionBox);
+      content.appendChild(changelogContainer);
+      content.appendChild(actions);
+      overlay.appendChild(content);
+      document.body.appendChild(overlay);
+
+      overlay.offsetHeight;
+      overlay.classList.add('active');
+
+      const cleanup = () => {
+        overlay.classList.remove('active');
+        setTimeout(() => {
+          overlay.remove();
+          if (updateAvailableModal === overlay) updateAvailableModal = null;
+        }, 300);
+      };
+
+      btnClose.onclick = cleanup;
+      btnDismiss.onclick = cleanup;
+      btnGithub.onclick = () => {
+        cleanup();
+        window.api.openExternalUrl(updateInfo.url);
+      };
+      btnInstall.onclick = () => {
+        cleanup();
+        startAutoUpdate(updateInfo.downloadUrl, updateInfo.latest);
+      };
+
+      updateAvailableModal = overlay;
+    };
+
     window.api.onAppUpdateAvailable(async (updateInfo) => {
       const banner = document.getElementById('app-update-banner');
       const lblNew = document.getElementById('lbl-new-app-version');
       const btnDownload = document.getElementById('btn-download-update');
       const btnAutoUpdate = document.getElementById('btn-auto-update');
       
-      lblNew.innerText = `v${updateInfo.latest}`;
-      banner.style.display = 'block';
+      if (lblNew) lblNew.innerText = `v${updateInfo.latest}`;
+      if (banner) banner.style.display = 'block';
       
-      btnDownload.onclick = () => {
-        window.api.openExternalUrl(updateInfo.url);
-      };
+      if (btnDownload) {
+        btnDownload.onclick = () => {
+          window.api.openExternalUrl(updateInfo.url);
+        };
+      }
 
-      const startAutoUpdate = async () => {
-        // Tampilkan modal progres pembaruan melayang
-        showUpdateProgressModal(updateInfo.latest);
-        
-        // Sembunyikan tombol-tombol update di banner pengaturan
-        btnDownload.style.display = 'none';
-        if (btnAutoUpdate) btnAutoUpdate.style.display = 'none';
-        document.getElementById('update-progress-container').style.display = 'block';
-        
-        try {
-          const res = await window.api.performAppUpdate(updateInfo.downloadUrl);
-          hideUpdateProgressModal();
-          if (!res.success) {
-            showToast(`Pembaruan gagal: ${res.message}`, 'error');
-            btnDownload.style.display = 'inline-flex';
-            if (btnAutoUpdate) btnAutoUpdate.style.display = 'inline-flex';
-            document.getElementById('update-progress-container').style.display = 'none';
-          }
-        } catch (err) {
-          hideUpdateProgressModal();
-          showToast(`Pembaruan gagal: ${err.message}`, 'error');
-          btnDownload.style.display = 'inline-flex';
-          if (btnAutoUpdate) btnAutoUpdate.style.display = 'inline-flex';
-          document.getElementById('update-progress-container').style.display = 'none';
-        }
-      };
-
-      // Tampilkan tombol "Pasang Otomatis" jika URL unduhan tersedia
       if (updateInfo.downloadUrl && btnAutoUpdate) {
         btnAutoUpdate.style.display = 'inline-flex';
-        btnAutoUpdate.onclick = async () => {
-          if (await confirmDialog(`Apakah Anda yakin ingin mengunduh dan memasang versi v${updateInfo.latest} secara otomatis? Aplikasi akan ditutup sementara dan terbuka kembali setelah selesai.`)) {
-            startAutoUpdate();
-          }
+        btnAutoUpdate.onclick = () => {
+          startAutoUpdate(updateInfo.downloadUrl, updateInfo.latest);
         };
       }
 
@@ -381,20 +582,12 @@ async function initSystemInfo() {
       });
 
       // Tampilkan toast notifikasi
-      showToast(`Pembaruan aplikasi tersedia: v${updateInfo.latest}! Silakan periksa tab Pengaturan.`, 'info');
+      showToast(`🚀 Pembaruan aplikasi tersedia: v${updateInfo.latest}!`, 'info');
 
-      // Tampilkan prompt konfirmasi agar user langsung menyadari adanya update
-      setTimeout(async () => {
-        if (updateInfo.downloadUrl) {
-          if (await confirmDialog(`Pembaruan Baru Tersedia!\n\nVersi v${updateInfo.latest} telah dirilis (versi Anda saat ini: v${info.appVersion}).\nApakah Anda ingin memasang pembaruan ini secara otomatis sekarang?`)) {
-            startAutoUpdate();
-          }
-        } else {
-          if (await confirmDialog(`Pembaruan Baru Tersedia!\n\nVersi v${updateInfo.latest} telah dirilis (versi Anda saat ini: v${info.appVersion}).\nApakah Anda ingin membuka halaman unduhan GitHub sekarang untuk memperbarui aplikasi?`)) {
-            window.api.openExternalUrl(updateInfo.url);
-          }
-        }
-      }, 1000);
+      // Tampilkan Modal Pembaruan Otomatis
+      setTimeout(() => {
+        window.showUpdateAvailableModal(updateInfo);
+      }, 800);
     });
     
     // Tampilkan mode di UI
@@ -1994,20 +2187,30 @@ function setupEventListeners() {
 
   // Cek Pembaruan Aplikasi dari GitHub
   const btnCheckAppUpdate = document.getElementById('btn-check-app-update');
-  btnCheckAppUpdate.addEventListener('click', async () => {
-    showToast('Mengecek pembaruan aplikasi di GitHub...', 'info');
-    btnCheckAppUpdate.disabled = true;
-    btnCheckAppUpdate.innerText = 'Mengecek...';
-    try {
-      await window.api.checkAppUpdates();
-      showToast('Pengecekan pembaruan aplikasi selesai.', 'success');
-    } catch (err) {
-      showToast('Gagal mengecek pembaruan: ' + err.message, 'error');
-    } finally {
-      btnCheckAppUpdate.disabled = false;
-      btnCheckAppUpdate.innerText = '🔄 Cek Pembaruan Aplikasi';
-    }
-  });
+  if (btnCheckAppUpdate) {
+    btnCheckAppUpdate.addEventListener('click', async () => {
+      showToast('Mengecek pembaruan aplikasi di GitHub...', 'info');
+      btnCheckAppUpdate.disabled = true;
+      btnCheckAppUpdate.innerText = 'Mengecek...';
+      try {
+        const res = await window.api.checkAppUpdates();
+        if (res && res.hasUpdate) {
+          showToast(`Pembaruan tersedia: v${res.latest}!`, 'success');
+          if (typeof window.showUpdateAvailableModal === 'function') {
+            window.showUpdateAvailableModal(res);
+          }
+        } else {
+          const info = await window.api.getSystemInfo();
+          showToast(`✅ Aplikasi sudah menggunakan versi terbaru (v${info.appVersion}). Tidak ada pembaruan saat ini.`, 'success');
+        }
+      } catch (err) {
+        showToast('Gagal mengecek pembaruan: ' + err.message, 'error');
+      } finally {
+        btnCheckAppUpdate.disabled = false;
+        btnCheckAppUpdate.innerText = '🔄 Cek Pembaruan Aplikasi';
+      }
+    });
+  }
 }
 
 // ==================== TAMPIL DATA LAINNYA ====================
