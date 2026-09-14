@@ -554,6 +554,7 @@
               <option value="calling">Dipanggil (Calling)</option>
               <option value="completed">Selesai (Completed)</option>
               <option value="skipped">Dilewati (Skipped)</option>
+              <option value="expired">Kadaluarsa (Expired)</option>
             </select>
           </div>
 
@@ -611,7 +612,7 @@
       </div>
 
       <!-- Widgets Summary -->
-      <div class="grid-4">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
         <div class="glass-panel stat-widget">
           <div class="stat-label">Total Antrian</div>
           <div class="stat-value-big" id="stats-total">0</div>
@@ -623,6 +624,10 @@
         <div class="glass-panel stat-widget">
           <div class="stat-label">Dilewati (Skipped)</div>
           <div class="stat-value-big" id="stats-skipped" style="color: var(--accent-secondary);">0</div>
+        </div>
+        <div class="glass-panel stat-widget">
+          <div class="stat-label">Kadaluarsa (Expired)</div>
+          <div class="stat-value-big" id="stats-expired" style="color: #94a3b8;">0</div>
         </div>
         <div class="glass-panel stat-widget">
           <div class="stat-label">Sedang Menunggu</div>
@@ -672,6 +677,7 @@
                   <th>Total</th>
                   <th>Selesai</th>
                   <th>Dilewati</th>
+                  <th>Kadaluarsa</th>
                 </tr>
               </thead>
               <tbody id="stats-services-tbody">

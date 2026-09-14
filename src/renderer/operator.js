@@ -2249,9 +2249,11 @@ async function triggerSearch() {
     const formattedCalled = t.called_at ? new Date(t.called_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
     
     let badgeClass = 'badge-waiting';
-    if (t.status === 'calling') badgeClass = 'badge-calling';
-    if (t.status === 'completed') badgeClass = 'badge-completed';
-    if (t.status === 'skipped') badgeClass = 'badge-skipped';
+    let statusLabel = 'Menunggu';
+    if (t.status === 'calling') { badgeClass = 'badge-calling'; statusLabel = 'Dipanggil'; }
+    if (t.status === 'completed') { badgeClass = 'badge-completed'; statusLabel = 'Selesai'; }
+    if (t.status === 'skipped') { badgeClass = 'badge-skipped'; statusLabel = 'Dilewati'; }
+    if (t.status === 'expired') { badgeClass = 'badge-expired'; statusLabel = 'Kadaluarsa'; }
 
     // Format param-param text untuk HTML attribute yang aman dari karakter kutip
     const nameEscaped = (t.customer_name || '').replace(/'/g, "\\'");
@@ -2262,7 +2264,7 @@ async function triggerSearch() {
       <td>${t.service_name}</td>
       <td>${t.customer_name || '-'}</td>
       <td>${t.customer_phone || '-'}</td>
-      <td><span class="badge ${badgeClass}">${t.status}</span></td>
+      <td><span class="badge ${badgeClass}">${statusLabel}</span></td>
       <td>${t.desk_number || '-'}</td>
       <td>${formattedCreated}</td>
       <td>${formattedCalled}</td>
@@ -2307,6 +2309,8 @@ async function loadStats(dateStr) {
   document.getElementById('stats-total').innerText = stats.summary.total;
   document.getElementById('stats-completed').innerText = stats.summary.completed;
   document.getElementById('stats-skipped').innerText = stats.summary.skipped;
+  const expiredEl = document.getElementById('stats-expired');
+  if (expiredEl) expiredEl.innerText = stats.summary.expired || 0;
   document.getElementById('stats-waiting').innerText = stats.summary.waiting;
 
   // Format Rata-rata waktu
@@ -2325,7 +2329,7 @@ async function loadStats(dateStr) {
   tbody.innerHTML = '';
   
   if (stats.services.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 10px;">Tidak ada ringkasan layanan.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 10px;">Tidak ada ringkasan layanan.</td></tr>';
   } else {
     stats.services.forEach(srv => {
       const tr = document.createElement('tr');
@@ -2335,6 +2339,7 @@ async function loadStats(dateStr) {
         <td>${srv.total || 0}</td>
         <td style="color: var(--accent-success);">${srv.completed || 0}</td>
         <td style="color: var(--accent-secondary);">${srv.skipped || 0}</td>
+        <td style="color: #94a3b8;">${srv.expired || 0}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -2415,10 +2420,15 @@ async function loadStats(dateStr) {
     statusChartInstance = new Chart(statusCtx, {
       type: 'doughnut',
       data: {
-        labels: ['Selesai', 'Dilewati', 'Menunggu'],
+        labels: ['Selesai', 'Dilewati', 'Kadaluarsa', 'Menunggu'],
         datasets: [{
-          data: [stats.summary.completed, stats.summary.skipped, stats.summary.waiting],
-          backgroundColor: ['#10b981', '#f43f5e', '#6366f1'],
+          data: [
+            stats.summary.completed, 
+            stats.summary.skipped, 
+            stats.summary.expired || 0, 
+            stats.summary.waiting
+          ],
+          backgroundColor: ['#10b981', '#f43f5e', '#94a3b8', '#6366f1'],
           borderWidth: 3,
           borderColor: '#0b0f19',
           hoverOffset: 4

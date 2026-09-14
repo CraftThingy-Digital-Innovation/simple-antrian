@@ -169,19 +169,19 @@ async function initDb() {
 
 // ==================== PENANGANAN PERGANTIAN HARI & DUPLIKASI ====================
 
-// Otomatis skip tiket waiting kemarin, selesaikan calling kemarin, dan reset current_number jika hari berganti
+// Otomatis tandai tiket waiting kemarin sebagai 'expired' (kadaluarsa), selesaikan calling kemarin, dan reset current_number jika hari berganti
 async function handleDayRollover() {
   try {
     let changed = false;
 
-    // 1. Lewatkan (skip) antrian waiting dari hari-hari sebelumnya
-    const skippedRes = await run(`
+    // 1. Ubah antrian waiting dari hari-hari sebelumnya menjadi 'expired' (kadaluarsa harian)
+    const expiredRes = await run(`
       UPDATE tickets 
-      SET status = 'skipped' 
+      SET status = 'expired', completed_at = CURRENT_TIMESTAMP 
       WHERE status = 'waiting' 
         AND date(created_at, 'localtime') < date('now', 'localtime')
     `);
-    if (skippedRes && skippedRes.changes > 0) changed = true;
+    if (expiredRes && expiredRes.changes > 0) changed = true;
 
     // 2. Selesaikan tiket calling dari hari-hari sebelumnya
     const completedRes = await run(`
@@ -242,7 +242,7 @@ async function fixDuplicateWaitingTickets() {
           `SELECT MAX(number_sequence) as max_seq 
            FROM tickets 
            WHERE service_id = ? 
-             AND status IN ('calling', 'completed', 'skipped') 
+             AND status IN ('calling', 'completed', 'skipped', 'expired') 
              AND date(created_at, 'localtime') = date('now', 'localtime')`,
           [srv.id]
         );
@@ -574,6 +574,7 @@ async function getDailyStats(dateStr = null) {
   const total = await get("SELECT COUNT(*) as count FROM tickets WHERE date(created_at, 'localtime') = date(?)", [dateFilter]);
   const completed = await get("SELECT COUNT(*) as count FROM tickets WHERE date(created_at, 'localtime') = date(?) AND status = 'completed'", [dateFilter]);
   const skipped = await get("SELECT COUNT(*) as count FROM tickets WHERE date(created_at, 'localtime') = date(?) AND status = 'skipped'", [dateFilter]);
+  const expired = await get("SELECT COUNT(*) as count FROM tickets WHERE date(created_at, 'localtime') = date(?) AND status = 'expired'", [dateFilter]);
   const waiting = await get("SELECT COUNT(*) as count FROM tickets WHERE date(created_at, 'localtime') = date(?) AND status = 'waiting'", [dateFilter]);
 
   // Rata-rata waktu tunggu (dari created_at ke called_at dalam detik)
@@ -599,6 +600,7 @@ async function getDailyStats(dateStr = null) {
       COUNT(t.id) as total,
       SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed,
       SUM(CASE WHEN t.status = 'skipped' THEN 1 ELSE 0 END) as skipped,
+      SUM(CASE WHEN t.status = 'expired' THEN 1 ELSE 0 END) as expired,
       SUM(CASE WHEN t.status = 'waiting' THEN 1 ELSE 0 END) as waiting
     FROM services s
     LEFT JOIN tickets t ON s.id = t.service_id AND date(t.created_at, 'localtime') = date(?)
@@ -620,6 +622,7 @@ async function getDailyStats(dateStr = null) {
       total: total.count || 0,
       completed: completed.count || 0,
       skipped: skipped.count || 0,
+      expired: expired.count || 0,
       waiting: waiting.count || 0,
       avg_wait_seconds: Math.round(avgWait.avg_wait || 0),
       avg_service_seconds: Math.round(avgService.avg_serve || 0)
