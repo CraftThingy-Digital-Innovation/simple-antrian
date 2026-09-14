@@ -299,24 +299,46 @@
 
     /* Server list style in Client Mode */
     .server-list-item {
-      padding: 16px;
+      padding: 12px 16px;
       border-radius: 10px;
       background: rgba(255,255,255,0.03);
       border: 1px solid var(--border-glass);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 10px;
+      transition: all var(--transition-fast);
     }
-
+    .server-list-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(99, 102, 241, 0.35);
+      transform: translateY(-1px);
+    }
+    .server-list-item.active-connected {
+      background: rgba(16, 185, 129, 0.08);
+      border-color: rgba(16, 185, 129, 0.4);
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);
+    }
     .server-info-title {
       font-weight: 700;
       font-size: 0.95rem;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-
     .server-info-ip {
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       color: var(--text-muted);
+      font-family: monospace;
+      margin-top: 2px;
+    }
+    @keyframes spin-anim {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .spinning {
+      animation: spin-anim 0.8s linear infinite;
+      display: inline-block;
     }
   </style>
 </head>
@@ -374,7 +396,12 @@
     <div class="tab-content active" id="tab-dashboard">
       <div class="page-header">
         <h1 class="page-title">Panggilan & Antrian</h1>
-        <div class="badge badge-waiting" id="badge-mode">Server Mode</div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <button class="btn btn-danger btn-sm" id="btn-stop-audio" style="display: flex; align-items: center; gap: 6px; font-weight: 700; background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);" title="Hentikan panggilan suara yang sedang berbunyi di Layar Display">
+            <span>⏹️</span> Hentikan Suara
+          </button>
+          <div class="badge badge-waiting" id="badge-mode">Server Mode</div>
+        </div>
       </div>
 
       <!-- TTS Status Banner -->
@@ -663,48 +690,159 @@
       </div>
 
       <div class="grid-2">
-        <!-- Mode Aplikasi (Server / Client) -->
-        <section class="glass-panel config-section">
-          <h3 class="config-title">Mode & Koneksi Jaringan</h3>
-          
+        <!-- Card 1: Mode Operasi Aplikasi -->
+        <section class="glass-panel config-section" id="section-app-mode">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 class="config-title" style="margin-bottom: 0;">🖥️ Mode Operasi Aplikasi</h3>
+            <span class="badge badge-waiting" id="badge-mode-config">Server Mode</span>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 18px; line-height: 1.5;">
+            Tentukan peran komputer ini dalam sistem antrian. Simpan untuk menerapkan perubahan.
+          </p>
+
           <div class="form-group">
-            <label for="app-mode-select">Mode Operasi</label>
+            <label for="app-mode-select">Pilihan Mode Operasi</label>
             <select class="input-control" id="app-mode-select">
-              <option value="server">Server Mode (Tuan Rumah Database)</option>
-              <option value="client">Client Mode (Terhubung ke Server Lain)</option>
+              <option value="server">🖥️ Server Mode (Pusat Database / WebSocket Host)</option>
+              <option value="client">💻 Client Mode (Operator Loket / Layar Tambahan)</option>
             </select>
           </div>
 
-          <!-- Bagian khusus Server -->
-          <div id="settings-server-group" style="display: flex; flex-direction: column; gap: 20px;">
+          <!-- Bagian khusus Server Mode -->
+          <div id="settings-server-group" style="display: flex; flex-direction: column; gap: 15px; margin-top: 8px;">
             <div class="form-group">
               <label for="setting-server-name">Nama Server Antrian</label>
-              <input type="text" class="input-control" id="setting-server-name" placeholder="Contoh: Server Utama">
+              <input type="text" class="input-control" id="setting-server-name" placeholder="Contoh: Layanan Paspor / Server Utama">
+              <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Nama ini akan disiarkan ke jaringan lokal dan dikenali oleh PC Client sebelah.</span>
             </div>
-            <div class="form-group">
-              <label for="setting-port">Port WebSocket Server</label>
-              <input type="number" class="input-control" id="setting-port" placeholder="Default: 8080">
-            </div>
-          </div>
 
-          <!-- Bagian khusus Client -->
-          <div id="settings-client-group" style="display: none; flex-direction: column; gap: 15px;">
-            <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;">Pilih Server untuk Dihubungkan</label>
-            <div id="discovered-servers-list" style="max-height: 200px; overflow-y: auto;">
-              <div style="text-align: center; color: var(--text-muted); padding: 15px;">Mencari server di jaringan lokal (UDP)...</div>
+            <div class="grid-2" style="gap: 15px;">
+              <div class="form-group">
+                <label for="setting-port">Port WebSocket Server</label>
+                <input type="number" class="input-control" id="setting-port" placeholder="Default: 8080">
+              </div>
+              <div class="form-group">
+                <label>IP Komputer Ini (Server)</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" class="input-control" id="lbl-local-ip-display" readonly value="127.0.0.1" style="background: rgba(0,0,0,0.2); cursor: default; font-family: monospace;">
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-server-ip" title="Salin Alamat IP:Port">📋</button>
+                </div>
+              </div>
             </div>
-            <div class="form-group" style="margin-top: 10px;">
-              <label for="client-manual-ip">Hubungkan Manual (IP Address)</label>
-              <div style="display: flex; gap: 10px;">
-                <input type="text" class="input-control" id="client-manual-ip" placeholder="Contoh: 192.168.1.100:8080">
-                <button class="btn btn-primary" id="btn-manual-connect">Hubungkan</button>
+
+            <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 10px; padding: 12px; font-size: 0.8rem; color: var(--text-secondary); display: flex; gap: 10px; align-items: flex-start;">
+              <span style="font-size: 1.2rem;">💡</span>
+              <div>
+                <strong>Info Koneksi Manual:</strong> Berikan alamat IP di atas (<span id="hint-server-ip-port" style="font-weight: 700; color: var(--accent-primary);">127.0.0.1:8080</span>) ke PC Client jika menghubungkan secara manual.
               </div>
             </div>
           </div>
 
-          <button class="btn btn-primary" id="btn-save-mode" style="margin-top: 10px;">
-            💾 Simpan Mode & Restart
+          <!-- Bagian khusus Client Mode (Info) -->
+          <div id="settings-client-info-group" style="display: none; flex-direction: column; gap: 12px; margin-top: 8px;">
+            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 10px; padding: 14px; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+              <strong style="color: var(--accent-success); display: flex; align-items: center; gap: 6px;">
+                <span>💻</span> Komputer ini diatur sebagai Client Mode
+              </strong>
+              <p style="margin: 8px 0 0 0;">
+                Komputer ini tidak menyimpan database, melainkan terhubung ke PC Server utama. Pilih server tujuan di kartu <strong>"Pilih Server Antrian"</strong> di samping.
+              </p>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" id="btn-save-mode" style="margin-top: 15px; width: 100%;">
+            💾 Simpan Mode Operasi & Restart
           </button>
+        </section>
+
+        <!-- Card 2: Pilih Server Antrian (Koneksi Client) -->
+        <section class="glass-panel config-section" id="section-server-connection">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 class="config-title" style="margin-bottom: 0;">📡 Pilih Server Antrian</h3>
+            <span class="badge" id="client-conn-badge">Mode Client</span>
+          </div>
+
+          <!-- Tampilan saat di SERVER MODE -->
+          <div id="server-mode-broadcast-info" style="display: flex; flex-direction: column; gap: 15px;">
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-glass); border-radius: 12px; padding: 24px 18px; text-align: center;">
+              <div style="font-size: 2.8rem; margin-bottom: 10px;">📡</div>
+              <h4 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 8px; color: var(--text-primary);">Server Aktif & Menyiarkan Layanan</h4>
+              <p style="font-size: 0.85rem; color: var(--text-secondary); max-width: 440px; margin: 0 auto 16px auto; line-height: 1.5;">
+                Komputer ini bertindak sebagai Tuan Rumah (Server). Komputer client di jaringan lokal dapat menemukan server ini secara otomatis melalui UDP Discovery.
+              </p>
+              <div style="display: inline-flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.25); padding: 12px 24px; border-radius: 10px; border: 1px solid var(--border-glass); text-align: left;">
+                <div style="font-size: 0.85rem; color: var(--text-muted);">Nama Server: <strong id="srv-card-name" style="color: var(--accent-primary);">Server Utama</strong></div>
+                <div style="font-size: 0.85rem; color: var(--text-muted);">Alamat Jaringan: <strong id="srv-card-addr" style="color: var(--accent-success); font-family: monospace;">127.0.0.1:8080</strong></div>
+              </div>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center;">
+              Ingin menghubungkan komputer ini ke server di PC sebelah? Ubah Mode Operasi menjadi <strong>Client Mode</strong> di panel sebelah kiri.
+            </p>
+          </div>
+
+          <!-- Tampilan saat di CLIENT MODE -->
+          <div id="client-mode-connection-panel" style="display: none; flex-direction: column; gap: 18px;">
+            <!-- Status Koneksi Aktif -->
+            <div id="active-connection-card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-glass); border-radius: 12px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px;">Status Koneksi Server</div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="status-dot" id="client-active-dot" style="background: var(--accent-warning);"></span>
+                  <strong id="client-active-server-name" style="font-size: 0.95rem; color: var(--text-primary);">Mencari server...</strong>
+                </div>
+                <div id="client-active-server-endpoint" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; font-family: monospace;">-</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="btn-reconnect-current" title="Hubungkan Ulang ke Server">🔄 Reconnect</button>
+            </div>
+
+            <!-- Server Terdeteksi Otomatis (UDP Discovery) -->
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                  <span>📡</span> Server Ditemukan di Jaringan (UDP)
+                </label>
+                <button class="btn btn-secondary btn-sm" id="btn-refresh-discovery" style="font-size: 0.8rem; padding: 4px 12px; display: flex; align-items: center; gap: 6px;">
+                  <span id="refresh-icon">🔄</span> Pindai Ulang
+                </button>
+              </div>
+
+              <div id="discovered-servers-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+                <div style="text-align: center; color: var(--text-muted); padding: 20px; background: rgba(0,0,0,0.15); border-radius: 10px; border: 1px dashed var(--border-glass);">
+                  <div style="font-size: 1.5rem; margin-bottom: 6px;">🔍</div>
+                  Mencari server di jaringan lokal (UDP)...
+                </div>
+              </div>
+            </div>
+
+            <!-- Hubungkan Manual (Alamat IP) -->
+            <div style="border-top: 1px solid var(--border-glass); padding-top: 15px;">
+              <label for="client-manual-ip" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 700; display: block; margin-bottom: 8px;">
+                🔗 Hubungkan Manual (Alamat IP & Port)
+              </label>
+              <div style="display: flex; gap: 10px;">
+                <input type="text" class="input-control" id="client-manual-ip" placeholder="Contoh: 192.168.1.50:8080" style="font-family: monospace;">
+                <button class="btn btn-primary" id="btn-manual-connect" style="white-space: nowrap; font-weight: 600;">
+                  Hubungkan
+                </button>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
+                Ketikkan IP PC Server target (lihat tab Pengaturan di PC Server).
+              </div>
+            </div>
+
+            <!-- Troubleshooting Box -->
+            <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-glass); border-radius: 10px; padding: 12px 14px; font-size: 0.78rem; color: var(--text-muted);">
+              <div style="font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                <span>💡</span> Tips jika server di PC sebelah belum muncul otomatis:
+              </div>
+              <ol style="margin: 0; padding-left: 18px; line-height: 1.6;">
+                <li>Pastikan kedua PC terhubung ke Wi-Fi / kabel LAN yang sama.</li>
+                <li>Di PC Server, lihat IP Lokal di tab Pengaturan (misal: <code>192.168.0.175:8080</code>).</li>
+                <li>Ketik IP tersebut di kolom <strong>Hubungkan Manual</strong> lalu klik <strong>Hubungkan</strong>.</li>
+                <li>Pastikan Windows Firewall di PC Server mengizinkan aplikasi SimpleAntrian (Private Network).</li>
+              </ol>
+            </div>
+          </div>
         </section>
 
         <!-- Kategori Layanan (Hanya Server Mode) -->
@@ -876,17 +1014,27 @@
             <label for="setting-tts-enabled" style="font-size: 0.95rem; font-weight: 600; cursor: pointer;">Aktifkan Suara Panggilan Pelanggan</label>
           </div>
 
+          <div class="form-group" style="flex-direction: row; gap: 10px; align-items: center; margin-top: 10px; padding-left: 28px;">
+            <input type="checkbox" id="setting-call-customer-name" style="width: 18px; height: 18px;" checked>
+            <label for="setting-call-customer-name" style="font-size: 0.9rem; font-weight: 600; cursor: pointer; color: var(--text-secondary);">Panggil Nama Pelanggan (contoh: "atas nama Budi")</label>
+          </div>
+
           <div class="form-group" id="setting-multilang-group" style="flex-direction: row; gap: 10px; align-items: center; margin-top: 10px; padding-left: 28px;">
             <input type="checkbox" id="setting-multilang-enabled" style="width: 18px; height: 18px;">
             <label for="setting-multilang-enabled" style="font-size: 0.9rem; font-weight: 600; cursor: pointer; color: var(--text-secondary);">Aktifkan Multi Bahasa (Inggris & Mandarin)</label>
           </div>
 
+          <div class="form-group" style="flex-direction: row; gap: 10px; align-items: center; margin-top: 10px; padding-left: 28px;">
+            <input type="checkbox" id="setting-auto-call-next" style="width: 18px; height: 18px;">
+            <label for="setting-auto-call-next" style="font-size: 0.9rem; font-weight: 600; cursor: pointer; color: var(--text-secondary);">Panggil otomatis antrian berikutnya saat tombol Selesai ditekan</label>
+          </div>
+
           <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">
-            Panggilan suara default dibacakan dalam Bahasa Indonesia. Jika opsi Multi Bahasa diaktifkan, nomor antrian akan dipanggil berurutan dalam 3 bahasa (Bahasa Indonesia, Inggris, dan Mandarin) pada layar display.
+            Panggilan suara default dibacakan dalam Bahasa Indonesia. Jika opsi nama aktif, sistem akan menyebutkan nomor tiket beserta nama orang yang mengantri ("Nomor antrian A001, atas nama Budi, silakan menuju loket 1"). Jika opsi panggil otomatis tidak dicentang, menekan tombol Selesai akan menyelesaikan antrian aktif tanpa memanggil antrian baru sampai Anda menekan tombol Panggil.
           </div>
 
           <button class="btn btn-primary" id="btn-save-tts" style="margin-top: 10px; width: 100%;">
-            💾 Simpan Pengaturan TTS
+            💾 Simpan Pengaturan Suara & Alur Panggilan
           </button>
         </section>
 

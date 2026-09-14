@@ -208,19 +208,18 @@ async function initSystemInfo() {
     serverPort = info.port || 8080;
     
     // Tampilkan versi aplikasi & hubungkan listener pembaruan GitHub
-    if (info.appVersion === '1.5.6') {
+    document.getElementById('lbl-app-version').innerText = `v${info.appVersion}`;
+    document.getElementById('lbl-settings-version').innerText = `v${info.appVersion}`;
+
+    const lastSeenVersion = localStorage.getItem('last_seen_app_version');
+    if (lastSeenVersion && lastSeenVersion !== info.appVersion) {
       document.getElementById('lbl-app-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Sukses Diperbarui)</span>`;
       document.getElementById('lbl-settings-version').innerHTML = `v${info.appVersion} <span style="color: var(--accent-success); font-size: 0.8rem; margin-left: 8px;">(Terbaru)</span>`;
-      if (!localStorage.getItem('v156_update_notified')) {
-        setTimeout(() => {
-          showToast("🎉 Selamat! Aplikasi berhasil diperbarui ke versi v1.5.6 secara otomatis!", "success");
-          localStorage.setItem('v156_update_notified', 'true');
-        }, 2000);
-      }
-    } else {
-      document.getElementById('lbl-app-version').innerText = `v${info.appVersion}`;
-      document.getElementById('lbl-settings-version').innerText = `v${info.appVersion}`;
+      setTimeout(() => {
+        showToast(`🎉 Selamat! Aplikasi berhasil diperbarui ke versi v${info.appVersion} secara otomatis!`, 'success');
+      }, 2000);
     }
+    localStorage.setItem('last_seen_app_version', info.appVersion);
     // Floating Update Progress Modal variables & helpers
     let updateProgressModal = null;
 
@@ -400,8 +399,41 @@ async function initSystemInfo() {
     
     // Tampilkan mode di UI
     const badgeMode = document.getElementById('badge-mode');
-    badgeMode.innerText = currentMode === 'server' ? 'Server Mode' : 'Client Mode';
-    badgeMode.className = `badge ${currentMode === 'server' ? 'badge-waiting' : 'badge-completed'}`;
+    if (badgeMode) {
+      badgeMode.innerText = currentMode === 'server' ? 'Server Mode' : 'Client Mode';
+      badgeMode.className = `badge ${currentMode === 'server' ? 'badge-waiting' : 'badge-completed'}`;
+    }
+
+    const badgeModeConfig = document.getElementById('badge-mode-config');
+    if (badgeModeConfig) {
+      badgeModeConfig.innerText = currentMode === 'server' ? 'Server Mode' : 'Client Mode';
+      badgeModeConfig.className = `badge ${currentMode === 'server' ? 'badge-waiting' : 'badge-completed'}`;
+    }
+
+    const clientConnBadge = document.getElementById('client-conn-badge');
+    if (clientConnBadge) {
+      clientConnBadge.innerText = currentMode === 'server' ? 'Mode Server (Host)' : 'Mode Client';
+      clientConnBadge.className = `badge ${currentMode === 'server' ? 'badge-waiting' : 'badge-completed'}`;
+    }
+
+    const localIpDisplay = document.getElementById('lbl-local-ip-display');
+    if (localIpDisplay) {
+      localIpDisplay.value = info.localIp || '127.0.0.1';
+    }
+
+    const hintServerIpPort = document.getElementById('hint-server-ip-port');
+    if (hintServerIpPort) {
+      hintServerIpPort.innerText = `${info.localIp}:${serverPort}`;
+    }
+
+    const settings = await window.api.getSettings();
+    const serverName = (settings && settings.server_name) || info.serverName || 'Server Antrian';
+
+    const srvCardName = document.getElementById('srv-card-name');
+    if (srvCardName) srvCardName.innerText = serverName;
+
+    const srvCardAddr = document.getElementById('srv-card-addr');
+    if (srvCardAddr) srvCardAddr.innerText = `${info.localIp}:${serverPort}`;
 
     if (currentMode === 'server') {
       document.getElementById('network-status-title').innerText = 'Server Aktif (Lokal)';
@@ -409,21 +441,26 @@ async function initSystemInfo() {
       document.getElementById('status-dot').style.background = 'var(--accent-success)';
       
       // Update local server name display
-      const settings = await window.api.getSettings();
-      if (settings && settings.server_name) {
-        const lbl = document.getElementById('status-server-name');
-        const val = document.getElementById('status-server-name-val');
-        if (lbl && val) {
-          val.innerText = settings.server_name;
-          lbl.style.display = 'block';
-        }
+      const lbl = document.getElementById('status-server-name');
+      const val = document.getElementById('status-server-name-val');
+      if (lbl && val) {
+        val.innerText = serverName;
+        lbl.style.display = 'block';
       }
       
       // Sembunyikan/Tampilkan menu pengaturan yang relevan
-      document.getElementById('settings-server-group').style.display = 'flex';
-      document.getElementById('settings-client-group').style.display = 'none';
-      document.getElementById('section-services-config').style.display = 'block';
-      document.getElementById('section-db-config').style.display = 'block';
+      const serverGroup = document.getElementById('settings-server-group');
+      if (serverGroup) serverGroup.style.display = 'flex';
+      const clientInfoGroup = document.getElementById('settings-client-info-group');
+      if (clientInfoGroup) clientInfoGroup.style.display = 'none';
+      const serverBroadcastInfo = document.getElementById('server-mode-broadcast-info');
+      if (serverBroadcastInfo) serverBroadcastInfo.style.display = 'flex';
+      const clientConnPanel = document.getElementById('client-mode-connection-panel');
+      if (clientConnPanel) clientConnPanel.style.display = 'none';
+      const servicesConfig = document.getElementById('section-services-config');
+      if (servicesConfig) servicesConfig.style.display = 'block';
+      const dbConfig = document.getElementById('section-db-config');
+      if (dbConfig) dbConfig.style.display = 'block';
       
       // Connect ke WebSocket lokal
       connectWebSocket(`ws://localhost:${serverPort}`);
@@ -432,19 +469,29 @@ async function initSystemInfo() {
       document.getElementById('status-text').innerText = 'Mencari server...';
       document.getElementById('status-dot').style.background = 'var(--accent-warning)';
       
-      document.getElementById('settings-server-group').style.display = 'none';
-      document.getElementById('settings-client-group').style.display = 'flex';
-      document.getElementById('section-services-config').style.display = 'none';
-      document.getElementById('section-db-config').style.display = 'none';
+      const serverGroup = document.getElementById('settings-server-group');
+      if (serverGroup) serverGroup.style.display = 'none';
+      const clientInfoGroup = document.getElementById('settings-client-info-group');
+      if (clientInfoGroup) clientInfoGroup.style.display = 'flex';
+      const serverBroadcastInfo = document.getElementById('server-mode-broadcast-info');
+      if (serverBroadcastInfo) serverBroadcastInfo.style.display = 'none';
+      const clientConnPanel = document.getElementById('client-mode-connection-panel');
+      if (clientConnPanel) clientConnPanel.style.display = 'flex';
+      const servicesConfig = document.getElementById('section-services-config');
+      if (servicesConfig) servicesConfig.style.display = 'none';
+      const dbConfig = document.getElementById('section-db-config');
+      if (dbConfig) dbConfig.style.display = 'none';
 
       // Load server terakhir yang disimpan jika ada
-      const lastConnectedServer = localStorage.getItem('last_connected_server');
+      const lastConnectedServer = settings.active_server_endpoint || localStorage.getItem('last_connected_server');
       if (lastConnectedServer) {
         document.getElementById('status-text').innerText = `Menghubungkan ke ${lastConnectedServer}...`;
+        const activeEpEl = document.getElementById('client-active-server-endpoint');
+        if (activeEpEl) activeEpEl.innerText = lastConnectedServer;
         connectWebSocket(`ws://${lastConnectedServer}`);
       }
 
-      // Mulai mendengarkan daftar server dari UDP Multicast
+      // Mulai mendengarkan daftar server dari UDP Discovery
       window.api.onServersUpdated((servers) => {
         renderDiscoveredServers(servers);
       });
@@ -454,43 +501,110 @@ async function initSystemInfo() {
   }
 }
 
+let currentConnectedEndpoint = '';
+let currentConnectedServerName = '';
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // Render server yang ditemukan di jaringan lokal (UDP)
 function renderDiscoveredServers(servers) {
   const container = document.getElementById('discovered-servers-list');
-  if (servers.length === 0) {
-    container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 15px;">Mencari server di jaringan lokal (UDP)...</div>';
+  if (!container) return;
+
+  if (!servers || servers.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; color: var(--text-muted); padding: 20px 12px; background: rgba(0,0,0,0.15); border-radius: 10px; border: 1px dashed var(--border-glass);">
+        <div style="font-size: 1.4rem; margin-bottom: 6px;">🔍</div>
+        <div style="font-weight: 600; color: var(--text-secondary);">Mencari server di jaringan lokal (UDP)...</div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Pastikan PC Server menyala pada Wi-Fi/LAN yang sama atau gunakan Hubungkan Manual di bawah.</div>
+      </div>
+    `;
     return;
   }
 
   container.innerHTML = '';
   servers.forEach(srv => {
     const srvIpPort = `${srv.ip}:${srv.port}`;
+    const isConnected = currentConnectedEndpoint && (
+      currentConnectedEndpoint === srvIpPort ||
+      (srv.rinfoAddress && currentConnectedEndpoint === `${srv.rinfoAddress}:${srv.port}`)
+    );
+
     const div = document.createElement('div');
-    div.className = 'server-list-item animate-pop-in';
+    div.className = `server-list-item animate-pop-in ${isConnected ? 'active-connected' : ''}`;
     div.innerHTML = `
       <div>
-        <div class="server-info-title">${srv.name}</div>
-        <div class="server-info-ip">${srvIpPort}</div>
+        <div class="server-info-title">
+          <span>🖥️</span> <strong>${escapeHtml(srv.name || 'Server Antrian')}</strong>
+          ${isConnected ? '<span class="badge badge-completed" style="font-size: 0.7rem; padding: 2px 8px;">✓ Terhubung</span>' : ''}
+        </div>
+        <div class="server-info-ip">${escapeHtml(srvIpPort)}</div>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="connectToRemoteServer('${srvIpPort}')">
-        Hubungkan
-      </button>
+      <div>
+        ${isConnected
+          ? '<span style="color: var(--accent-success); font-size: 0.85rem; font-weight: 700; margin-right: 6px;">● Aktif</span>'
+          : `<button class="btn btn-primary btn-sm" onclick="connectToRemoteServer('${srvIpPort}', '${escapeHtml(srv.name || '')}')" style="font-weight: 600; padding: 5px 14px;">⚡ Hubungkan</button>`
+        }
+      </div>
     `;
     container.appendChild(div);
   });
 }
 
 // Hubungkan ke server remote (Client Mode)
-window.connectToRemoteServer = function(ipPort) {
+window.connectToRemoteServer = async function(ipPort, serverName = '') {
+  if (!ipPort) return;
+  ipPort = ipPort.trim().replace(/^ws:\/\//, '');
+
   localStorage.setItem('last_connected_server', ipPort);
-  document.getElementById('status-text').innerText = `Menghubungkan ke ${ipPort}...`;
+  try {
+    await window.api.saveSetting('active_server_endpoint', ipPort);
+    await window.api.setActiveServerEndpoint(ipPort);
+  } catch (_) {}
+
+  currentConnectedEndpoint = ipPort;
+  if (serverName) currentConnectedServerName = serverName;
+
+  const displayName = currentConnectedServerName ? `${currentConnectedServerName} (${ipPort})` : ipPort;
+  document.getElementById('status-text').innerText = `${ipPort}`;
+  document.getElementById('status-dot').style.background = 'var(--accent-warning)';
+
+  const activeNameEl = document.getElementById('client-active-server-name');
+  if (activeNameEl) activeNameEl.innerText = `Menghubungkan ke ${currentConnectedServerName || 'Server'}...`;
+
+  const activeEpEl = document.getElementById('client-active-server-endpoint');
+  if (activeEpEl) activeEpEl.innerText = ipPort;
+
+  const activeDotEl = document.getElementById('client-active-dot');
+  if (activeDotEl) activeDotEl.style.background = 'var(--accent-warning)';
+
+  showToast(`Menghubungkan ke server ${displayName}...`, 'info');
   connectWebSocket(`ws://${ipPort}`);
 };
 
+let currentOperatorWsUrl = '';
+let operatorReconnectTimer = null;
+
 // Inisialisasi Koneksi WebSocket
 function connectWebSocket(url) {
+  currentOperatorWsUrl = url;
+  if (operatorReconnectTimer) {
+    clearTimeout(operatorReconnectTimer);
+    operatorReconnectTimer = null;
+  }
+
   if (ws) {
-    ws.close();
+    ws.onclose = null;
+    ws.onerror = null;
+    try { ws.close(); } catch (_) {}
   }
 
   showToast(`Menghubungkan ke WebSocket ${url}...`, 'info');
@@ -502,7 +616,33 @@ function connectWebSocket(url) {
     
     const displayUrl = url.replace('ws://', '').replace('localhost', 'Server');
     document.getElementById('status-text').innerText = displayUrl;
-    
+    currentConnectedEndpoint = url.replace('ws://', '');
+
+    const activeDotEl = document.getElementById('client-active-dot');
+    if (activeDotEl) activeDotEl.style.background = 'var(--accent-success)';
+
+    const activeNameEl = document.getElementById('client-active-server-name');
+    if (activeNameEl) {
+      activeNameEl.innerText = currentConnectedServerName || 'Server Terhubung';
+    }
+
+    const activeEpEl = document.getElementById('client-active-server-endpoint');
+    if (activeEpEl) activeEpEl.innerText = currentConnectedEndpoint;
+
+    // Refresh server list highlighting
+    const container = document.getElementById('discovered-servers-list');
+    if (container) {
+      const items = container.querySelectorAll('.server-list-item');
+      items.forEach(item => {
+        const ipEl = item.querySelector('.server-info-ip');
+        if (ipEl && ipEl.innerText.trim() === currentConnectedEndpoint) {
+          item.classList.add('active-connected');
+        } else {
+          item.classList.remove('active-connected');
+        }
+      });
+    }
+
     // Minta data state awal
     sendAction('GET_STATE');
     
@@ -513,6 +653,12 @@ function connectWebSocket(url) {
   ws.onmessage = (event) => {
     try {
       const message = JSON.parse(event.data);
+      if (message.type === 'PING') {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'PONG' }));
+        }
+        return;
+      }
       handleWebSocketMessage(message);
     } catch (err) {
       console.error('Error parsing WS message:', err);
@@ -522,16 +668,27 @@ function connectWebSocket(url) {
   ws.onclose = () => {
     document.getElementById('status-dot').style.background = 'var(--accent-secondary)';
     document.getElementById('status-text').innerText = 'Terputus';
-    showToast('Koneksi terputus. Mencoba menghubungkan kembali dalam 5 detik...', 'error');
+
+    const activeDotEl = document.getElementById('client-active-dot');
+    if (activeDotEl) activeDotEl.style.background = 'var(--accent-danger)';
+
+    const activeNameEl = document.getElementById('client-active-server-name');
+    if (activeNameEl && currentMode === 'client') activeNameEl.innerText = 'Koneksi Terputus';
+
+    showToast('Koneksi terputus. Mencoba menghubungkan kembali...', 'error');
     
-    // Auto reconnect
-    setTimeout(() => {
-      connectWebSocket(url);
-    }, 5000);
+    // Auto reconnect dengan debounce guard
+    if (!operatorReconnectTimer) {
+      operatorReconnectTimer = setTimeout(() => {
+        operatorReconnectTimer = null;
+        connectWebSocket(currentOperatorWsUrl);
+      }, 3000);
+    }
   };
 
   ws.onerror = (err) => {
     console.error('WebSocket Error:', err);
+    try { ws.close(); } catch (_) {}
   };
 }
 
@@ -550,6 +707,17 @@ function handleWebSocketMessage(message) {
   
   switch (type) {
     case 'STATE_UPDATE':
+      if (payload && payload.serverName) {
+        currentConnectedServerName = payload.serverName;
+        const lbl = document.getElementById('status-server-name');
+        const val = document.getElementById('status-server-name-val');
+        if (lbl && val) {
+          val.innerText = payload.serverName;
+          lbl.style.display = 'block';
+        }
+        const activeNameEl = document.getElementById('client-active-server-name');
+        if (activeNameEl) activeNameEl.innerText = payload.serverName;
+      }
       renderQueueState(payload);
       break;
 
@@ -571,6 +739,10 @@ function handleWebSocketMessage(message) {
       // Main process display window yang akan memutar suara, 
       // tapi kita juga bisa memutarnya secara opsional di operator panel.
       playVoiceAnnounce(payload.ticketNumber, payload.deskNumber, payload.voiceFiles);
+      break;
+
+    case 'STOP_ANNOUNCEMENT':
+      stopLocalAudio();
       break;
 
     case 'ALERT':
@@ -784,6 +956,21 @@ async function playVoiceAnnounce(ticketNumber, deskNumber, voiceFiles) {
   }
 }
 
+let currentLocalAudio = null;
+let isLocalPlaying = false;
+
+function stopLocalAudio() {
+  isLocalPlaying = false;
+  if (currentLocalAudio) {
+    try {
+      currentLocalAudio.pause();
+      currentLocalAudio.currentTime = 0;
+      currentLocalAudio.src = '';
+    } catch (_) {}
+    currentLocalAudio = null;
+  }
+}
+
 function playAudioSequence(urls) {
   return new Promise((resolve) => {
     if (!urls || urls.length === 0) {
@@ -791,8 +978,10 @@ function playAudioSequence(urls) {
       return;
     }
     
+    isLocalPlaying = true;
     let index = 0;
     const audio = new Audio();
+    currentLocalAudio = audio;
     
     audio.onended = () => {
       index++;
@@ -806,7 +995,8 @@ function playAudioSequence(urls) {
     };
     
     function playNext() {
-      if (index >= urls.length) {
+      if (!isLocalPlaying || index >= urls.length) {
+        currentLocalAudio = null;
         resolve();
         return;
       }
@@ -1005,7 +1195,7 @@ function renderQueueState(state) {
     
     if (!currentDesk) {
       // Jika ada tiket aktif dipanggil untuk layanan ini, samakan nomor loketnya
-      if (anyActiveCall) {
+      if (anyActiveCall && anyActiveCall.desk_number) {
         currentDesk = anyActiveCall.desk_number;
         localDeskSettings[srv.id] = currentDesk;
         localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
@@ -1015,15 +1205,22 @@ function renderQueueState(state) {
     }
 
     // Cari apakah ada tiket sedang dipanggil untuk layanan dan loket ini
+    // 1. Cocokkan nomor loket yang terdaftar
     let activeCall = callingTickets.find(t => t.service_id === srv.id && t.desk_number === currentDesk);
     
-    // Jika tidak ditemukan karena nama loket baru diubah di input, cari berdasarkan activeTickets tracking
+    // 2. Jika tidak ditemukan karena nama loket baru diubah di input, cari berdasarkan activeTickets tracking
     if (!activeCall && activeTickets[srv.id]) {
       activeCall = callingTickets.find(t => t.id === activeTickets[srv.id]);
     }
-    // Atau jika ada panggilan aktif apa saja untuk layanan ini dan kita belum memiliki activeTickets terdaftar
+
+    // 3. Fallback: jika ada tiket calling untuk layanan ini, langsung pasangkan dan sinkronkan desk
     if (!activeCall && anyActiveCall) {
       activeCall = anyActiveCall;
+      if (activeCall.desk_number) {
+        currentDesk = activeCall.desk_number;
+        localDeskSettings[srv.id] = currentDesk;
+        localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
+      }
     }
 
     if (activeCall) {
@@ -1056,10 +1253,10 @@ function renderQueueState(state) {
           <button class="btn btn-secondary" onclick="callSkipped('${srv.id}')" ${srv.skipped_count > 0 ? '' : 'disabled'}>
             🔄 Terlewat ${srv.skipped_count > 0 ? `(${srv.skipped_count})` : ''}
           </button>
-          <button class="btn btn-success" onclick="completeCall('${activeCall.id}')" style="grid-column: span 1;">
+          <button class="btn btn-success" onclick="completeCall('${activeCall.id}', '${srv.id}')" style="grid-column: span 1;">
             ✅ Selesai
           </button>
-          <button class="btn btn-danger" onclick="skipCall('${activeCall.id}')" style="grid-column: span 1;">
+          <button class="btn btn-danger" onclick="skipCall('${activeCall.id}', '${srv.id}')" style="grid-column: span 1;">
             ❌ Lewati
           </button>
         </div>
@@ -1195,11 +1392,13 @@ window.callNext = function(serviceId) {
   const deskInput = document.getElementById(`desk-input-${serviceId}`);
   let deskNumber = '';
   if (deskInput && deskInput.value) {
-    deskNumber = deskInput.value;
+    deskNumber = deskInput.value.trim();
   } else {
     const srv = servicesList.find(s => s.id === serviceId);
     deskNumber = srv ? srv.name : 'Loket 1';
   }
+  localDeskSettings[serviceId] = deskNumber;
+  localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
   sendAction('CALL_NEXT', { serviceId, deskNumber });
 };
 
@@ -1207,11 +1406,13 @@ window.callSkipped = function(serviceId) {
   const deskInput = document.getElementById(`desk-input-${serviceId}`);
   let deskNumber = '';
   if (deskInput && deskInput.value) {
-    deskNumber = deskInput.value;
+    deskNumber = deskInput.value.trim();
   } else {
     const srv = servicesList.find(s => s.id === serviceId);
     deskNumber = srv ? srv.name : 'Loket 1';
   }
+  localDeskSettings[serviceId] = deskNumber;
+  localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
   sendAction('CALL_SKIPPED', { serviceId, deskNumber });
 };
 
@@ -1220,21 +1421,29 @@ window.recall = function(ticketId, serviceId) {
   const deskInput = document.getElementById(`desk-input-${serviceId}`);
   let deskNumber = '';
   if (deskInput && deskInput.value) {
-    deskNumber = deskInput.value;
+    deskNumber = deskInput.value.trim();
   } else {
     const srv = servicesList.find(s => s.id === serviceId);
     deskNumber = srv ? srv.name : 'Loket 1';
   }
+  localDeskSettings[serviceId] = deskNumber;
+  localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
   sendAction('RECALL', { ticketId, deskNumber });
 };
 
-window.completeCall = function(ticketId) {
+window.completeCall = function(ticketId, serviceId) {
   if (!ticketId) return;
+  if (serviceId && activeTickets[serviceId]) {
+    delete activeTickets[serviceId];
+  }
   sendAction('COMPLETE', { ticketId });
 };
 
-window.skipCall = function(ticketId) {
+window.skipCall = function(ticketId, serviceId) {
   if (!ticketId) return;
+  if (serviceId && activeTickets[serviceId]) {
+    delete activeTickets[serviceId];
+  }
   sendAction('SKIP', { ticketId });
 };
 
@@ -1346,33 +1555,127 @@ function setupEventListeners() {
 
   // Hubungkan Manual (Client Mode)
   const btnManualConnect = document.getElementById('btn-manual-connect');
-  btnManualConnect.addEventListener('click', () => {
-    const ipPort = document.getElementById('client-manual-ip').value.trim();
-    if (!ipPort) {
-      showToast('Ketik alamat IP:Port server target.', 'error');
-      return;
-    }
-    connectToRemoteServer(ipPort);
-  });
+  if (btnManualConnect) {
+    btnManualConnect.addEventListener('click', () => {
+      const ipPort = document.getElementById('client-manual-ip').value.trim();
+      if (!ipPort) {
+        showToast('Ketik alamat IP:Port server target (contoh: 192.168.1.50:8080).', 'error');
+        return;
+      }
+      connectToRemoteServer(ipPort);
+    });
+  }
+
+  const clientManualIp = document.getElementById('client-manual-ip');
+  if (clientManualIp && btnManualConnect) {
+    clientManualIp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        btnManualConnect.click();
+      }
+    });
+  }
+
+  // Pindai Ulang Server UDP (Client Mode)
+  const btnRefreshDiscovery = document.getElementById('btn-refresh-discovery');
+  if (btnRefreshDiscovery) {
+    btnRefreshDiscovery.addEventListener('click', async () => {
+      const icon = document.getElementById('refresh-icon');
+      if (icon) icon.classList.add('spinning');
+      showToast('📡 Memindai server antrian di jaringan lokal (UDP)...', 'info');
+      try {
+        const servers = await window.api.refreshDiscovery();
+        if (servers) renderDiscoveredServers(servers);
+      } catch (err) {
+        console.error('Failed to refresh discovery:', err);
+      } finally {
+        setTimeout(() => {
+          if (icon) icon.classList.remove('spinning');
+        }, 800);
+      }
+    });
+  }
+
+  // Reconnect ke server yang sedang aktif
+  const btnReconnectCurrent = document.getElementById('btn-reconnect-current');
+  if (btnReconnectCurrent) {
+    btnReconnectCurrent.addEventListener('click', () => {
+      const target = currentConnectedEndpoint || localStorage.getItem('last_connected_server');
+      if (target) {
+        showToast(`Menghubungkan ulang ke ${target}...`, 'info');
+        connectToRemoteServer(target);
+      } else {
+        showToast('Belum ada server yang dipilih.', 'warning');
+      }
+    });
+  }
+
+  // Salin Alamat IP Server ke Clipboard
+  const btnCopyServerIp = document.getElementById('btn-copy-server-ip');
+  if (btnCopyServerIp) {
+    btnCopyServerIp.addEventListener('click', () => {
+      const ip = document.getElementById('lbl-local-ip-display').value || '127.0.0.1';
+      const port = document.getElementById('setting-port').value || '8080';
+      const fullAddr = `${ip}:${port}`;
+      navigator.clipboard.writeText(fullAddr).then(() => {
+        showToast(`Alamat Server (${fullAddr}) berhasil disalin ke clipboard!`, 'success');
+      }).catch(() => {
+        showToast(`Alamat Server: ${fullAddr}`, 'info');
+      });
+    });
+  }
+
+  // Live preview perubahan pilihan mode operasi
+  const appModeSelect = document.getElementById('app-mode-select');
+  if (appModeSelect) {
+    appModeSelect.addEventListener('change', (e) => {
+      const selectedMode = e.target.value;
+      const serverGroup = document.getElementById('settings-server-group');
+      const clientInfoGroup = document.getElementById('settings-client-info-group');
+      if (selectedMode === 'server') {
+        if (serverGroup) serverGroup.style.display = 'flex';
+        if (clientInfoGroup) clientInfoGroup.style.display = 'none';
+      } else {
+        if (serverGroup) serverGroup.style.display = 'none';
+        if (clientInfoGroup) clientInfoGroup.style.display = 'flex';
+      }
+    });
+  }
+
+  // Klik status card di sidebar untuk langsung menuju pengaturan koneksi server
+  const sidebarStatusCard = document.querySelector('.sidebar .status-card');
+  if (sidebarStatusCard) {
+    sidebarStatusCard.style.cursor = 'pointer';
+    sidebarStatusCard.title = 'Buka Pengaturan Koneksi Server';
+    sidebarStatusCard.addEventListener('click', () => {
+      const settingsNav = document.querySelector('.nav-item[data-tab="settings"]');
+      if (settingsNav) settingsNav.click();
+      const serverSection = document.getElementById('section-server-connection');
+      if (serverSection) {
+        serverSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  }
 
   // Simpan Mode & Restart
   const btnSaveMode = document.getElementById('btn-save-mode');
-  btnSaveMode.addEventListener('click', async () => {
-    const mode = document.getElementById('app-mode-select').value;
-    const serverName = document.getElementById('setting-server-name').value.trim();
-    const port = document.getElementById('setting-port').value || '8080';
+  if (btnSaveMode) {
+    btnSaveMode.addEventListener('click', async () => {
+      const mode = document.getElementById('app-mode-select').value;
+      const serverName = document.getElementById('setting-server-name').value.trim();
+      const port = document.getElementById('setting-port').value || '8080';
 
-    if (mode === 'server' && !serverName) {
-      showToast('Nama Server tidak boleh kosong.', 'error');
-      return;
-    }
+      if (mode === 'server' && !serverName) {
+        showToast('Nama Server tidak boleh kosong.', 'error');
+        return;
+      }
 
-    await window.api.saveModeSettings({ mode, serverName, port });
-    showToast('Pengaturan mode berhasil disimpan! Sistem merestart service.', 'success');
-    
-    // Muat ulang detail
-    await initSystemInfo();
-  });
+      await window.api.saveModeSettings({ mode, serverName, port });
+      showToast('Pengaturan mode berhasil disimpan! Sistem merestart service.', 'success');
+      
+      // Muat ulang detail
+      await initSystemInfo();
+    });
+  }
 
   // Tambah Layanan
   const btnAddService = document.getElementById('btn-add-service');
@@ -1399,14 +1702,26 @@ function setupEventListeners() {
     }
   });
 
-  // Simpan TTS Settings
+  // Tombol Hentikan Suara Cepat (Dashboard)
+  const btnStopAudio = document.getElementById('btn-stop-audio');
+  if (btnStopAudio) {
+    btnStopAudio.addEventListener('click', () => {
+      sendAction('STOP_ANNOUNCEMENT');
+      stopLocalAudio();
+      showToast('⏹️ Panggilan suara dihentikan.', 'info');
+    });
+  }
+
+  // Simpan TTS & Queue Settings
   const btnSaveTts = document.getElementById('btn-save-tts');
   if (btnSaveTts) {
     btnSaveTts.addEventListener('click', () => {
       const enabled = document.getElementById('setting-tts-enabled').checked ? 'true' : 'false';
+      const callName = document.getElementById('setting-call-customer-name').checked ? 'true' : 'false';
       const multilang = document.getElementById('setting-multilang-enabled').checked ? 'true' : 'false';
-      sendAction('SAVE_TTS', { enabled, multilang });
-      showToast('Menyimpan pengaturan Text-to-Speech...', 'info');
+      const autoCallNext = document.getElementById('setting-auto-call-next') ? (document.getElementById('setting-auto-call-next').checked ? 'true' : 'false') : 'false';
+      sendAction('SAVE_TTS', { enabled, multilang, callName, autoCallNext });
+      showToast('Menyimpan pengaturan Suara & Alur Panggilan...', 'info');
     });
   }
 
@@ -1926,18 +2241,40 @@ async function loadSettings() {
   const settings = await getSettingsData();
   
   // App Mode UI
-  document.getElementById('app-mode-select').value = settings.app_mode || 'server';
-  document.getElementById('setting-server-name').value = settings.server_name || 'Server Utama';
-  document.getElementById('setting-port').value = settings.port || '8080';
+  const appMode = settings.app_mode || 'server';
+  const appModeSelectEl = document.getElementById('app-mode-select');
+  if (appModeSelectEl) appModeSelectEl.value = appMode;
+  const srvNameInput = document.getElementById('setting-server-name');
+  if (srvNameInput) srvNameInput.value = settings.server_name || 'Server Utama';
+  const srvPortInput = document.getElementById('setting-port');
+  if (srvPortInput) srvPortInput.value = settings.port || '8080';
+
+  const serverGroup = document.getElementById('settings-server-group');
+  const clientInfoGroup = document.getElementById('settings-client-info-group');
+  if (appMode === 'server') {
+    if (serverGroup) serverGroup.style.display = 'flex';
+    if (clientInfoGroup) clientInfoGroup.style.display = 'none';
+  } else {
+    if (serverGroup) serverGroup.style.display = 'none';
+    if (clientInfoGroup) clientInfoGroup.style.display = 'flex';
+  }
   
   // TTS Settings UI
   const ttsCheckbox = document.getElementById('setting-tts-enabled');
   if (ttsCheckbox) {
     ttsCheckbox.checked = settings.tts_enabled !== 'false';
   }
+  const callNameCheckbox = document.getElementById('setting-call-customer-name');
+  if (callNameCheckbox) {
+    callNameCheckbox.checked = settings.call_customer_name !== 'false';
+  }
   const multilangCheckbox = document.getElementById('setting-multilang-enabled');
   if (multilangCheckbox) {
     multilangCheckbox.checked = settings.multilang_enabled === 'true';
+  }
+  const autoCallCheckbox = document.getElementById('setting-auto-call-next');
+  if (autoCallCheckbox) {
+    autoCallCheckbox.checked = settings.auto_call_next_on_complete === 'true';
   }
 
   // WA Settings UI

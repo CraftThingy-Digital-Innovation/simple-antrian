@@ -17,6 +17,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadAnnouncements();
 });
 
+let currentWsUrl = '';
+let reconnectTimer = null;
+
 // Ambil info koneksi & hubungkan ke server websocket yang tepat
 async function initDisplayConnection() {
   try {
@@ -31,10 +34,28 @@ async function initDisplayConnection() {
       // Connect ke server lokal
       connectWebSocket(`ws://localhost:${serverPort}`);
     } else {
-      // Mode Client: Hubungkan ke server remote yang disimpan di database/settings
-      const activeEndpoint = dbSettings.active_server_endpoint || 'localhost:8080';
+      // Mode Client: Coba endpoint dari DB, lalu localStorage, lalu default
+      const activeEndpoint = dbSettings.active_server_endpoint || localStorage.getItem('last_connected_server') || `localhost:${serverPort}`;
       connectWebSocket(`ws://${activeEndpoint}`);
+
+      // Dengarkan penemuan server via UDP Discovery
+      window.api.onServersUpdated((servers) => {
+        if (servers && servers.length > 0) {
+          const srv = servers[0];
+          const srvEndpoint = `${srv.ip}:${srv.port}`;
+          if (!ws || ws.readyState !== WebSocket.OPEN) {
+            console.log(`[Display UDP] Menghubungkan otomatis ke server terdeteksi: ${srvEndpoint}`);
+            connectWebSocket(`ws://${srvEndpoint}`);
+          }
+        }
+      });
     }
+
+    // Dengarkan perubahan endpoint server dari Operator Panel secara realtime
+    window.api.onServerEndpointChanged((newEndpoint) => {
+      console.log(`[Display] Server endpoint diubah oleh operator menjadi: ${newEndpoint}`);
+      connectWebSocket(`ws://${newEndpoint}`);
+    });
   } catch (err) {
     console.error('Failed to init display connection:', err);
     setTimeout(initDisplayConnection, 5000);
@@ -43,15 +64,24 @@ async function initDisplayConnection() {
 
 // Hubungkan ke WebSocket
 function connectWebSocket(url) {
+  currentWsUrl = url;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
   if (ws) {
-    ws.close();
+    // Matikan event listener lama agar tidak memicu reconnect ganda saat sengaja ditutup
+    ws.onclose = null;
+    ws.onerror = null;
+    try { ws.close(); } catch (_) {}
   }
 
   console.log(`Display connecting to ${url}`);
   ws = new WebSocket(url);
 
   ws.onopen = () => {
-    console.log('Display WebSocket connected!');
+    console.log(`Display WebSocket connected to ${url}!`);
     // Request data awal
     ws.send(JSON.stringify({ type: 'GET_STATE' }));
     ws.send(JSON.stringify({ type: 'GET_SETTINGS' }));
@@ -60,6 +90,12 @@ function connectWebSocket(url) {
   ws.onmessage = (event) => {
     try {
       const message = JSON.parse(event.data);
+      if (message.type === 'PING') {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'PONG' }));
+        }
+        return;
+      }
       handleWebSocketMessage(message);
     } catch (err) {
       console.error('Error parsing display WS message:', err);
@@ -67,12 +103,18 @@ function connectWebSocket(url) {
   };
 
   ws.onclose = () => {
-    console.log('Display WebSocket closed. Reconnecting in 5 seconds...');
-    setTimeout(() => connectWebSocket(url), 5000);
+    console.log(`Display WebSocket closed (${currentWsUrl}). Reconnecting in 3 seconds...`);
+    if (!reconnectTimer) {
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connectWebSocket(currentWsUrl);
+      }, 3000);
+    }
   };
 
   ws.onerror = (err) => {
     console.error('Display WebSocket error:', err);
+    try { ws.close(); } catch (_) {}
   };
 }
 
@@ -168,6 +210,10 @@ function handleWebSocketMessage(message) {
       if (globalSettings) {
         globalSettings.tts_enabled = payload.enabled;
       }
+      break;
+
+    case 'STOP_ANNOUNCEMENT':
+      stopAnnouncement();
       break;
   }
 }
@@ -378,6 +424,59 @@ async function loadAnnouncements() {
 
 // ==================== ANTRIAN SUARA (VOICE ANNOUNCEMENT QUEUE) ====================
 
+let currentDisplayAudio = null;
+let isDisplayAnnouncing = false;
+
+function stopAnnouncement() {
+  console.log('[Display] Menghentikan panggilan suara pengumuman.');
+  announcementQueue = [];
+  isAnnouncing = false;
+  isDisplayAnnouncing = false;
+
+  if (currentDisplayAudio) {
+    try {
+      currentDisplayAudio.pause();
+      currentDisplayAudio.currentTime = 0;
+      currentDisplayAudio.src = '';
+    } catch (_) {}
+    currentDisplayAudio = null;
+  }
+
+  // Cancel Web Speech API jika ada
+  if (window.speechSynthesis) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch (_) {}
+  }
+
+  // Hapus status aktif animasi tombol stop
+  const stopBtn = document.getElementById('btn-display-stop-sound');
+  if (stopBtn) {
+    stopBtn.classList.remove('sound-active');
+  }
+
+  // Hentikan kedip animasi jika sedang berkedip
+  const mainDisplayPanel = document.getElementById('main-display-panel');
+  if (mainDisplayPanel) {
+    mainDisplayPanel.classList.remove('animate-call-blink');
+  }
+  const numberEl = document.getElementById('lbl-call-number');
+  const deskEl = document.getElementById('lbl-call-desk');
+  if (numberEl) numberEl.classList.remove('scale-up');
+  if (deskEl) deskEl.classList.remove('scale-up');
+}
+
+// Handler klik tombol stop di layar display
+function handleDisplayStopAudio() {
+  stopAnnouncement();
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'STOP_ANNOUNCEMENT' }));
+  }
+}
+
+window.stopAnnouncement = stopAnnouncement;
+window.handleDisplayStopAudio = handleDisplayStopAudio;
+
 function queueAnnouncement(ticketNumber, deskNumber, voiceFiles) {
   announcementQueue.push({ ticketNumber, deskNumber, voiceFiles });
   if (!isAnnouncing) {
@@ -388,18 +487,27 @@ function queueAnnouncement(ticketNumber, deskNumber, voiceFiles) {
 async function processNextAnnouncement() {
   if (announcementQueue.length === 0) {
     isAnnouncing = false;
+    const stopBtn = document.getElementById('btn-display-stop-sound');
+    if (stopBtn) stopBtn.classList.remove('sound-active');
     return;
   }
 
   isAnnouncing = true;
+  const stopBtn = document.getElementById('btn-display-stop-sound');
+  if (stopBtn) stopBtn.classList.add('sound-active');
+
   const { ticketNumber, deskNumber, voiceFiles } = announcementQueue.shift();
 
   try {
     // 1. Bunyikan Bel Ding-Dong
     await playDingDongChime();
     
+    if (!isAnnouncing) return;
+
     // Tunggu jeda singkat
     await delay(300);
+
+    if (!isAnnouncing) return;
 
     // 2. Putar Pengumuman Suara
     await playVoice(ticketNumber, deskNumber, voiceFiles);
@@ -407,8 +515,12 @@ async function processNextAnnouncement() {
     console.error('Announcement playback error:', err);
   }
 
+  if (!isAnnouncing) return;
+
   // Jeda antar pengumuman
   await delay(1000);
+
+  if (!isAnnouncing) return;
   processNextAnnouncement();
 }
 
@@ -486,26 +598,32 @@ function generateChimeWavBlob() {
 // Ding-Dong Chime menggunakan HTML5 Audio (Bypass autoplay block)
 function playDingDongChime() {
   return new Promise((resolve) => {
+    if (!isAnnouncing) {
+      resolve();
+      return;
+    }
     try {
       const wavBlob = generateChimeWavBlob();
       const blobUrl = URL.createObjectURL(wavBlob);
       const audio = new Audio(blobUrl);
+      currentDisplayAudio = audio;
       
-      audio.onended = () => {
+      const cleanup = () => {
+        if (currentDisplayAudio === audio) currentDisplayAudio = null;
         URL.revokeObjectURL(blobUrl);
         resolve();
       };
+
+      audio.onended = cleanup;
       
       audio.onerror = (err) => {
         console.error('HTML5 Chime playback failed:', err);
-        URL.revokeObjectURL(blobUrl);
-        resolve();
+        cleanup();
       };
       
       audio.play().catch(err => {
         console.error('HTML5 Chime autoplay error:', err);
-        URL.revokeObjectURL(blobUrl);
-        resolve();
+        cleanup();
       });
     } catch (e) {
       resolve();
@@ -526,8 +644,19 @@ async function playVoice(ticketNumber, deskNumber, voiceFiles) {
   }
 
   try {
-    const wsUrlObj = new URL(ws.url);
-    const audioBaseUrl = `http://${wsUrlObj.host}/audio`;
+    let host = 'localhost:8080';
+    if (ws && ws.url) {
+      try {
+        const wsUrlObj = new URL(ws.url);
+        host = wsUrlObj.host;
+      } catch (_) {}
+    } else if (currentWsUrl) {
+      try {
+        const wsUrlObj = new URL(currentWsUrl);
+        host = wsUrlObj.host;
+      } catch (_) {}
+    }
+    const audioBaseUrl = `http://${host}/audio`;
     const urls = voiceFiles.map(file => `${audioBaseUrl}/${file}`);
     await playAudioSequence(urls);
   } catch (err) {
@@ -537,13 +666,15 @@ async function playVoice(ticketNumber, deskNumber, voiceFiles) {
 
 function playAudioSequence(urls) {
   return new Promise((resolve) => {
-    if (!urls || urls.length === 0) {
+    if (!urls || urls.length === 0 || !isAnnouncing) {
       resolve();
       return;
     }
     
+    isDisplayAnnouncing = true;
     let index = 0;
     const audio = new Audio();
+    currentDisplayAudio = audio;
     
     audio.onended = () => {
       index++;
@@ -557,7 +688,8 @@ function playAudioSequence(urls) {
     };
     
     function playNext() {
-      if (index >= urls.length) {
+      if (!isAnnouncing || !isDisplayAnnouncing || index >= urls.length) {
+        if (currentDisplayAudio === audio) currentDisplayAudio = null;
         resolve();
         return;
       }

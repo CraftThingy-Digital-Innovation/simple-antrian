@@ -3,17 +3,17 @@ const path = require('path');
 const { spawn, exec } = require('child_process');
 const https = require('https');
 const crypto = require('crypto');
+const { app } = require('electron');
 
-// Target Directories
-const rootDir = process.cwd();
-const dataDir = path.join(rootDir, 'data');
+// Target Directories (userData agar aman dari permission EPERM saat dipaketkan)
+const dataDir = app ? path.join(app.getPath('userData'), 'data') : path.join(process.cwd(), 'data');
 const piperDir = path.join(dataDir, 'piper');
 const cacheDir = path.join(dataDir, 'tts-cache');
 
 // Ensure directories exist
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
-if (!fs.existsSync(piperDir)) fs.mkdirSync(piperDir);
-if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir);
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+if (!fs.existsSync(piperDir)) fs.mkdirSync(piperDir, { recursive: true });
+if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
 
 // State info
 let statusCallback = null;
@@ -349,7 +349,7 @@ async function generatePhraseIfNeeded(text, lang) {
     // Pastikan biner Piper sudah terunduh & siap digunakan.
     const binaryPath = getBinaryPath();
     const binaryExists = fileExistsAndNotEmpty(binaryPath);
-    if (!binaryExists) {
+    if (!binaryExists || !isReady) {
       console.log("[TTS Engine] Frasa kustom baru dideteksi. Mengunduh dan menginisialisasi Piper Engine...");
       const success = await initTtsEngine(null, true);
       if (!success) {

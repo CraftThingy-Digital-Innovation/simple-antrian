@@ -35,10 +35,18 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   // UDP Discovery (Client Mode)
+  refreshDiscovery: () => ipcRenderer.invoke('refresh-discovery'),
   onServersUpdated: (callback) => {
     // Remove existing listener before adding a new one to prevent memory leaks
     ipcRenderer.removeAllListeners('servers-updated');
     ipcRenderer.on('servers-updated', (event, servers) => callback(servers));
+  },
+
+  // Endpoint Sync (Display & Kiosk)
+  setActiveServerEndpoint: (endpoint) => ipcRenderer.invoke('set-active-server-endpoint', endpoint),
+  onServerEndpointChanged: (callback) => {
+    ipcRenderer.removeAllListeners('server-endpoint-changed');
+    ipcRenderer.on('server-endpoint-changed', (event, endpoint) => callback(endpoint));
   },
   
   // Stats (Database)

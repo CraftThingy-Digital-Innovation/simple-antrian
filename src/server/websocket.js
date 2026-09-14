@@ -8,6 +8,7 @@ const ttsGenerator = require('./tts-generator');
 
 let wss = null;
 let httpServer = null;
+let heartbeatInterval = null;
 
 // Mulai server WebSocket
 function startWebSocketServer(port) {
@@ -17,7 +18,17 @@ function startWebSocketServer(port) {
   httpServer = http.createServer((req, res) => {
     if (req.url.startsWith('/audio/')) {
       const filename = path.basename(req.url);
-      const filePath = path.join(process.cwd(), 'data', 'tts-cache', filename);
+      // Prioritas pencarian berkas audio:
+      // 1. Folder cache TTS dinamis di userData (data/tts-cache)
+      // 2. Folder berkas suara bawaan aplikasi di src/assets/tts-prebuilt
+      // 3. Folder data/tts-cache di process.cwd()
+      let filePath = path.join(ttsGenerator.cacheDir, filename);
+      if (!fs.existsSync(filePath)) {
+        filePath = path.join(__dirname, '..', 'assets', 'tts-prebuilt', filename);
+      }
+      if (!fs.existsSync(filePath)) {
+        filePath = path.join(process.cwd(), 'data', 'tts-cache', filename);
+      }
       
       if (fs.existsSync(filePath)) {
         const stat = fs.statSync(filePath);
@@ -115,6 +126,11 @@ function startWebSocketServer(port) {
 
   wss.on('connection', async (ws) => {
     console.log('Client connected to WebSocket server');
+    ws.isAlive = true;
+
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
 
     // Kirim data awal (inisialisasi state) ke client yang baru terhubung
     try {
@@ -132,6 +148,10 @@ function startWebSocketServer(port) {
     ws.on('message', async (message) => {
       try {
         const action = JSON.parse(message.toString());
+        if (action.type === 'PONG') {
+          ws.isAlive = true;
+          return;
+        }
         await handleClientAction(action, ws);
       } catch (err) {
         console.error('Error parsing client message:', err);
@@ -144,12 +164,33 @@ function startWebSocketServer(port) {
     });
   });
 
+  // Heartbeat berkala setiap 25 detik agar koneksi tidak diputus router/OS saat idle
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+  heartbeatInterval = setInterval(() => {
+    if (!wss) return;
+    wss.clients.forEach((client) => {
+      if (client.isAlive === false) {
+        console.log('[WebSocket Server] Memutuskan koneksi client yang tidak merespon heartbeat.');
+        return client.terminate();
+      }
+      client.isAlive = false;
+      try {
+        client.ping();
+        client.send(JSON.stringify({ type: 'PING' }));
+      } catch (_) {}
+    });
+  }, 25000);
+
   httpServer.listen(port);
   console.log('WebSocket & HTTP Audio Server started on port', port);
 }
 
 // Hentikan server WebSocket
 function stopWebSocketServer() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
   if (wss) {
     wss.clients.forEach((client) => {
       client.close();
@@ -337,7 +378,7 @@ async function handleClientAction(action, ws) {
           await broadcastStateUpdate();
           
           // Kirim trigger panggilan suara (announcement) ke seluruh display
-          await announceCall(calledTicket.ticket_number, calledTicket.desk_number, calledTicket.service_name);
+          await announceCall(calledTicket.ticket_number, calledTicket.desk_number, calledTicket.service_name, calledTicket.customer_name);
 
           // Kirim WhatsApp pemberitahuan giliran tiba
           try {
@@ -363,7 +404,7 @@ async function handleClientAction(action, ws) {
           await broadcastStateUpdate();
           
           // Kirim trigger panggilan suara (announcement)
-          await announceCall(calledTicket.ticket_number, calledTicket.desk_number, calledTicket.service_name);
+          await announceCall(calledTicket.ticket_number, calledTicket.desk_number, calledTicket.service_name, calledTicket.customer_name);
 
           // Kirim WhatsApp pemberitahuan
           try {
@@ -387,17 +428,21 @@ async function handleClientAction(action, ws) {
           await broadcastStateUpdate();
 
           // Kirim trigger panggilan ulang suara
-          await announceCall(recalledTicket.ticket_number, recalledTicket.desk_number, recalledTicket.service_name);
+          await announceCall(recalledTicket.ticket_number, recalledTicket.desk_number, recalledTicket.service_name, recalledTicket.customer_name);
         }
         break;
       }
 
       case 'COMPLETE': {
-        const { ticketId } = payload;
-        // Ambil info tiket sebelum diselesaikan untuk tahu layanan dan loketnya (completeTicket mengembalikan data tiket)
+        const { ticketId, autoCallNext } = payload;
+        // Selesaikan tiket di database
         const ticket = await db.completeTicket(ticketId);
 
-        if (ticket) {
+        // Periksa apakah auto-call diaktifkan di setting atau payload (default: false agar operator dapat memanggil secara manual saat siap)
+        const settings = await db.getSettings();
+        const shouldAutoCall = autoCallNext === true || settings.auto_call_next_on_complete === 'true';
+
+        if (shouldAutoCall && ticket) {
           const { service_id, desk_number } = ticket;
           // Cari apakah ada antrian berikutnya untuk layanan yang sama
           const calledTicket = await db.callNextTicket(service_id, desk_number);
@@ -405,7 +450,7 @@ async function handleClientAction(action, ws) {
             await broadcastStateUpdate();
             
             // Broadcast ke display untuk memutar suara panggilan
-            await announceCall(calledTicket.ticket_number, calledTicket.desk_number, calledTicket.service_name);
+            await announceCall(calledTicket.ticket_number, calledTicket.desk_number, calledTicket.service_name, calledTicket.customer_name);
 
             // Kirim notifikasi WA
             try {
@@ -453,17 +498,30 @@ async function handleClientAction(action, ws) {
         break;
       }
 
+      case 'STOP_ANNOUNCEMENT': {
+        broadcast({
+          type: 'STOP_ANNOUNCEMENT'
+        });
+        break;
+      }
+
       case 'SAVE_TTS': {
-        const { enabled, multilang } = payload;
+        const { enabled, multilang, callName, autoCallNext } = payload;
         const dbMod = require('./db');
         await dbMod.saveSetting('tts_enabled', enabled);
         if (multilang !== undefined) {
           await dbMod.saveSetting('multilang_enabled', multilang);
         }
+        if (callName !== undefined) {
+          await dbMod.saveSetting('call_customer_name', callName);
+        }
+        if (autoCallNext !== undefined) {
+          await dbMod.saveSetting('auto_call_next_on_complete', autoCallNext);
+        }
         // Broadcast ke semua client
         broadcast({
           type: 'TTS_SETTING_UPDATE',
-          payload: { enabled, multilang }
+          payload: { enabled, multilang, callName, autoCallNext }
         });
         // Kirim status TTS engine terkini ke seluruh klien agar progress bar muncul
         const currentTtsStatus = ttsGenerator.getLastStatus();
@@ -750,7 +808,7 @@ function getChineseNumberTokens(num) {
   return tokens;
 }
 
-async function getVoiceAnnouncementFiles(ticketNumber, deskNumber) {
+async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName) {
   const prefix = ticketNumber.charAt(0);
   const num = parseInt(ticketNumber.substring(1));
   
@@ -784,12 +842,27 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber) {
 
   const settings = await db.getSettings();
   const isMultilang = settings.multilang_enabled === 'true';
+  const isCallNameEnabled = settings.call_customer_name !== 'false';
+  const cleanName = customerName ? customerName.trim() : '';
 
   // 1. Indonesian
   files.push('id_nomor_antrian.wav');
   files.push(`id_letter_${prefix}.wav`);
   const idNumTokens = getIndonesianNumberTokens(num);
   idNumTokens.forEach(t => files.push(`id_${t}.wav`));
+
+  // Panggil Nama Pelanggan setelah nomor antrian jika ada & aktif
+  if (isCallNameEnabled && cleanName) {
+    try {
+      const namePhraseFile = await ttsGenerator.generatePhraseIfNeeded(`atas nama ${cleanName}`, 'id');
+      if (namePhraseFile) {
+        files.push(namePhraseFile);
+      }
+    } catch (err) {
+      console.error(`[TTS] Gagal generate audio nama "${cleanName}":`, err.message);
+    }
+  }
+
   files.push('id_silakan_menuju.wav');
   if (deskWord) {
     files.push(await getDeskWordFile(deskWord, 'id'));
@@ -807,6 +880,14 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber) {
     files.push(`en_letter_${prefix}.wav`);
     const enNumTokens = getEnglishNumberTokens(num);
     enNumTokens.forEach(t => files.push(`en_${t}.wav`));
+
+    if (isCallNameEnabled && cleanName) {
+      try {
+        const enNameFile = await ttsGenerator.generatePhraseIfNeeded(`for ${cleanName}`, 'en');
+        if (enNameFile) files.push(enNameFile);
+      } catch (_) {}
+    }
+
     files.push('en_please_proceed_to.wav');
     if (deskWord) {
       const enWord = deskWord.replace(/loket/i, 'counter');
@@ -824,6 +905,14 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber) {
     files.push(`zh_letter_${prefix}.wav`);
     const zhNumTokens = getChineseNumberTokens(num);
     zhNumTokens.forEach(t => files.push(`zh_${t}.wav`));
+
+    if (isCallNameEnabled && cleanName) {
+      try {
+        const zhNameFile = await ttsGenerator.generatePhraseIfNeeded(cleanName, 'zh');
+        if (zhNameFile) files.push(zhNameFile);
+      } catch (_) {}
+    }
+
     files.push('zh_please_proceed_to.wav');
     if (deskWord) {
       const zhWord = deskWord
@@ -843,14 +932,15 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber) {
   return files;
 }
 
-async function announceCall(ticketNumber, deskNumber, serviceName) {
-  const voiceFiles = await getVoiceAnnouncementFiles(ticketNumber, deskNumber);
+async function announceCall(ticketNumber, deskNumber, serviceName, customerName) {
+  const voiceFiles = await getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName);
   broadcast({
     type: 'ANNOUNCE_CALL',
     payload: {
       ticketNumber,
       deskNumber,
       serviceName,
+      customerName: customerName || '',
       voiceFiles
     }
   });

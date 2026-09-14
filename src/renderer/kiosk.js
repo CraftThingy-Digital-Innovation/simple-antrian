@@ -23,11 +23,12 @@ async function initKiosk() {
     
     // Tentukan URL WebSocket
     let wsUrl = '';
+    const dbSettings = await window.api.getSettings();
     if (info.mode === 'server') {
       wsUrl = `ws://localhost:${serverPort}`;
     } else {
-      // Jika mode client, hubungkan ke server terakhir yang tersimpan di localStorage
-      const lastConnectedServer = localStorage.getItem('last_connected_server');
+      // Jika mode client, hubungkan ke server terakhir yang tersimpan di DB / localStorage
+      const lastConnectedServer = dbSettings.active_server_endpoint || localStorage.getItem('last_connected_server');
       if (lastConnectedServer) {
         wsUrl = `ws://${lastConnectedServer}`;
       } else {
@@ -53,6 +54,12 @@ async function initKiosk() {
         }
       });
     }
+
+    // Dengarkan perubahan endpoint server dari Operator Panel secara realtime
+    window.api.onServerEndpointChanged((newEndpoint) => {
+      console.log(`[Kiosk] Server endpoint diubah oleh operator menjadi: ${newEndpoint}`);
+      connectWebSocket(`ws://${newEndpoint}`);
+    });
     
     connectWebSocket(wsUrl);
   } catch (err) {
@@ -91,6 +98,12 @@ function connectWebSocket(url) {
   socket.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
+      if (data.type === 'PING') {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: 'PONG' }));
+        }
+        return;
+      }
       
       switch (data.type) {
         case 'STATE_UPDATE':

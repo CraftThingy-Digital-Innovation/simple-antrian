@@ -9,7 +9,25 @@ if (platform === 'win32') {
   if (fs.existsSync(winDir)) {
     fs.writeFileSync(path.join(winDir, 'Mulai-Server.bat'), '@echo off\r\nstart "" "%~dp0SimpleAntrian.exe" --server\r\n');
     fs.writeFileSync(path.join(winDir, 'Mulai-Client.bat'), '@echo off\r\nstart "" "%~dp0SimpleAntrian.exe" --client\r\n');
-    console.log('[Post-Build] Created Mulai-Server.bat and Mulai-Client.bat in dist/SimpleAntrian-win32-x64');
+    fs.writeFileSync(path.join(winDir, 'Install-Certificate.bat'),
+      '@echo off\r\n' +
+      'echo =======================================================\r\n' +
+      'echo   Instalasi Sertifikat Digital SimpleAntrian\r\n' +
+      'echo   CraftThingy Digital Innovation\r\n' +
+      'echo =======================================================\r\n' +
+      'echo.\r\n' +
+      'if not exist "%~dp0SimpleAntrian-Certificate.cer" (\r\n' +
+      '  echo Berkas sertifikat SimpleAntrian-Certificate.cer tidak ditemukan.\r\n' +
+      '  pause\r\n' +
+      '  exit /b 1\r\n' +
+      ')\r\n' +
+      'echo Mendaftarkan sertifikat ke Trusted Root Certification Authorities...\r\n' +
+      'certutil -addstore -f "Root" "%~dp0SimpleAntrian-Certificate.cer"\r\n' +
+      'echo.\r\n' +
+      'echo Selesai! Windows sekarang mempercayai SimpleAntrian sebagai aplikasi terverifikasi.\r\n' +
+      'pause\r\n'
+    );
+    console.log('[Post-Build] Created Mulai-Server.bat, Mulai-Client.bat, and Install-Certificate.bat in dist/SimpleAntrian-win32-x64');
   } else {
     console.error('[Post-Build] Directory dist/SimpleAntrian-win32-x64 does not exist.');
   }

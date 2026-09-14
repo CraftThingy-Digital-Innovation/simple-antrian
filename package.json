@@ -1,11 +1,11 @@
 {
   "name": "simple-antrian",
-  "version": "1.5.6",
+  "version": "1.5.7",
   "description": "Aplikasi Antrian Standalone Lintas Platform oleh CraftThingy Digital Innovation",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "pack": "electron-packager . SimpleAntrian --platform=win32 --arch=x64 --out=dist --overwrite --ignore=\"^/(dist|data|\\.git)($|/)\" && node post-build.js win32",
+    "pack": "electron-packager . SimpleAntrian --platform=win32 --arch=x64 --out=dist --overwrite --ignore=\"^/(dist|data|\\.git)($|/)\" --win32metadata.CompanyName=\"CraftThingy Digital Innovation\" --win32metadata.FileDescription=\"SimpleAntrian Standalone Queue System\" --win32metadata.ProductName=\"SimpleAntrian\" --win32metadata.InternalName=\"SimpleAntrian\" --win32metadata.OriginalFilename=\"SimpleAntrian.exe\" && node post-build.js win32",
     "pack-linux": "electron-packager . SimpleAntrian --platform=linux --arch=x64 --out=dist --overwrite --ignore=\"^/(dist|data|\\.git)($|/)\" && node post-build.js linux"
   },
   "keywords": [

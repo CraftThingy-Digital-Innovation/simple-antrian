@@ -125,7 +125,9 @@ async function initDb() {
     { key: 'video_sidebar_muted', value: 'true' },
     { key: 'video_fullscreen_muted', value: 'false' },
     { key: 'color_theme', value: 'default' },
-    { key: 'multilang_enabled', value: 'false' }
+    { key: 'multilang_enabled', value: 'false' },
+    { key: 'call_customer_name', value: 'true' },
+    { key: 'auto_call_next_on_complete', value: 'false' }
   ];
 
   for (const s of defaultSettings) {
@@ -141,8 +143,8 @@ async function initDb() {
 function getServices() {
   return all(`
     SELECT s.*, 
-      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'waiting' AND date(t.created_at, 'localtime') = date('now', 'localtime')) as waiting_count,
-      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'skipped' AND date(t.created_at, 'localtime') = date('now', 'localtime')) as skipped_count
+      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'waiting') as waiting_count,
+      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'skipped') as skipped_count
     FROM services s
     ORDER BY s.prefix ASC
   `);
@@ -187,14 +189,14 @@ function getTickets(dateStr = null) {
 // Dapatkan tiket waiting
 function getWaitingTickets() {
   return all(
-    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.status = 'waiting' AND date(t.created_at, 'localtime') = date('now', 'localtime') ORDER BY t.number_sequence ASC"
+    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.status = 'waiting' ORDER BY t.number_sequence ASC"
   );
 }
 
 // Dapatkan tiket yang dipanggil saat ini
 function getCallingTickets() {
   return all(
-    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.status = 'calling' AND date(t.created_at, 'localtime') = date('now', 'localtime') ORDER BY t.called_at DESC"
+    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.status = 'calling' ORDER BY t.called_at DESC"
   );
 }
 
@@ -250,7 +252,7 @@ async function callNextTicket(serviceId, deskNumber) {
 // Panggil antrian terlewat (skipped) pertama ke loket tertentu
 async function callSkippedTicket(serviceId, deskNumber) {
   const nextSkipped = await get(
-    "SELECT * FROM tickets WHERE service_id = ? AND status = 'skipped' AND date(created_at) = date('now', 'localtime') ORDER BY created_at ASC LIMIT 1",
+    "SELECT * FROM tickets WHERE service_id = ? AND status = 'skipped' ORDER BY created_at ASC LIMIT 1",
     [serviceId]
   );
 

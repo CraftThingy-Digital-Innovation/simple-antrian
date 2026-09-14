@@ -10,3 +10,4 @@ db.sqlite-wal
 db.sqlite-shm
 data/
 tmp/
+release_body.md

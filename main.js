@@ -235,9 +235,15 @@ async function startServicesBasedOnMode(settings) {
 
     // Jalankan UDP Discovery Listener
     discovery.startDiscoveryListener((servers) => {
-      // Kirim daftar server ke renderer process
-      if (mainWindow) {
+      // Kirim daftar server ke semua renderer window yang aktif
+      if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('servers-updated', servers);
+      }
+      if (displayWindow && !displayWindow.isDestroyed()) {
+        displayWindow.webContents.send('servers-updated', servers);
+      }
+      if (kioskWindow && !kioskWindow.isDestroyed()) {
+        kioskWindow.webContents.send('servers-updated', servers);
       }
     });
     isDiscoveryRunning = true;
@@ -253,9 +259,10 @@ ipcMain.handle('get-system-info', async () => {
   return {
     mode: currentMode,
     serverUuid: runtimeServerUuid,
-    serverName: settings.server_name,
-    port: settings.port,
+    serverName: settings.server_name || 'Server Antrian',
+    port: settings.port || '8080',
     localIp: discovery.getLocalIp(),
+    allLocalIps: discovery.getAllLocalIps(),
     appVersion: appVersion
   };
 });
@@ -265,8 +272,8 @@ ipcMain.handle('save-mode-settings', async (event, modeSettings) => {
   
   currentMode = mode;
   await db.saveSetting('app_mode', mode);
-  await db.saveSetting('server_name', serverName);
-  await db.saveSetting('port', port);
+  if (serverName) await db.saveSetting('server_name', serverName);
+  if (port) await db.saveSetting('port', port);
   
   const settings = await db.getSettings();
   await startServicesBasedOnMode(settings);
@@ -274,9 +281,35 @@ ipcMain.handle('save-mode-settings', async (event, modeSettings) => {
   return { success: true };
 });
 
+// Refresh / Trigger Scan UDP Discovery (Mode Client)
+ipcMain.handle('refresh-discovery', async () => {
+  if (currentMode === 'client') {
+    discovery.sendDiscoveryQuery();
+    return discovery.getDiscoveredServersList();
+  }
+  return [];
+});
+
 // Pengaturan DB Umum
 ipcMain.handle('get-settings', () => db.getSettings());
-ipcMain.handle('save-setting', (event, key, value) => db.saveSetting(key, value));
+ipcMain.handle('save-setting', async (event, key, value) => {
+  const res = await db.saveSetting(key, value);
+  if (key === 'server_name' && currentMode === 'server') {
+    discovery.updateBroadcasterDetails(value, null);
+  } else if (key === 'port' && currentMode === 'server') {
+    discovery.updateBroadcasterDetails(null, parseInt(value));
+  }
+  return res;
+});
+ipcMain.handle('set-active-server-endpoint', (event, endpoint) => {
+  if (displayWindow && !displayWindow.isDestroyed()) {
+    displayWindow.webContents.send('server-endpoint-changed', endpoint);
+  }
+  if (kioskWindow && !kioskWindow.isDestroyed()) {
+    kioskWindow.webContents.send('server-endpoint-changed', endpoint);
+  }
+  return true;
+});
 
 // Deteksi Monitor & Window Display Layar Kedua
 ipcMain.handle('get-monitors', () => {

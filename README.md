@@ -148,7 +148,29 @@ Proyek ini telah dikonfigurasi dengan pipeline CI/CD GitHub Actions di [.github/
   git tag v1.0.0
   git push origin v1.0.0
   ```
-* **Hasil**: GitHub Actions akan otomatis membuat draf rilis baru di repositori GitHub organisasi `CraftThingy-Digital-Innovation`, mengompilasi module SQLite untuk Windows dan Linux pada runner native masing-masing, mengompresnya (`.zip` untuk Windows, `.tar.gz` untuk Linux), dan mengunggahnya sebagai aset rilis secara otomatis. Pengguna akhir Anda dapat langsung mengunduh versi rilis yang diinginkan dari tab **Releases** di GitHub.
+* **Hasil**: GitHub Actions akan otomatis membuat rilis baru di repositori GitHub, menyusun catatan perubahan (*release notes* / changelog otomatis) dari commit dan pull request, mengompres paket biner (`.zip` untuk Windows, `.tar.gz` untuk Linux), menghitung berkas verifikasi SHA-256 (`.sha256`), dan mengunggahnya secara instan ke tab **Releases**.
+
+---
+
+## 🛡️ Catatan Keamanan Windows Defender / SmartScreen
+
+Jika Anda mengunduh binary rilis dari GitHub dan muncul peringatan **"Windows protected your PC" (Microsoft Defender SmartScreen)** atau peringatan antivirus saat pertama kali menjalankan `SimpleAntrian.exe`:
+
+### Mengapa Peringatan Ini Muncul?
+1. **Aplikasi Open Source Belum Memiliki Sertifikat EV Berbayar**: Microsoft SmartScreen mewajibkan sertifikat *Extended Validation (EV) Code Signing* komersial berbayar mahal ($300–$500/tahun). File executable baru yang belum memiliki reputasi unduhan jutaan kali akan otomatis diberi peringatan oleh Windows SmartScreen meskipun bebas dari virus/malware.
+2. **Paket Electron Mandiri**: Antivirus menggunakan metode analisis heuristik terhadap binary mandiri yang berisi server lokal (WebSocket, HTTP Server, UDP Multicast) untuk fitur sinkronisasi dual-screen dan multi-client tanpa internet.
+
+### Cara Menjalankan Aplikasi dengan Aman:
+1. Klik **"More info"** (*Informasi selengkapnya*) pada dialog SmartScreen warna biru.
+2. Klik tombol **"Run anyway"** (*Tetap jalankan*).
+3. **Mendaftarkan Sertifikat Digital (Opsional)**:
+   Aplikasi telah ditandatangani secara digital dengan sertifikat Authenticode (`CraftThingy Digital Innovation`). Di dalam paket ZIP Windows, terdapat file **`Install-Certificate.bat`**:
+   * Klik kanan **`Install-Certificate.bat`** -> Pilih **"Run as administrator"**.
+   * Setelah sertifikat terdaftar di sistem Windows Anda, peringatan SmartScreen tidak akan muncul lagi di komputer tersebut.
+4. **Verifikasi Integritas File**: Anda dapat mencocokkan nilai SHA-256 file zip dengan file `.sha256` yang tersedia di halaman rilis GitHub menggunakan PowerShell:
+   ```powershell
+   Get-FileHash .\SimpleAntrian-windows-x64.zip -Algorithm SHA256
+   ```
 
 ---
 
