@@ -9,6 +9,7 @@ const ttsGenerator = require('./tts-generator');
 let wss = null;
 let httpServer = null;
 let heartbeatInterval = null;
+let dayRolloverInterval = null;
 
 // Mulai server WebSocket
 function startWebSocketServer(port) {
@@ -181,6 +182,19 @@ function startWebSocketServer(port) {
     });
   }, 25000);
 
+  // Interval pemeriksaan pergantian hari otomatis setiap 60 detik
+  if (dayRolloverInterval) {
+    clearInterval(dayRolloverInterval);
+  }
+  dayRolloverInterval = setInterval(async () => {
+    try {
+      const changed = await db.handleDayRollover();
+      if (changed) {
+        await broadcastStateUpdate();
+      }
+    } catch (_) {}
+  }, 60000);
+
   httpServer.listen(port);
   console.log('WebSocket & HTTP Audio Server started on port', port);
 }
@@ -190,6 +204,10 @@ function stopWebSocketServer() {
   if (heartbeatInterval) {
     clearInterval(heartbeatInterval);
     heartbeatInterval = null;
+  }
+  if (dayRolloverInterval) {
+    clearInterval(dayRolloverInterval);
+    dayRolloverInterval = null;
   }
   if (wss) {
     wss.clients.forEach((client) => {
@@ -224,6 +242,7 @@ async function sendStateToClient(ws) {
 
 // Ambil state gabungan saat ini
 async function getCurrentState() {
+  await db.handleDayRollover();
   const services = await db.getServices();
   const waitingTickets = await db.getWaitingTickets();
   const callingTickets = await db.getCallingTickets();

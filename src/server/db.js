@@ -160,15 +160,120 @@ async function initDb() {
     `);
   } catch (_) {}
 
-  // Selesaikan tiket calling dari tanggal kemarin yang masih tertinggal
+  // 1. Eksekusi rollover harian (lewati tiket waiting kemarin & selesaikan calling kemarin)
+  await handleDayRollover();
+
+  // 2. Perbaiki tiket duplikat di antrian waiting jika ada dari versi sebelumnya
+  await fixDuplicateWaitingTickets();
+}
+
+// ==================== PENANGANAN PERGANTIAN HARI & DUPLIKASI ====================
+
+// Otomatis skip tiket waiting kemarin, selesaikan calling kemarin, dan reset current_number jika hari berganti
+async function handleDayRollover() {
   try {
-    await run(`
+    let changed = false;
+
+    // 1. Lewatkan (skip) antrian waiting dari hari-hari sebelumnya
+    const skippedRes = await run(`
+      UPDATE tickets 
+      SET status = 'skipped' 
+      WHERE status = 'waiting' 
+        AND date(created_at, 'localtime') < date('now', 'localtime')
+    `);
+    if (skippedRes && skippedRes.changes > 0) changed = true;
+
+    // 2. Selesaikan tiket calling dari hari-hari sebelumnya
+    const completedRes = await run(`
       UPDATE tickets 
       SET status = 'completed', completed_at = CURRENT_TIMESTAMP 
       WHERE status = 'calling' 
-      AND date(created_at, 'localtime') < date('now', 'localtime')
+        AND date(created_at, 'localtime') < date('now', 'localtime')
     `);
-  } catch (_) {}
+    if (completedRes && completedRes.changes > 0) changed = true;
+
+    // 3. Sinkronisasikan current_number setiap layanan ke tiket terakhir yang dipanggil HARI INI
+    // Jika belum ada tiket yang dipanggil hari ini, current_number kembali ke 0
+    const allServices = await all("SELECT * FROM services");
+    for (const srv of allServices) {
+      const todayCalled = await get(
+        `SELECT MAX(number_sequence) as max_seq 
+         FROM tickets 
+         WHERE service_id = ? 
+           AND status IN ('calling', 'completed') 
+           AND date(created_at, 'localtime') = date('now', 'localtime')`,
+        [srv.id]
+      );
+      const todaySeq = (todayCalled && todayCalled.max_seq) ? Number(todayCalled.max_seq) : 0;
+      if (srv.current_number !== todaySeq) {
+        await run("UPDATE services SET current_number = ? WHERE id = ?", [todaySeq, srv.id]);
+        changed = true;
+      }
+    }
+
+    return changed;
+  } catch (err) {
+    console.error("handleDayRollover error:", err);
+    return false;
+  }
+}
+
+// Perbaiki duplikasi nomor tiket waiting yang sempat terbentuk di database
+async function fixDuplicateWaitingTickets() {
+  try {
+    const allServices = await all("SELECT * FROM services");
+    for (const srv of allServices) {
+      const duplicates = await get(
+        `SELECT COUNT(*) as dup_count 
+         FROM (
+           SELECT number_sequence, COUNT(*) as c 
+           FROM tickets 
+           WHERE service_id = ? 
+             AND status = 'waiting' 
+             AND date(created_at, 'localtime') = date('now', 'localtime') 
+           GROUP BY number_sequence 
+           HAVING c > 1
+         )`,
+        [srv.id]
+      );
+
+      if (duplicates && duplicates.dup_count > 0) {
+        const lastServed = await get(
+          `SELECT MAX(number_sequence) as max_seq 
+           FROM tickets 
+           WHERE service_id = ? 
+             AND status IN ('calling', 'completed', 'skipped') 
+             AND date(created_at, 'localtime') = date('now', 'localtime')`,
+          [srv.id]
+        );
+        let baseSeq = Math.max(
+          lastServed && lastServed.max_seq ? Number(lastServed.max_seq) : 0,
+          srv.current_number ? Number(srv.current_number) : 0
+        );
+
+        const waitingTickets = await all(
+          `SELECT id, number_sequence 
+           FROM tickets 
+           WHERE service_id = ? 
+             AND status = 'waiting' 
+             AND date(created_at, 'localtime') = date('now', 'localtime') 
+           ORDER BY rowid ASC`,
+          [srv.id]
+        );
+
+        for (const t of waitingTickets) {
+          baseSeq++;
+          const newTicketNum = `${srv.prefix}${String(baseSeq).padStart(3, '0')}`;
+          await run(
+            "UPDATE tickets SET number_sequence = ?, ticket_number = ? WHERE id = ?",
+            [baseSeq, newTicketNum, t.id]
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.error("fixDuplicateWaitingTickets error:", err);
+  }
 }
 
 // ==================== OPERASI LAYANAN (SERVICES) ====================
@@ -176,8 +281,8 @@ async function initDb() {
 function getServices() {
   return all(`
     SELECT s.*, 
-      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'waiting') as waiting_count,
-      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'skipped') as skipped_count
+      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'waiting' AND date(t.created_at, 'localtime') = date('now', 'localtime')) as waiting_count,
+      (SELECT COUNT(*) FROM tickets t WHERE t.service_id = s.id AND t.status = 'skipped' AND date(t.created_at, 'localtime') = date('now', 'localtime')) as skipped_count
     FROM services s
     ORDER BY s.prefix ASC
   `);
@@ -219,33 +324,48 @@ function getTickets(dateStr = null) {
   );
 }
 
-// Dapatkan tiket waiting
+// Dapatkan tiket waiting hari ini
 function getWaitingTickets() {
   return all(
-    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.status = 'waiting' ORDER BY t.number_sequence ASC"
+    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.status = 'waiting' AND date(t.created_at, 'localtime') = date('now', 'localtime') ORDER BY t.number_sequence ASC"
   );
 }
 
-// Dapatkan tiket yang dipanggil saat ini
+// Dapatkan tiket yang dipanggil hari ini
 function getCallingTickets() {
   return all(
-    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.status = 'calling' ORDER BY t.called_at DESC"
+    "SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.status = 'calling' AND date(t.created_at, 'localtime') = date('now', 'localtime') ORDER BY t.called_at DESC"
   );
 }
 
-// Buat tiket baru (auto increment)
-async function createTicket(serviceId, name, phone) {
+// Queue mutex untuk menjamin nomor tiket selalu unik & berurutan secara thread-safe
+let ticketCreationQueue = Promise.resolve();
+
+async function _createTicketInternal(serviceId, name, phone) {
+  await handleDayRollover();
+
   const service = await get("SELECT * FROM services WHERE id = ?", [serviceId]);
   if (!service) throw new Error("Service not found");
 
-  // Dapatkan sequence terakhir untuk hari ini
+  // Dapatkan sequence tertinggi untuk hari ini atau yang sedang aktif di antrian
   const today = new Date().toLocaleDateString('sv-SE');
   const lastTicket = await get(
-    "SELECT MAX(number_sequence) as max_seq FROM tickets WHERE service_id = ? AND date(created_at, 'localtime') = date(?)",
-    [serviceId, today]
+    `SELECT MAX(number_sequence) as max_seq 
+     FROM tickets 
+     WHERE service_id = ? 
+       AND (
+         date(created_at, 'localtime') = date('now', 'localtime')
+         OR date(created_at) = date('now')
+         OR date(created_at, 'localtime') = date(?)
+         OR date(created_at) = date(?)
+         OR status IN ('waiting', 'calling')
+       )`,
+    [serviceId, today, today]
   );
 
-  const nextSeq = (lastTicket && lastTicket.max_seq ? lastTicket.max_seq : 0) + 1;
+  const maxTicketSeq = (lastTicket && lastTicket.max_seq) ? Number(lastTicket.max_seq) : 0;
+  const currentServed = (service && service.current_number) ? Number(service.current_number) : 0;
+  const nextSeq = Math.max(maxTicketSeq, currentServed) + 1;
   const ticketNumber = `${service.prefix}${String(nextSeq).padStart(3, '0')}`;
   const id = require('crypto').randomUUID();
 
@@ -257,11 +377,27 @@ async function createTicket(serviceId, name, phone) {
   return get("SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.id = ?", [id]);
 }
 
+// Buat tiket baru (auto increment dengan jaminan sequence urut tanpa duplikasi)
+function createTicket(serviceId, name, phone) {
+  return new Promise((resolve, reject) => {
+    ticketCreationQueue = ticketCreationQueue.then(async () => {
+      try {
+        const result = await _createTicketInternal(serviceId, name, phone);
+        resolve(result);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
 // Panggil antrian berikutnya
 async function callNextTicket(serviceId, deskNumber) {
-  // Cari tiket waiting pertama
+  await handleDayRollover();
+
+  // Cari tiket waiting pertama hari ini
   const nextTicket = await get(
-    "SELECT * FROM tickets WHERE service_id = ? AND status = 'waiting' ORDER BY number_sequence ASC LIMIT 1",
+    "SELECT * FROM tickets WHERE service_id = ? AND status = 'waiting' AND date(created_at, 'localtime') = date('now', 'localtime') ORDER BY number_sequence ASC LIMIT 1",
     [serviceId]
   );
 
@@ -298,8 +434,10 @@ async function callNextTicket(serviceId, deskNumber) {
 
 // Panggil antrian terlewat (skipped) pertama ke loket tertentu
 async function callSkippedTicket(serviceId, deskNumber) {
+  await handleDayRollover();
+
   const nextSkipped = await get(
-    "SELECT * FROM tickets WHERE service_id = ? AND status = 'skipped' ORDER BY created_at ASC LIMIT 1",
+    "SELECT * FROM tickets WHERE service_id = ? AND status = 'skipped' AND date(created_at, 'localtime') = date('now', 'localtime') ORDER BY created_at ASC LIMIT 1",
     [serviceId]
   );
 
@@ -560,5 +698,7 @@ module.exports = {
   saveSetting,
   getDailyStats,
   backupDatabase,
-  restoreDatabase
+  restoreDatabase,
+  handleDayRollover,
+  fixDuplicateWaitingTickets
 };
