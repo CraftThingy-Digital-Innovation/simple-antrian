@@ -66,7 +66,7 @@ function startWebSocketServer(port) {
         res.end();
       }
     } else if (req.url.startsWith('/video/')) {
-      const filename = path.basename(req.url);
+      const filename = path.basename(decodeURIComponent(req.url.split('?')[0]));
       const videoDir = app ? path.join(app.getPath('userData'), 'data', 'videos') : path.join(process.cwd(), 'data', 'videos');
       const filePath = path.join(videoDir, filename);
       
@@ -76,9 +76,32 @@ function startWebSocketServer(port) {
         const range = req.headers.range;
         
         const ext = path.extname(filePath).toLowerCase();
-        let contentType = 'video/mp4';
-        if (ext === '.webm') contentType = 'video/webm';
-        else if (ext === '.ogg') contentType = 'video/ogg';
+        const mimeTypes = {
+          // Videos
+          '.mp4': 'video/mp4',
+          '.m4v': 'video/mp4',
+          '.webm': 'video/webm',
+          '.ogg': 'video/ogg',
+          '.ogv': 'video/ogg',
+          '.mkv': 'video/x-matroska',
+          '.mov': 'video/quicktime',
+          '.avi': 'video/x-msvideo',
+          '.wmv': 'video/x-ms-wmv',
+          '.flv': 'video/x-flv',
+          '.3gp': 'video/3gpp',
+          '.ts': 'video/mp2t',
+          // Images
+          '.webp': 'image/webp',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.png': 'image/png',
+          '.gif': 'image/gif',
+          '.bmp': 'image/bmp',
+          '.svg': 'image/svg+xml',
+          '.avif': 'image/avif',
+          '.ico': 'image/x-icon'
+        };
+        const contentType = mimeTypes[ext] || 'application/octet-stream';
         
         if (range) {
           const parts = range.replace(/bytes=/, "").split("-");
@@ -93,7 +116,8 @@ function startWebSocketServer(port) {
             'Content-Range': `bytes ${start}-${end}/${total}`,
             'Accept-Ranges': 'bytes',
             'Content-Length': chunksize,
-            'Content-Type': contentType
+            'Content-Type': contentType,
+            'Access-Control-Allow-Origin': '*'
           });
           
           fs.createReadStream(filePath, { start: start, end: end }).pipe(res);
@@ -101,7 +125,8 @@ function startWebSocketServer(port) {
           res.writeHead(200, {
             'Content-Length': total,
             'Content-Type': contentType,
-            'Accept-Ranges': 'bytes'
+            'Accept-Ranges': 'bytes',
+            'Access-Control-Allow-Origin': '*'
           });
           fs.createReadStream(filePath).pipe(res);
         }
@@ -254,6 +279,8 @@ async function getCurrentState() {
   const videoSidebarMuted = settings.video_sidebar_muted !== 'false'; // default true
   const videoFullscreenMuted = settings.video_fullscreen_muted === 'true'; // default false
   const colorTheme = settings.color_theme || 'default';
+  const displayLayout = settings.display_layout || 'standard';
+  const photoDuration = parseInt(settings.photo_duration, 10) || 10;
   
   return {
     serverName: settings.server_name || 'Server Utama',
@@ -267,7 +294,9 @@ async function getCurrentState() {
     mirrorCropTop,
     videoSidebarMuted,
     videoFullscreenMuted,
-    colorTheme
+    colorTheme,
+    displayLayout,
+    photoDuration
   };
 }
 
@@ -569,33 +598,40 @@ async function handleClientAction(action, ws) {
       }
 
       case 'SAVE_DISPLAY_CUSTOM': {
-        const { title, subtitle, logo } = payload;
+        const { title, subtitle, logo, theme, layout } = payload;
         const dbMod = require('./db');
-        await dbMod.saveSetting('display_title', title);
-        await dbMod.saveSetting('display_subtitle', subtitle);
-        await dbMod.saveSetting('display_logo', logo);
+        if (title !== undefined) await dbMod.saveSetting('display_title', title);
+        if (subtitle !== undefined) await dbMod.saveSetting('display_subtitle', subtitle);
+        if (logo !== undefined) await dbMod.saveSetting('display_logo', logo);
+        if (theme !== undefined) await dbMod.saveSetting('color_theme', theme);
+        if (layout !== undefined) await dbMod.saveSetting('display_layout', layout);
         
         // Broadcast ke semua client
         broadcast({
           type: 'DISPLAY_CUSTOM_UPDATE',
-          payload: { title, subtitle, logo }
+          payload: { title, subtitle, logo, theme, layout }
         });
+        await broadcastStateUpdate();
         ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Pengaturan Tampilan berhasil disimpan!' } }));
         break;
       }
 
       case 'SAVE_VIDEO_PLAYLIST': {
-        const { playlist } = payload;
+        const { playlist, photoDuration } = payload;
         if (!Array.isArray(playlist)) break;
         const dbMod = require('./db');
         await dbMod.saveSetting('video_playlist', JSON.stringify(playlist));
+        if (photoDuration !== undefined) {
+          await dbMod.saveSetting('photo_duration', String(photoDuration));
+        }
         
         // Broadcast ke semua client
         broadcast({
           type: 'VIDEO_PLAYLIST_UPDATE',
-          payload: { playlist }
+          payload: { playlist, photoDuration }
         });
-        ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Playlist Video berhasil disimpan!' } }));
+        await broadcastStateUpdate();
+        ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Playlist Media berhasil disimpan!' } }));
         break;
       }
 

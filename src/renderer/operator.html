@@ -924,6 +924,17 @@
             </select>
           </div>
 
+          <div class="form-group" style="margin-top: 15px;">
+            <label for="setting-display-layout">Tata Letak Layar Antrian (Layout Card)</label>
+            <select class="input-control" id="setting-display-layout">
+              <option value="standard">Standar (Nomor Antrian Besar di Kiri, Video/Foto di Kanan)</option>
+              <option value="swapped">Video/Foto Utama (Video/Foto Besar di Kiri, Nomor Antrian di Kanan)</option>
+            </select>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+              Pilihan untuk menukar card video/foto menjadi besar utama di sebelah kiri dan nomor antrian berada di samping kanan secara proporsional.
+            </div>
+          </div>
+
           <button class="btn btn-primary" id="btn-save-display-custom" style="margin-top: 15px; width: 100%;">
             💾 Simpan Pengaturan Tampilan
           </button>
@@ -965,30 +976,43 @@
           </button>
         </section>
 
-        <!-- ===== PLAYLIST VIDEO DISPLAY ===== -->
+        <!-- ===== PLAYLIST MEDIA (VIDEO & FOTO) DISPLAY ===== -->
         <section class="glass-panel config-section" id="section-video-playlist-config">
-          <h3 class="config-title">📹 Playlist Video Layar Display</h3>
+          <h3 class="config-title">🎬 Playlist Media (Video & Foto) Layar Display</h3>
           <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
-            Pilih dan atur urutan video yang akan diputar di layar display pelanggan. Video diputar tanpa suara (muted) secara otomatis.
+            Pilih dan atur urutan video atau foto yang akan diputar/ditampilkan di layar display pelanggan.
           </p>
 
-          <!-- Daftar video saat ini -->
+          <!-- Daftar video & foto saat ini -->
           <div id="video-playlist-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; max-height: 280px; overflow-y: auto; padding-right: 4px;">
             <!-- JS-populated -->
           </div>
 
-          <!-- Form tambah video baru -->
+          <!-- Form tambah media baru -->
           <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
-            <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Tambah Video Baru</label>
+            <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Tambah Media Baru (Video / Foto)</label>
             <div style="display: flex; gap: 8px; align-items: center;">
               <button type="button" class="btn btn-secondary" id="btn-browse-video" style="padding: 12px 16px; white-space: nowrap;">
-                📁 Pilih Berkas Video
+                📁 Pilih Berkas Media (Video / Foto)
               </button>
               <div style="flex: 1; font-size: 0.85rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="selected-video-path">
                 Belum ada file terpilih...
               </div>
             </div>
-            <div style="font-size: 0.75rem; color: var(--text-muted);">Format didukung: MP4, WebM, Ogg.</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">
+              Format didukung: Video (MP4, WebM, MKV, MOV, AVI, OGG, dll) &amp; Foto (WebP, JPG, PNG, GIF, BMP, SVG, AVIF, dll). Mendukung pilih banyak berkas sekaligus.
+            </div>
+
+            <!-- Pengaturan Durasi Foto -->
+            <div class="form-group" style="margin-top: 10px;">
+              <label for="setting-photo-duration" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">
+                ⏱️ Durasi Tampil Foto (detik)
+              </label>
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                <input type="number" id="setting-photo-duration" min="1" max="300" value="10" class="input-control" style="width: 90px; padding: 6px 10px;">
+                <span style="font-size: 0.85rem; color: var(--text-muted);">detik per foto sebelum beralih ke konten berikutnya</span>
+              </div>
+            </div>
             
             <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border-glass); padding-top: 12px;">
               <div style="display: flex; align-items: center; gap: 8px;">
@@ -1007,7 +1031,7 @@
           </div>
 
           <button class="btn btn-primary" id="btn-save-video-playlist" style="margin-top: 16px; width: 100%;">
-            💾 Simpan & Terapkan Playlist Video
+            💾 Simpan & Terapkan Playlist Media
           </button>
         </section>
 

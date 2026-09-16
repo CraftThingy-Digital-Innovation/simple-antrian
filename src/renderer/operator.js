@@ -1973,12 +1973,14 @@ function setupEventListeners() {
       const title = document.getElementById('setting-display-title').value.trim();
       const subtitle = document.getElementById('setting-display-subtitle').value.trim();
       const theme = document.getElementById('setting-color-theme').value;
+      const layout = document.getElementById('setting-display-layout')?.value || 'standard';
 
       sendAction('SAVE_DISPLAY_CUSTOM', {
         title: title || 'SimpleAntrian',
         subtitle: subtitle || 'Budayakan antri demi kenyamanan bersama. Silakan siapkan tiket Anda dan perhatikan panggilan layar.',
         logo: currentLogoBase64,
-        theme: theme
+        theme: theme,
+        layout: layout
       });
       showToast('Menyimpan pengaturan tampilan display...', 'info');
     });
@@ -2006,28 +2008,36 @@ function setupEventListeners() {
 
   if (btnBrowseVideo) {
     btnBrowseVideo.addEventListener('click', async () => {
-      showToast('Membuka pemilih berkas video...', 'info');
+      showToast('Membuka pemilih berkas media...', 'info');
       try {
         const res = await window.api.addVideoFile();
-        if (res.success && res.video) {
-          currentVideoPlaylist.push(res.video);
-          renderVideoPlaylist();
-          showToast(`Berhasil menambahkan video: ${res.video.originalName}`, 'success');
+        if (res.success) {
+          if (Array.isArray(res.mediaList) && res.mediaList.length > 0) {
+            res.mediaList.forEach(item => currentVideoPlaylist.push(item));
+            renderVideoPlaylist();
+            showToast(`Berhasil menambahkan ${res.mediaList.length} berkas media!`, 'success');
+          } else if (res.video) {
+            currentVideoPlaylist.push(res.video);
+            renderVideoPlaylist();
+            showToast(`Berhasil menambahkan: ${res.video.originalName}`, 'success');
+          }
         } else if (res.message) {
-          if (res.message !== 'Batal memilih video.') {
+          if (!res.message.includes('Batal')) {
             showToast(res.message, 'error');
           }
         }
       } catch (err) {
-        showToast('Gagal menambahkan video: ' + err.message, 'error');
+        showToast('Gagal menambahkan media: ' + err.message, 'error');
       }
     });
   }
 
   if (btnSaveVideoPlaylist) {
     btnSaveVideoPlaylist.addEventListener('click', () => {
+      const photoDuration = parseInt(document.getElementById('setting-photo-duration')?.value || '10', 10) || 10;
       sendAction('SAVE_VIDEO_PLAYLIST', {
-        playlist: currentVideoPlaylist
+        playlist: currentVideoPlaylist,
+        photoDuration: photoDuration
       });
       
       const sidebarMuted = document.getElementById('setting-video-sidebar-muted').checked;
@@ -2037,7 +2047,7 @@ function setupEventListeners() {
         fullscreenMuted
       });
       
-      showToast('Menyimpan playlist dan pengaturan suara video...', 'info');
+      showToast('Menyimpan playlist media dan durasi foto...', 'info');
     });
   }
 
@@ -2527,6 +2537,18 @@ async function loadSettings() {
   }
   document.body.className = themeVal === 'imigrasi' ? 'theme-imigrasi' : '';
 
+  // Display Layout setting
+  const layoutSelect = document.getElementById('setting-display-layout');
+  if (layoutSelect) {
+    layoutSelect.value = settings.display_layout || 'standard';
+  }
+
+  // Photo Duration setting
+  const photoDurationInput = document.getElementById('setting-photo-duration');
+  if (photoDurationInput) {
+    photoDurationInput.value = settings.photo_duration || '10';
+  }
+
   // Video Audio Settings UI
   const sidebarMutedCheckbox = document.getElementById('setting-video-sidebar-muted');
   if (sidebarMutedCheckbox) {
@@ -2708,20 +2730,30 @@ function renderVideoPlaylist() {
   container.innerHTML = '';
 
   if (currentVideoPlaylist.length === 0) {
-    container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:16px;">Belum ada video dalam playlist. Silakan tambah video di bawah.</div>`;
+    container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:16px;">Belum ada media (video/foto) dalam playlist. Silakan tambah media di bawah.</div>`;
     return;
   }
 
+  const imageExts = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg', '.avif'];
+
   currentVideoPlaylist.forEach((vid, index) => {
+    const ext = (vid.filename || vid.originalName || '').substring((vid.filename || vid.originalName || '').lastIndexOf('.')).toLowerCase();
+    const isImage = vid.type === 'image' || imageExts.includes(ext);
+    const typeBadge = isImage 
+      ? '<span style="display:inline-block; font-size:0.7rem; font-weight:700; background:rgba(236,72,153,0.15); color:#f472b6; border:1px solid rgba(236,72,153,0.3); border-radius:4px; padding:2px 6px; margin-right:6px;">FOTO</span>'
+      : '<span style="display:inline-block; font-size:0.7rem; font-weight:700; background:rgba(99,102,241,0.15); color:#818cf8; border:1px solid rgba(99,102,241,0.3); border-radius:4px; padding:2px 6px; margin-right:6px;">VIDEO</span>';
+
     const item = document.createElement('div');
     item.style.cssText = 'display:flex; gap:10px; align-items:center; background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:10px; padding:12px;';
     item.innerHTML = `
+      <div style="font-size:1.4rem; width:28px; text-align:center; flex-shrink:0;">${isImage ? '🖼️' : '🎬'}</div>
       <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:4px;">
-        <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">
-          ${vid.originalName}
+        <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap; display:flex; align-items:center;">
+          ${typeBadge}
+          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${vid.originalName}</span>
         </div>
         <div style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">
-          Path: ${vid.url}
+          ${vid.url}
         </div>
       </div>
       <div style="display:flex; gap:6px; flex-shrink:0;">

@@ -444,47 +444,63 @@ ipcMain.handle('is-kiosk-window-open', () => {
   return kioskWindow !== null;
 });
 
-// IPC Handler to pick and copy local video files to data/videos/
+// IPC Handler to pick and copy local video or photo files to data/videos/
 ipcMain.handle('add-video-file', async () => {
   if (!mainWindow) return { success: false, message: 'Window utama tidak ditemukan.' };
   
   const { filePaths } = await dialog.showOpenDialog(mainWindow, {
-    title: 'Pilih Video untuk Playlist',
-    filters: [{ name: 'Videos', extensions: ['mp4', 'webm', 'ogg'] }],
-    properties: ['openFile']
+    title: 'Pilih Berkas Video atau Foto untuk Playlist',
+    filters: [
+      { name: 'Semua Media (Video & Foto)', extensions: ['mp4', 'webm', 'ogg', 'mkv', 'mov', 'avi', 'flv', 'wmv', 'm4v', '3gp', 'ts', 'webp', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'avif'] },
+      { name: 'Video', extensions: ['mp4', 'webm', 'ogg', 'mkv', 'mov', 'avi', 'flv', 'wmv', 'm4v', '3gp', 'ts'] },
+      { name: 'Foto / Gambar', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg', 'avif'] },
+      { name: 'Semua Berkas (*.*)', extensions: ['*'] }
+    ],
+    properties: ['openFile', 'multiSelections']
   });
   
   if (filePaths && filePaths.length > 0) {
-    const srcPath = filePaths[0];
-    const ext = path.extname(srcPath);
-    const baseName = path.basename(srcPath);
-    
     const videoDir = app ? path.join(app.getPath('userData'), 'data', 'videos') : path.join(process.cwd(), 'data', 'videos');
     if (!fs.existsSync(videoDir)) {
       fs.mkdirSync(videoDir, { recursive: true });
     }
     
     const crypto = require('crypto');
-    const uniqueFilename = `${crypto.randomUUID()}${ext}`;
-    const destPath = path.join(videoDir, uniqueFilename);
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg', '.avif'];
+    const mediaList = [];
     
-    try {
-      fs.copyFileSync(srcPath, destPath);
-      return {
-        success: true,
-        video: {
+    for (const srcPath of filePaths) {
+      const ext = path.extname(srcPath).toLowerCase();
+      const baseName = path.basename(srcPath);
+      const isImage = imageExtensions.includes(ext);
+      const uniqueFilename = `${crypto.randomUUID()}${ext}`;
+      const destPath = path.join(videoDir, uniqueFilename);
+      
+      try {
+        fs.copyFileSync(srcPath, destPath);
+        mediaList.push({
           id: crypto.randomUUID().substring(0, 8),
+          type: isImage ? 'image' : 'video',
           originalName: baseName,
           filename: uniqueFilename,
           url: `/video/${uniqueFilename}`
-        }
+        });
+      } catch (err) {
+        console.error('Gagal menyalin berkas media:', err);
+      }
+    }
+    
+    if (mediaList.length > 0) {
+      return {
+        success: true,
+        video: mediaList[0],
+        mediaList: mediaList
       };
-    } catch (err) {
-      console.error("Gagal menyalin video:", err);
-      return { success: false, message: `Gagal menyalin video: ${err.message}` };
+    } else {
+      return { success: false, message: 'Gagal menyalin berkas media yang dipilih.' };
     }
   }
-  return { success: false, message: 'Batal memilih video.' };
+  return { success: false, message: 'Batal memilih berkas media.' };
 });
 
 // Database Pass-through

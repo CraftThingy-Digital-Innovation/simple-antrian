@@ -127,7 +127,9 @@ async function initDb() {
     { key: 'color_theme', value: 'default' },
     { key: 'multilang_enabled', value: 'false' },
     { key: 'call_customer_name', value: 'true' },
-    { key: 'auto_call_next_on_complete', value: 'true' }
+    { key: 'auto_call_next_on_complete', value: 'true' },
+    { key: 'display_layout', value: 'standard' },
+    { key: 'photo_duration', value: '10' }
   ];
 
   for (const s of defaultSettings) {

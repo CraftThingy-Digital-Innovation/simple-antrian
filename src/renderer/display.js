@@ -140,6 +140,12 @@ function handleWebSocketMessage(message) {
       if (payload.colorTheme !== undefined) {
         document.body.className = payload.colorTheme === 'imigrasi' ? 'theme-imigrasi' : '';
       }
+      if (payload.displayLayout !== undefined) {
+        applyDisplayLayout(payload.displayLayout);
+      }
+      if (payload.photoDuration !== undefined) {
+        photoDurationSetting = parseInt(payload.photoDuration, 10) || 10;
+      }
       break;
 
     case 'ANNOUNCE_CALL':
@@ -181,11 +187,20 @@ function handleWebSocketMessage(message) {
       if (payload.color_theme !== undefined) {
         document.body.className = payload.color_theme === 'imigrasi' ? 'theme-imigrasi' : '';
       }
+      if (payload.display_layout !== undefined) {
+        applyDisplayLayout(payload.display_layout);
+      }
+      if (payload.photo_duration !== undefined) {
+        photoDurationSetting = parseInt(payload.photo_duration, 10) || 10;
+      }
       break;
 
     case 'VIDEO_PLAYLIST_UPDATE':
       if (typeof updateVideoPlaylist === 'function') {
         updateVideoPlaylist(payload.playlist);
+      }
+      if (payload.photoDuration !== undefined) {
+        photoDurationSetting = parseInt(payload.photoDuration, 10) || 10;
       }
       break;
 
@@ -201,6 +216,9 @@ function handleWebSocketMessage(message) {
         display_subtitle: payload.subtitle,
         display_logo: payload.logo
       });
+      if (payload.layout !== undefined) {
+        applyDisplayLayout(payload.layout);
+      }
       if (payload.theme !== undefined) {
         document.body.className = payload.theme === 'imigrasi' ? 'theme-imigrasi' : '';
       }
@@ -811,12 +829,30 @@ function initCanvasVisualizer() {
   animate();
 }
 
-// ==================== PLAYLIST VIDEO DISPLAY ====================
+// ==================== PLAYLIST MEDIA DISPLAY (VIDEO & FOTO) ====================
 let videoPlaylist = [];
-let currentVideoIndex = 0;
+let currentMediaIndex = 0;
+let currentActiveMediaUrl = '';
 let currentDisplayMode = 'queue';
 let videoSidebarMuted = true;
 let videoFullscreenMuted = false;
+let photoDurationSetting = 10;
+let displayLayoutSetting = 'standard';
+let mediaAdvanceTimer = null;
+
+function clearMediaTimer() {
+  if (mediaAdvanceTimer) {
+    clearTimeout(mediaAdvanceTimer);
+    mediaAdvanceTimer = null;
+  }
+}
+
+function isImageMedia(item) {
+  if (!item) return false;
+  if (item.type === 'image') return true;
+  const target = item.url || item.filename || item.name || '';
+  return /\.(jpe?g|png|gif|webp|bmp|svg|avif)$/i.test(target);
+}
 
 function updateVideoPlaylist(newPlaylist) {
   const playlist = Array.isArray(newPlaylist) ? newPlaylist : [];
@@ -825,9 +861,68 @@ function updateVideoPlaylist(newPlaylist) {
   
   if (playlistJson !== currentJson) {
     videoPlaylist = playlist;
-    currentVideoIndex = 0;
+    currentMediaIndex = 0;
+    currentActiveMediaUrl = '';
+    clearMediaTimer();
     syncVideoPlayers(currentDisplayMode);
   }
+}
+
+function applyDisplayLayout(layout) {
+  displayLayoutSetting = (layout === 'swapped') ? 'swapped' : 'standard';
+  const contentArea = document.getElementById('content-area');
+  const primarySlot = document.getElementById('primary-slot');
+  const sidebarSlot = document.getElementById('sidebar-top-slot');
+  const mainCallPanel = document.getElementById('main-display-panel');
+  const mediaContainer = document.getElementById('media-container');
+
+  if (!primarySlot || !sidebarSlot || !mainCallPanel || !mediaContainer) return;
+
+  if (displayLayoutSetting === 'swapped') {
+    if (contentArea) contentArea.classList.add('layout-swapped');
+    mainCallPanel.classList.add('compact');
+    mediaContainer.classList.add('primary-media');
+
+    if (primarySlot.firstElementChild !== mediaContainer) {
+      primarySlot.appendChild(mediaContainer);
+    }
+    if (sidebarSlot.firstElementChild !== mainCallPanel) {
+      sidebarSlot.appendChild(mainCallPanel);
+    }
+  } else {
+    if (contentArea) contentArea.classList.remove('layout-swapped');
+    mainCallPanel.classList.remove('compact');
+    mediaContainer.classList.remove('primary-media');
+
+    if (primarySlot.firstElementChild !== mainCallPanel) {
+      primarySlot.appendChild(mainCallPanel);
+    }
+    if (sidebarSlot.firstElementChild !== mediaContainer) {
+      sidebarSlot.appendChild(mediaContainer);
+    }
+  }
+
+  // Trigger resize agar visualizer canvas menyesuaikan ukuran jika aktif
+  window.dispatchEvent(new Event('resize'));
+}
+
+function advanceMedia(isError = false) {
+  clearMediaTimer();
+  if (videoPlaylist.length <= 1 && !isError) {
+    if (videoPlaylist.length === 1 && isImageMedia(videoPlaylist[0])) {
+      const durationMs = Math.max(3, photoDurationSetting) * 1000;
+      mediaAdvanceTimer = setTimeout(() => advanceMedia(false), durationMs);
+    }
+    return;
+  }
+  
+  if (videoPlaylist.length > 0) {
+    currentMediaIndex = (currentMediaIndex + 1) % videoPlaylist.length;
+  } else {
+    currentMediaIndex = 0;
+  }
+  currentActiveMediaUrl = '';
+  syncVideoPlayers();
 }
 
 function syncVideoPlayers(displayMode) {
@@ -835,22 +930,50 @@ function syncVideoPlayers(displayMode) {
     currentDisplayMode = displayMode;
   }
   
-  const sidebarCard = document.getElementById('video-card');
+  const videoCard = document.getElementById('video-card');
+  const mediaCard = document.querySelector('.media-card');
   const sidebarPlayer = document.getElementById('display-video-player');
+  const sidebarImage = document.getElementById('display-image-player');
+  
   const fullscreenContainer = document.getElementById('video-fullscreen-container');
   const fullscreenPlayer = document.getElementById('fullscreen-video-player');
+  const fullscreenImage = document.getElementById('fullscreen-image-player');
   const fullscreenPlaceholder = document.getElementById('fullscreen-video-placeholder');
   
   if (!sidebarPlayer || !fullscreenPlayer) return;
   
-  // Jika playlist kosong, sembunyikan semua player
+  // Jika playlist kosong, sembunyikan player dan tampilkan fallback/placeholder
   if (videoPlaylist.length === 0) {
-    if (sidebarCard) sidebarCard.style.display = 'none';
-    if (fullscreenContainer) fullscreenContainer.style.display = 'none';
+    clearMediaTimer();
+    currentActiveMediaUrl = '';
+    
+    if (videoCard) videoCard.style.display = 'none';
+    if (mediaCard) mediaCard.style.display = 'flex';
+    
     sidebarPlayer.pause();
-    sidebarPlayer.src = '';
+    sidebarPlayer.removeAttribute('src');
+    sidebarPlayer.load();
+    sidebarPlayer.style.display = 'none';
+    if (sidebarImage) {
+      sidebarImage.style.display = 'none';
+      sidebarImage.removeAttribute('src');
+    }
+    
     fullscreenPlayer.pause();
-    fullscreenPlayer.src = '';
+    fullscreenPlayer.removeAttribute('src');
+    fullscreenPlayer.load();
+    fullscreenPlayer.style.display = 'none';
+    if (fullscreenImage) {
+      fullscreenImage.style.display = 'none';
+      fullscreenImage.removeAttribute('src');
+    }
+    
+    if (currentDisplayMode === 'video') {
+      if (fullscreenContainer) fullscreenContainer.style.display = 'flex';
+      if (fullscreenPlaceholder) fullscreenPlaceholder.style.display = 'flex';
+    } else {
+      if (fullscreenContainer) fullscreenContainer.style.display = 'none';
+    }
     return;
   }
   
@@ -865,109 +988,194 @@ function syncVideoPlayers(displayMode) {
     }
   }
   
-  // Pastikan indeks video valid
-  if (currentVideoIndex >= videoPlaylist.length) {
-    currentVideoIndex = 0;
+  // Pastikan indeks media valid
+  if (currentMediaIndex >= videoPlaylist.length || currentMediaIndex < 0) {
+    currentMediaIndex = 0;
   }
-  const video = videoPlaylist[currentVideoIndex];
-  const videoUrl = `http://${host}${video.url}`;
+  
+  const currentItem = videoPlaylist[currentMediaIndex];
+  let rawUrl = currentItem.url || '';
+  let mediaUrl = rawUrl;
+  if (!mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://')) {
+    mediaUrl = 'http://' + host + rawUrl;
+  }
+  
+  const isImg = isImageMedia(currentItem);
   
   if (currentDisplayMode === 'video') {
-    // Mode Video Fullscreen
-    if (sidebarCard) sidebarCard.style.display = 'none';
+    // Mode Video Fullscreen Dedicated
+    if (videoCard) videoCard.style.display = 'none';
     sidebarPlayer.pause();
-    sidebarPlayer.src = '';
+    sidebarPlayer.style.display = 'none';
+    if (sidebarImage) sidebarImage.style.display = 'none';
     
     if (fullscreenContainer) fullscreenContainer.style.display = 'flex';
     if (fullscreenPlaceholder) fullscreenPlaceholder.style.display = 'none';
     
-    // Set status mute secara dinamis dari pengaturan
-    fullscreenPlayer.muted = videoFullscreenMuted;
-    
-    // Play video jika belum memutar URL yang benar
-    if (fullscreenPlayer.src !== videoUrl) {
-      console.log(`[FullscreenPlayer] Playing video ${currentVideoIndex + 1}/${videoPlaylist.length}: ${videoUrl}`);
-      fullscreenPlayer.src = videoUrl;
-      fullscreenPlayer.load();
+    if (isImg) {
+      // Tampilkan Foto Fullscreen
+      fullscreenPlayer.pause();
+      fullscreenPlayer.style.display = 'none';
+      if (fullscreenImage) {
+        fullscreenImage.style.display = 'block';
+        if (currentActiveMediaUrl !== mediaUrl || fullscreenImage.src !== mediaUrl) {
+          currentActiveMediaUrl = mediaUrl;
+          fullscreenImage.src = mediaUrl;
+          clearMediaTimer();
+          const durationMs = Math.max(3, photoDurationSetting) * 1000;
+          mediaAdvanceTimer = setTimeout(() => advanceMedia(false), durationMs);
+        }
+      }
+    } else {
+      // Tampilkan Video Fullscreen
+      if (fullscreenImage) {
+        fullscreenImage.style.display = 'none';
+        fullscreenImage.removeAttribute('src');
+      }
+      fullscreenPlayer.style.display = 'block';
+      fullscreenPlayer.playbackRate = 1.0;
+      fullscreenPlayer.loop = (videoPlaylist.length === 1);
+      fullscreenPlayer.muted = videoFullscreenMuted;
       
-      const playPromise = fullscreenPlayer.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.warn("Failed to autoplay fullscreen video, skipping to next:", error);
-          setTimeout(() => {
-            currentVideoIndex++;
-            syncVideoPlayers();
-          }, 3000);
-        });
+      if (currentActiveMediaUrl !== mediaUrl) {
+        currentActiveMediaUrl = mediaUrl;
+        clearMediaTimer();
+        fullscreenPlayer.src = mediaUrl;
+        fullscreenPlayer.load();
+        
+        const playPromise = fullscreenPlayer.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            if (error.name === 'AbortError') return;
+            if (error.name === 'NotAllowedError') {
+              fullscreenPlayer.muted = true;
+              fullscreenPlayer.play().catch(() => {});
+              return;
+            }
+            console.warn("[FullscreenPlayer] Autoplay failed, advancing in 3s:", error);
+            clearMediaTimer();
+            mediaAdvanceTimer = setTimeout(() => advanceMedia(true), 3000);
+          });
+        }
       }
     }
   } else if (currentDisplayMode === 'queue') {
-    // Mode Antrian Standar
+    // Mode Antrian Standar / Swapped
     if (fullscreenContainer) fullscreenContainer.style.display = 'none';
     fullscreenPlayer.pause();
-    fullscreenPlayer.src = '';
+    fullscreenPlayer.style.display = 'none';
+    if (fullscreenImage) fullscreenImage.style.display = 'none';
     
-    if (sidebarCard) sidebarCard.style.display = 'block';
+    if (videoCard) videoCard.style.display = 'flex';
+    if (mediaCard) mediaCard.style.display = 'none';
     
-    // Set status mute secara dinamis dari pengaturan
-    sidebarPlayer.muted = videoSidebarMuted;
-    
-    if (sidebarPlayer.src !== videoUrl) {
-      console.log(`[SidebarPlayer] Playing video ${currentVideoIndex + 1}/${videoPlaylist.length}: ${videoUrl}`);
-      sidebarPlayer.src = videoUrl;
-      sidebarPlayer.load();
+    if (isImg) {
+      // Tampilkan Foto di Card Media
+      sidebarPlayer.pause();
+      sidebarPlayer.style.display = 'none';
+      if (sidebarImage) {
+        sidebarImage.style.display = 'block';
+        if (currentActiveMediaUrl !== mediaUrl || sidebarImage.src !== mediaUrl) {
+          currentActiveMediaUrl = mediaUrl;
+          sidebarImage.src = mediaUrl;
+          clearMediaTimer();
+          const durationMs = Math.max(3, photoDurationSetting) * 1000;
+          mediaAdvanceTimer = setTimeout(() => advanceMedia(false), durationMs);
+        }
+      }
+    } else {
+      // Tampilkan Video di Card Media
+      if (sidebarImage) {
+        sidebarImage.style.display = 'none';
+        sidebarImage.removeAttribute('src');
+      }
+      sidebarPlayer.style.display = 'block';
+      sidebarPlayer.playbackRate = 1.0;
+      sidebarPlayer.loop = (videoPlaylist.length === 1);
+      sidebarPlayer.muted = videoSidebarMuted;
       
-      const playPromise = sidebarPlayer.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.warn("Failed to autoplay sidebar video, skipping to next:", error);
-          setTimeout(() => {
-            currentVideoIndex++;
-            syncVideoPlayers();
-          }, 3000);
-        });
+      if (currentActiveMediaUrl !== mediaUrl) {
+        currentActiveMediaUrl = mediaUrl;
+        clearMediaTimer();
+        sidebarPlayer.src = mediaUrl;
+        sidebarPlayer.load();
+        
+        const playPromise = sidebarPlayer.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            if (error.name === 'AbortError') return;
+            if (error.name === 'NotAllowedError') {
+              sidebarPlayer.muted = true;
+              sidebarPlayer.play().catch(() => {});
+              return;
+            }
+            console.warn("[SidebarPlayer] Autoplay failed, advancing in 3s:", error);
+            clearMediaTimer();
+            mediaAdvanceTimer = setTimeout(() => advanceMedia(true), 3000);
+          });
+        }
       }
     }
   } else {
-    // Mode Mirroring atau lainnya, pause semua
-    if (sidebarCard) sidebarCard.style.display = 'none';
+    // Mode Mirroring atau lainnya, sembunyikan semua
+    clearMediaTimer();
+    currentActiveMediaUrl = '';
+    if (videoCard) videoCard.style.display = 'none';
     if (fullscreenContainer) fullscreenContainer.style.display = 'none';
     sidebarPlayer.pause();
-    sidebarPlayer.src = '';
+    sidebarPlayer.style.display = 'none';
+    if (sidebarImage) sidebarImage.style.display = 'none';
     fullscreenPlayer.pause();
-    fullscreenPlayer.src = '';
+    fullscreenPlayer.style.display = 'none';
+    if (fullscreenImage) fullscreenImage.style.display = 'none';
   }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   const sidebarPlayer = document.getElementById('display-video-player');
   const fullscreenPlayer = document.getElementById('fullscreen-video-player');
+  const sidebarImage = document.getElementById('display-image-player');
+  const fullscreenImage = document.getElementById('fullscreen-image-player');
   
   if (sidebarPlayer) {
     sidebarPlayer.addEventListener('ended', () => {
-      currentVideoIndex++;
-      syncVideoPlayers();
+      if (!sidebarPlayer.loop) {
+        advanceMedia(false);
+      }
     });
     sidebarPlayer.addEventListener('error', (e) => {
-      console.error("[SidebarPlayer] Error loading video file, skipping...", e);
-      setTimeout(() => {
-        currentVideoIndex++;
-        syncVideoPlayers();
-      }, 3000);
+      console.error("[SidebarPlayer] Error loading video file, advancing...", e);
+      clearMediaTimer();
+      mediaAdvanceTimer = setTimeout(() => advanceMedia(true), 3000);
     });
   }
   
   if (fullscreenPlayer) {
     fullscreenPlayer.addEventListener('ended', () => {
-      currentVideoIndex++;
-      syncVideoPlayers();
+      if (!fullscreenPlayer.loop) {
+        advanceMedia(false);
+      }
     });
     fullscreenPlayer.addEventListener('error', (e) => {
-      console.error("[FullscreenPlayer] Error loading video file, skipping...", e);
-      setTimeout(() => {
-        currentVideoIndex++;
-        syncVideoPlayers();
-      }, 3000);
+      console.error("[FullscreenPlayer] Error loading video file, advancing...", e);
+      clearMediaTimer();
+      mediaAdvanceTimer = setTimeout(() => advanceMedia(true), 3000);
+    });
+  }
+
+  if (sidebarImage) {
+    sidebarImage.addEventListener('error', (e) => {
+      console.error("[SidebarImage] Error loading image file, advancing in 2s...", e);
+      clearMediaTimer();
+      mediaAdvanceTimer = setTimeout(() => advanceMedia(true), 2000);
+    });
+  }
+
+  if (fullscreenImage) {
+    fullscreenImage.addEventListener('error', (e) => {
+      console.error("[FullscreenImage] Error loading image file, advancing in 2s...", e);
+      clearMediaTimer();
+      mediaAdvanceTimer = setTimeout(() => advanceMedia(true), 2000);
     });
   }
   

@@ -322,6 +322,64 @@
         box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
       }
     }
+
+    /* ==================== SWAPPED LAYOUT STYLES ==================== */
+    .content-area.layout-swapped #primary-slot {
+      flex: 7;
+    }
+
+    .content-area.layout-swapped .right-sidebar {
+      flex: 5;
+    }
+
+    /* Media Container Primary Mode */
+    #media-container.primary-media {
+      height: 100%;
+      flex: 1;
+    }
+
+    #media-container.primary-media #video-card {
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    #media-container.primary-media .media-card {
+      border-radius: 20px;
+    }
+
+    /* Compact Main Call Panel (when moved to sidebar in swapped layout) */
+    .main-call-panel.compact {
+      flex: 1;
+      height: 100%;
+      min-height: 260px;
+      padding: 24px 20px;
+      border-radius: 16px;
+    }
+
+    .main-call-panel.compact .main-call-label {
+      font-size: 1.25rem;
+      letter-spacing: 2px;
+    }
+
+    .main-call-panel.compact .main-call-number {
+      font-size: 4.8rem;
+      margin: 10px 0;
+      letter-spacing: -1px;
+    }
+
+    .main-call-panel.compact .main-call-desk-label {
+      font-size: 1.25rem;
+      margin-top: 6px;
+    }
+
+    .main-call-panel.compact .main-call-desk {
+      font-size: 2.3rem;
+      margin-top: 6px;
+    }
+
+    .main-call-panel.compact.standby .main-call-desk {
+      font-size: 1.6rem;
+    }
   </style>
 </head>
 <body>
@@ -333,39 +391,48 @@
   </button>
 
   <!-- MAIN AREA -->
-  <div class="content-area">
-    <!-- LEFT PANEL: Active Call Display -->
-    <div class="glass-panel main-call-panel standby" id="main-display-panel">
-      <div class="main-call-label">Nomor Antrian</div>
-      <div class="main-call-number" id="lbl-call-number">---</div>
-      <div class="main-call-desk-label" id="lbl-desk-label">Silakan Menuju</div>
-      <div class="main-call-desk" id="lbl-call-desk">Belum ada antrian</div>
+  <div class="content-area" id="content-area">
+    <!-- PRIMARY SLOT (Left by default in standard mode) -->
+    <div id="primary-slot" class="primary-slot" style="flex: 7; display: flex; flex-direction: column; min-height: 0;">
+      <!-- Active Call Display Panel -->
+      <div class="glass-panel main-call-panel standby" id="main-display-panel">
+        <div class="main-call-label">Nomor Antrian</div>
+        <div class="main-call-number" id="lbl-call-number">---</div>
+        <div class="main-call-desk-label" id="lbl-desk-label">Silakan Menuju</div>
+        <div class="main-call-desk" id="lbl-call-desk">Belum ada antrian</div>
+      </div>
     </div>
 
-    <!-- RIGHT PANEL -->
-    <div class="right-sidebar">
-      <!-- High-tech Graphic/Visualization (100% Offline) -->
-      <div class="glass-panel media-card">
-        <canvas id="visualizer-canvas"></canvas>
-        <div class="media-card-content" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%; height: 100%; box-sizing: border-box; position: relative; z-index: 2;">
-          <div id="display-logo-container" style="display: none; margin-bottom: 15px; max-width: 100px; max-height: 100px; align-items: center; justify-content: center;">
-            <img id="display-logo-img" src="" style="max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35));">
+    <!-- RIGHT PANEL / SIDEBAR -->
+    <div class="right-sidebar" id="right-sidebar" style="flex: 5; display: flex; flex-direction: column; gap: 30px; min-height: 0;">
+      <!-- SIDEBAR TOP SLOT (Holds Media Container by default, or Compact Call Panel when swapped) -->
+      <div id="sidebar-top-slot" class="sidebar-top-slot" style="flex: 6; display: flex; flex-direction: column; min-height: 0;">
+        <div id="media-container" style="width: 100%; height: 100%; display: flex; flex-direction: column; min-height: 0;">
+          <!-- High-tech Graphic/Visualization (100% Offline) -->
+          <div class="glass-panel media-card" style="width: 100%; height: 100%; display: flex;">
+            <canvas id="visualizer-canvas"></canvas>
+            <div class="media-card-content" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%; height: 100%; box-sizing: border-box; position: relative; z-index: 2;">
+              <div id="display-logo-container" style="display: none; margin-bottom: 15px; max-width: 100px; max-height: 100px; align-items: center; justify-content: center;">
+                <img id="display-logo-img" src="" style="max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35));">
+              </div>
+              <div class="media-card-title" id="display-card-title" style="margin-bottom: 10px;">SimpleAntrian</div>
+              <div class="media-card-text" id="display-card-text">
+                Budayakan antri demi kenyamanan bersama. <br>
+                Silakan siapkan tiket Anda dan perhatikan panggilan layar.
+              </div>
+            </div>
           </div>
-          <div class="media-card-title" id="display-card-title" style="margin-bottom: 10px;">SimpleAntrian</div>
-          <div class="media-card-text" id="display-card-text">
-            Budayakan antri demi kenyamanan bersama. <br>
-            Silakan siapkan tiket Anda dan perhatikan panggilan layar.
+
+          <!-- Playlist Media Player Card (Video & Foto) -->
+          <div class="glass-panel video-playlist-card" id="video-card" style="flex: 1; width: 100%; height: 100%; overflow: hidden; display: none; border-radius: 16px; position: relative; background: #000; box-shadow: var(--shadow-main); padding: 0;">
+            <video id="display-video-player" style="width: 100%; height: 100%; object-fit: contain; border-radius: 16px; display: none;" autoplay muted playsinline></video>
+            <img id="display-image-player" style="width: 100%; height: 100%; object-fit: contain; border-radius: 16px; display: none;" alt="Media Display">
           </div>
         </div>
       </div>
 
-      <!-- Playlist Video Player Card -->
-      <div class="glass-panel video-playlist-card" id="video-card" style="flex: 9; overflow: hidden; display: none; border-radius: 16px; position: relative; aspect-ratio: 16/9; background: #000; box-shadow: var(--shadow-main); padding: 0;">
-        <video id="display-video-player" style="width: 100%; height: 100%; object-fit: contain; border-radius: 16px;" autoplay muted playsinline></video>
-      </div>
-
       <!-- Other Active Services List -->
-      <div class="glass-panel other-services-card">
+      <div class="glass-panel other-services-card" style="flex: 5; min-height: 0;">
         <div class="sidebar-title">Daftar Antrian Aktif</div>
         <div class="other-services-list" id="lst-other-services">
           <!-- JS-populated -->
@@ -392,13 +459,14 @@
     </div>
   </footer>
 
-  <!-- FULLSCREEN VIDEO CONTAINER -->
+  <!-- FULLSCREEN MEDIA CONTAINER (Video & Foto) -->
   <div id="video-fullscreen-container" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 90; display: none; align-items: center; justify-content: center;">
-    <video id="fullscreen-video-player" style="width: 100%; height: 100%; object-fit: contain;" autoplay playsinline></video>
+    <video id="fullscreen-video-player" style="width: 100%; height: 100%; object-fit: contain; display: none;" autoplay playsinline></video>
+    <img id="fullscreen-image-player" style="width: 100%; height: 100%; object-fit: contain; display: none;" alt="Media Display">
     <div id="fullscreen-video-placeholder" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 15px; text-align: center; color: var(--text-secondary); font-family: sans-serif; z-index: 92;">
       <div style="font-size: 3rem;">📹</div>
-      <div style="font-size: 1.5rem; font-weight: 700;">Playlist Video Kosong</div>
-      <div style="font-size: 1rem; color: var(--text-muted);">Silakan tambahkan file video di tab Pengaturan Operator.</div>
+      <div style="font-size: 1.5rem; font-weight: 700;">Playlist Media Kosong</div>
+      <div style="font-size: 1rem; color: var(--text-muted);">Silakan tambahkan file video atau foto di tab Pengaturan Operator.</div>
     </div>
   </div>
 
