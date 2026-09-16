@@ -296,7 +296,10 @@ async function getCurrentState() {
     videoFullscreenMuted,
     colorTheme,
     displayLayout,
-    photoDuration
+    photoDuration,
+    displayTitle: settings.display_title || 'SimpleAntrian',
+    displaySubtitle: settings.display_subtitle || '',
+    displayLogo: settings.display_logo || ''
   };
 }
 

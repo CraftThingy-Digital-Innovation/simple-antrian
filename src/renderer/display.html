@@ -278,53 +278,47 @@
       flex: 5;
     }
 
-    /* Media Container Primary Mode */
-    #media-container.primary-media {
-      height: 100%;
+    /* Video Card Primary Mode (when placed in primary-slot on the left) */
+    .video-playlist-card.primary-video {
       flex: 1;
-    }
-
-    #media-container.primary-media #video-card {
+      height: 100%;
       border-radius: 20px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    }
-
-    #media-container.primary-media .media-card {
-      border-radius: 20px;
+      border: 1px solid var(--border-glass);
     }
 
     /* Compact Main Call Panel (when moved to sidebar in swapped layout) */
     .main-call-panel.compact {
       flex: 1;
       height: 100%;
-      min-height: 260px;
-      padding: 24px 20px;
+      min-height: 240px;
+      padding: 20px 16px;
       border-radius: 16px;
     }
 
     .main-call-panel.compact .main-call-label {
-      font-size: 1.25rem;
+      font-size: 1.15rem;
       letter-spacing: 2px;
     }
 
     .main-call-panel.compact .main-call-number {
-      font-size: 4.8rem;
-      margin: 10px 0;
+      font-size: 4.5rem;
+      margin: 8px 0;
       letter-spacing: -1px;
     }
 
     .main-call-panel.compact .main-call-desk-label {
-      font-size: 1.25rem;
-      margin-top: 6px;
+      font-size: 1.15rem;
+      margin-top: 4px;
     }
 
     .main-call-panel.compact .main-call-desk {
-      font-size: 2.3rem;
-      margin-top: 6px;
+      font-size: 2.2rem;
+      margin-top: 4px;
     }
 
     .main-call-panel.compact.standby .main-call-desk {
-      font-size: 1.6rem;
+      font-size: 1.5rem;
     }
   </style>
 </head>
@@ -332,7 +326,7 @@
 
   <!-- MAIN AREA -->
   <div class="content-area" id="content-area">
-    <!-- PRIMARY SLOT (Left by default in standard mode) -->
+    <!-- PRIMARY SLOT (Left by default in standard mode: Main Call Panel; Swapped: Video Card) -->
     <div id="primary-slot" class="primary-slot" style="flex: 7; display: flex; flex-direction: column; min-height: 0;">
       <!-- Active Call Display Panel -->
       <div class="glass-panel main-call-panel standby" id="main-display-panel">
@@ -344,38 +338,40 @@
     </div>
 
     <!-- RIGHT PANEL / SIDEBAR -->
-    <div class="right-sidebar" id="right-sidebar" style="flex: 5; display: flex; flex-direction: column; gap: 30px; min-height: 0;">
-      <!-- SIDEBAR TOP SLOT (Holds Media Container by default, or Compact Call Panel when swapped) -->
-      <div id="sidebar-top-slot" class="sidebar-top-slot" style="flex: 6; display: flex; flex-direction: column; min-height: 0;">
-        <div id="media-container" style="width: 100%; height: 100%; display: flex; flex-direction: column; min-height: 0;">
-          <!-- High-tech Graphic/Visualization (100% Offline) -->
-          <div class="glass-panel media-card" style="width: 100%; height: 100%; display: flex;">
-            <canvas id="visualizer-canvas"></canvas>
-            <div class="media-card-content" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%; height: 100%; box-sizing: border-box; position: relative; z-index: 2;">
-              <div id="display-logo-container" style="display: none; margin-bottom: 15px; max-width: 100px; max-height: 100px; align-items: center; justify-content: center;">
-                <img id="display-logo-img" src="" style="max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35));">
-              </div>
-              <div class="media-card-title" id="display-card-title" style="margin-bottom: 10px;">SimpleAntrian</div>
-              <div class="media-card-text" id="display-card-text">
-                Budayakan antri demi kenyamanan bersama. <br>
-                Silakan siapkan tiket Anda dan perhatikan panggilan layar.
-              </div>
-            </div>
+    <div class="right-sidebar" id="right-sidebar" style="flex: 5; display: flex; flex-direction: column; gap: 20px; min-height: 0;">
+      <!-- 1. PERMANENT BANNER: Logo, Nama Instansi / Judul, Subtitle & Visualizer (ALWAYS VISIBLE) -->
+      <div class="glass-panel media-card" id="display-banner-card" style="flex: 5; min-height: 180px; display: flex; border-radius: 16px; position: relative; overflow: hidden;">
+        <canvas id="visualizer-canvas"></canvas>
+        <div class="media-card-content" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%; height: 100%; box-sizing: border-box; position: relative; z-index: 2; padding: 20px;">
+          <div id="display-logo-container" style="display: none; margin-bottom: 12px; max-width: 100px; max-height: 90px; align-items: center; justify-content: center;">
+            <img id="display-logo-img" src="" style="max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35));">
           </div>
-
-          <!-- Playlist Media Player Card (Video & Foto) -->
-          <div class="glass-panel video-playlist-card" id="video-card" style="flex: 1; width: 100%; height: 100%; overflow: hidden; display: none; border-radius: 16px; position: relative; background: #000; box-shadow: var(--shadow-main); padding: 0;">
-            <video id="display-video-player" style="width: 100%; height: 100%; object-fit: contain; border-radius: 16px; display: none;" autoplay muted playsinline></video>
-            <img id="display-image-player" style="width: 100%; height: 100%; object-fit: contain; border-radius: 16px; display: none;" alt="Media Display">
+          <div class="media-card-title" id="display-card-title" style="margin-bottom: 8px;">SimpleAntrian</div>
+          <div class="media-card-text" id="display-card-text">
+            Budayakan antri demi kenyamanan bersama. <br>
+            Silakan siapkan tiket Anda dan perhatikan panggilan layar.
           </div>
         </div>
       </div>
 
-      <!-- Other Active Services List -->
+      <!-- 2. SWAPPABLE SLOT: Standard Layout = Video Card; Swapped Layout = Compact Main Call Panel -->
+      <div id="sidebar-swappable-slot" class="sidebar-swappable-slot" style="flex: 6; display: flex; flex-direction: column; min-height: 0;">
+        <!-- Playlist Media Player Card (Video & Foto) -->
+        <div class="glass-panel video-playlist-card" id="video-card" style="flex: 1; width: 100%; height: 100%; overflow: hidden; display: none; border-radius: 16px; position: relative; background: #000; box-shadow: var(--shadow-main); padding: 0;">
+          <video id="display-video-player" style="width: 100%; height: 100%; object-fit: contain; border-radius: 16px; display: none;" autoplay muted playsinline></video>
+          <img id="display-image-player" style="width: 100%; height: 100%; object-fit: contain; border-radius: 16px; display: none;" alt="Media Display">
+          <!-- Placeholder saat mode swapped namun playlist media kosong -->
+          <div id="video-card-empty-placeholder" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-muted); font-size: 0.95rem;">
+            <div style="font-size: 2.5rem;">🎬</div>
+            <div>Belum ada media dalam playlist</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. PERMANENT: Daftar Antrian Aktif -->
       <div class="glass-panel other-services-card" style="flex: 5; min-height: 0;">
         <div class="sidebar-title">Daftar Antrian Aktif</div>
         <div class="other-services-list" id="lst-other-services">
-          <!-- JS-populated -->
           <div style="text-align: center; color: var(--text-muted); margin-top: 20px;">Menunggu data...</div>
         </div>
       </div>

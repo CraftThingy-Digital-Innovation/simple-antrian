@@ -143,6 +143,13 @@ function handleWebSocketMessage(message) {
       if (payload.displayLayout !== undefined) {
         applyDisplayLayout(payload.displayLayout);
       }
+      if (payload.displayTitle !== undefined || payload.displayLogo !== undefined) {
+        applyDisplayCustomization({
+          display_title: payload.displayTitle,
+          display_subtitle: payload.displaySubtitle,
+          display_logo: payload.displayLogo
+        });
+      }
       if (payload.photoDuration !== undefined) {
         photoDurationSetting = parseInt(payload.photoDuration, 10) || 10;
       }
@@ -862,37 +869,42 @@ function applyDisplayLayout(layout) {
   displayLayoutSetting = (layout === 'swapped') ? 'swapped' : 'standard';
   const contentArea = document.getElementById('content-area');
   const primarySlot = document.getElementById('primary-slot');
-  const sidebarSlot = document.getElementById('sidebar-top-slot');
+  const sidebarSlot = document.getElementById('sidebar-swappable-slot');
   const mainCallPanel = document.getElementById('main-display-panel');
-  const mediaContainer = document.getElementById('media-container');
+  const videoCard = document.getElementById('video-card');
 
-  if (!primarySlot || !sidebarSlot || !mainCallPanel || !mediaContainer) return;
+  if (!primarySlot || !sidebarSlot || !mainCallPanel || !videoCard) return;
 
   if (displayLayoutSetting === 'swapped') {
     if (contentArea) contentArea.classList.add('layout-swapped');
     mainCallPanel.classList.add('compact');
-    mediaContainer.classList.add('primary-media');
+    videoCard.classList.add('primary-video');
 
-    if (primarySlot.firstElementChild !== mediaContainer) {
-      primarySlot.appendChild(mediaContainer);
+    // Pindahkan video card ke slot utama (kiri)
+    if (primarySlot.firstElementChild !== videoCard) {
+      primarySlot.appendChild(videoCard);
     }
+    // Pindahkan nomor antrian ke slot sidebar (kanan)
     if (sidebarSlot.firstElementChild !== mainCallPanel) {
       sidebarSlot.appendChild(mainCallPanel);
     }
   } else {
     if (contentArea) contentArea.classList.remove('layout-swapped');
     mainCallPanel.classList.remove('compact');
-    mediaContainer.classList.remove('primary-media');
+    videoCard.classList.remove('primary-video');
 
+    // Pindahkan nomor antrian ke slot utama (kiri)
     if (primarySlot.firstElementChild !== mainCallPanel) {
       primarySlot.appendChild(mainCallPanel);
     }
-    if (sidebarSlot.firstElementChild !== mediaContainer) {
-      sidebarSlot.appendChild(mediaContainer);
+    // Pindahkan video card ke slot sidebar (kanan)
+    if (sidebarSlot.firstElementChild !== videoCard) {
+      sidebarSlot.appendChild(videoCard);
     }
   }
 
-  // Trigger resize agar visualizer canvas menyesuaikan ukuran jika aktif
+  // Banner Logo & Nama Instansi (.media-card) SELALU TETAP TAMPIL DI SIDEBAR!
+  syncVideoPlayers();
   window.dispatchEvent(new Event('resize'));
 }
 
@@ -921,7 +933,7 @@ function syncVideoPlayers(displayMode) {
   }
   
   const videoCard = document.getElementById('video-card');
-  const mediaCard = document.querySelector('.media-card');
+  const emptyPlaceholder = document.getElementById('video-card-empty-placeholder');
   const sidebarPlayer = document.getElementById('display-video-player');
   const sidebarImage = document.getElementById('display-image-player');
   
@@ -932,13 +944,19 @@ function syncVideoPlayers(displayMode) {
   
   if (!sidebarPlayer || !fullscreenPlayer) return;
   
-  // Jika playlist kosong, sembunyikan player dan tampilkan fallback/placeholder
+  // Jika playlist kosong, bersihkan media player
   if (videoPlaylist.length === 0) {
     clearMediaTimer();
     currentActiveMediaUrl = '';
     
-    if (videoCard) videoCard.style.display = 'none';
-    if (mediaCard) mediaCard.style.display = 'flex';
+    // Banner Logo/Instansi (.media-card) tidak pernah disentuh agar tetap tampil!
+    if (displayLayoutSetting === 'swapped') {
+      if (videoCard) videoCard.style.display = 'flex';
+      if (emptyPlaceholder) emptyPlaceholder.style.display = 'flex';
+    } else {
+      if (videoCard) videoCard.style.display = 'none';
+      if (emptyPlaceholder) emptyPlaceholder.style.display = 'none';
+    }
     
     sidebarPlayer.pause();
     sidebarPlayer.removeAttribute('src');
@@ -966,6 +984,8 @@ function syncVideoPlayers(displayMode) {
     }
     return;
   }
+  
+  if (emptyPlaceholder) emptyPlaceholder.style.display = 'none';
   
   // Tentukan host berdasarkan lokasi WebSocket
   let host = window.location.host;
@@ -1056,8 +1076,8 @@ function syncVideoPlayers(displayMode) {
     fullscreenPlayer.style.display = 'none';
     if (fullscreenImage) fullscreenImage.style.display = 'none';
     
+    // Tampilkan video card (di sidebar jika standar, atau di kiri jika swapped)
     if (videoCard) videoCard.style.display = 'flex';
-    if (mediaCard) mediaCard.style.display = 'none';
     
     if (isImg) {
       // Tampilkan Foto di Card Media
