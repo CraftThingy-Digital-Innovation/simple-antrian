@@ -467,12 +467,6 @@ function stopAnnouncement() {
     } catch (_) {}
   }
 
-  // Hapus status aktif animasi tombol stop
-  const stopBtn = document.getElementById('btn-display-stop-sound');
-  if (stopBtn) {
-    stopBtn.classList.remove('sound-active');
-  }
-
   // Hentikan kedip animasi jika sedang berkedip
   const mainDisplayPanel = document.getElementById('main-display-panel');
   if (mainDisplayPanel) {
@@ -505,14 +499,10 @@ function queueAnnouncement(ticketNumber, deskNumber, voiceFiles) {
 async function processNextAnnouncement() {
   if (announcementQueue.length === 0) {
     isAnnouncing = false;
-    const stopBtn = document.getElementById('btn-display-stop-sound');
-    if (stopBtn) stopBtn.classList.remove('sound-active');
     return;
   }
 
   isAnnouncing = true;
-  const stopBtn = document.getElementById('btn-display-stop-sound');
-  if (stopBtn) stopBtn.classList.add('sound-active');
 
   const { ticketNumber, deskNumber, voiceFiles } = announcementQueue.shift();
 
