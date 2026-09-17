@@ -1927,10 +1927,11 @@ function setupEventListeners() {
     btnSaveTts.addEventListener('click', () => {
       const enabled = document.getElementById('setting-tts-enabled').checked ? 'true' : 'false';
       const callName = document.getElementById('setting-call-customer-name').checked ? 'true' : 'false';
+      const callDesk = document.getElementById('setting-call-desk-enabled')?.checked ? 'true' : 'false';
       const ttsLanguage = document.getElementById('setting-tts-language') ? document.getElementById('setting-tts-language').value : 'id';
       const multilang = ttsLanguage === 'id_en' ? 'true' : 'false';
       const autoCallNext = document.getElementById('setting-auto-call-next') ? (document.getElementById('setting-auto-call-next').checked ? 'true' : 'false') : 'false';
-      sendAction('SAVE_TTS', { enabled, multilang, ttsLanguage, callName, autoCallNext });
+      sendAction('SAVE_TTS', { enabled, multilang, ttsLanguage, callName, callDesk, autoCallNext });
       showToast('Menyimpan pengaturan Suara & Alur Panggilan...', 'info');
     });
   }
@@ -2529,6 +2530,10 @@ async function loadSettings() {
   const callNameCheckbox = document.getElementById('setting-call-customer-name');
   if (callNameCheckbox) {
     callNameCheckbox.checked = settings.call_customer_name !== 'false';
+  }
+  const callDeskCheckbox = document.getElementById('setting-call-desk-enabled');
+  if (callDeskCheckbox) {
+    callDeskCheckbox.checked = settings.call_desk_enabled !== 'false';
   }
   const ttsLangSelect = document.getElementById('setting-tts-language');
   if (ttsLangSelect) {

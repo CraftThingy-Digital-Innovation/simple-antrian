@@ -592,7 +592,7 @@ async function handleClientAction(action, ws) {
       }
 
       case 'SAVE_TTS': {
-        const { enabled, multilang, ttsLanguage, callName, autoCallNext } = payload;
+        const { enabled, multilang, ttsLanguage, callName, callDesk, autoCallNext } = payload;
         const dbMod = require('./db');
         if (enabled !== undefined) await dbMod.saveSetting('tts_enabled', enabled);
         if (ttsLanguage !== undefined) {
@@ -604,6 +604,9 @@ async function handleClientAction(action, ws) {
         }
         if (callName !== undefined) {
           await dbMod.saveSetting('call_customer_name', callName);
+        }
+        if (callDesk !== undefined) {
+          await dbMod.saveSetting('call_desk_enabled', callDesk);
         }
         if (autoCallNext !== undefined) {
           await dbMod.saveSetting('auto_call_next_on_complete', autoCallNext);
@@ -920,27 +923,26 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName)
     const cleanWord = word.trim().toLowerCase();
     
     // Map standard words directly to static vocabulary files to avoid redundant TTS generation
-    if (lang === 'id' && cleanWord === 'loket') return 'id_loket.wav';
-    if (lang === 'en' && cleanWord === 'counter') return 'en_counter.wav';
+    if (lang === 'id' && (cleanWord === 'loket' || cleanWord === 'counter')) return 'id_loket.wav';
+    if (lang === 'en' && (cleanWord === 'counter' || cleanWord === 'loket')) return 'en_counter.wav';
     
-    // Custom phrase generation
-    const crypto = require('crypto');
-    const hash = crypto.createHash('md5').update(cleanWord).digest('hex');
-    const filename = `${lang}_phrase_${hash}.wav`;
-    
+    // Custom phrase generation via Piper if available
     try {
       const ttsGenerator = require('./tts-generator');
-      await ttsGenerator.generatePhraseIfNeeded(word, lang);
+      const generated = await ttsGenerator.generatePhraseIfNeeded(word, lang);
+      if (generated) return generated;
     } catch (err) {
-      console.error(`[WebSocket Server] Dynamic TTS phrase generation failed for "${word}" (${lang}):`, err.message);
+      console.warn(`[WebSocket Server] Dynamic TTS phrase generation failed for "${word}" (${lang}):`, err.message);
     }
     
-    return filename;
+    // Fallback aman ke berkas audio bawaan (loket / counter) agar tidak terjadi audio hilang / 404
+    return lang === 'en' ? 'en_counter.wav' : 'id_loket.wav';
   };
 
   const settings = await db.getSettings();
   const ttsLanguage = settings.tts_language || (settings.multilang_enabled === 'true' ? 'id_en' : 'id');
   const isCallNameEnabled = settings.call_customer_name !== 'false';
+  const isCallDeskEnabled = settings.call_desk_enabled !== 'false';
   const cleanName = customerName ? customerName.trim() : '';
 
   // Helper untuk panggil nomor antrian dalam Bahasa Indonesia
@@ -950,7 +952,7 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName)
     const idNumTokens = getIndonesianNumberTokens(num);
     idNumTokens.forEach(t => files.push(`id_${t}.wav`));
 
-    if (isCallNameEnabled && cleanName) {
+    if (isCallNameEnabled && cleanName && cleanName !== 'Pelanggan' && cleanName !== 'Pelanggan Mandiri') {
       try {
         const ttsGenerator = require('./tts-generator');
         const namePhraseFile = await ttsGenerator.generatePhraseIfNeeded(cleanName, 'id');
@@ -960,15 +962,18 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName)
       }
     }
 
-    files.push('id_silakan_menuju.wav');
-    if (deskWord) {
-      files.push(await getDeskWordFile(deskWord, 'id'));
-    } else {
-      files.push('id_loket.wav');
-    }
-    if (!isNaN(deskNum)) {
-      const idDeskTokens = getIndonesianNumberTokens(deskNum);
-      idDeskTokens.forEach(t => files.push(`id_${t}.wav`));
+    // Hanya ucapkan "silakan menuju loket..." jika opsi sebutkan loket diaktifkan
+    if (isCallDeskEnabled) {
+      files.push('id_silakan_menuju.wav');
+      if (deskWord) {
+        files.push(await getDeskWordFile(deskWord, 'id'));
+      } else {
+        files.push('id_loket.wav');
+      }
+      if (!isNaN(deskNum)) {
+        const idDeskTokens = getIndonesianNumberTokens(deskNum);
+        idDeskTokens.forEach(t => files.push(`id_${t}.wav`));
+      }
     }
   };
 
@@ -979,7 +984,7 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName)
     const enNumTokens = getEnglishNumberTokens(num);
     enNumTokens.forEach(t => files.push(`en_${t}.wav`));
 
-    if (isCallNameEnabled && cleanName) {
+    if (isCallNameEnabled && cleanName && cleanName !== 'Pelanggan' && cleanName !== 'Pelanggan Mandiri') {
       try {
         const ttsGenerator = require('./tts-generator');
         const enNameFile = await ttsGenerator.generatePhraseIfNeeded(cleanName, 'en');
@@ -987,16 +992,19 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName)
       } catch (_) {}
     }
 
-    files.push('en_please_proceed_to.wav');
-    if (deskWord) {
-      const enWord = deskWord.replace(/loket/i, 'counter');
-      files.push(await getDeskWordFile(enWord, 'en'));
-    } else {
-      files.push('en_counter.wav');
-    }
-    if (!isNaN(deskNum)) {
-      const enDeskTokens = getEnglishNumberTokens(deskNum);
-      enDeskTokens.forEach(t => files.push(`en_${t}.wav`));
+    // Hanya ucapkan "please proceed to counter..." jika opsi sebutkan loket diaktifkan
+    if (isCallDeskEnabled) {
+      files.push('en_please_proceed_to.wav');
+      if (deskWord) {
+        const enWord = deskWord.replace(/loket/i, 'counter');
+        files.push(await getDeskWordFile(enWord, 'en'));
+      } else {
+        files.push('en_counter.wav');
+      }
+      if (!isNaN(deskNum)) {
+        const enDeskTokens = getEnglishNumberTokens(deskNum);
+        enDeskTokens.forEach(t => files.push(`en_${t}.wav`));
+      }
     }
   };
 

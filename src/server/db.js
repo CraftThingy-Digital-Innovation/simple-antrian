@@ -134,7 +134,8 @@ async function initDb() {
     { key: 'display_target_monitor', value: 'auto' },
     { key: 'display_lock_fullscreen', value: 'true' },
     { key: 'feedback_survey_url', value: '' },
-    { key: 'feedback_display_mode', value: 'both' }
+    { key: 'feedback_display_mode', value: 'both' },
+    { key: 'call_desk_enabled', value: 'true' }
   ];
 
   for (const s of defaultSettings) {
