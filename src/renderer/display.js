@@ -918,11 +918,11 @@ if (typeof window !== 'undefined' && window.api && window.api.getSystemInfo) {
 let videoPlaylist = [];
 let currentMediaIndex = 0;
 let currentActiveMediaUrl = '';
-let currentDisplayMode = 'queue';
+let currentDisplayMode = '';
 let videoSidebarMuted = true;
 let videoFullscreenMuted = false;
 let photoDurationSetting = 10;
-let displayLayoutSetting = 'standard';
+let displayLayoutSetting = '';
 let mediaAdvanceTimer = null;
 
 function clearMediaTimer() {
@@ -954,7 +954,12 @@ function updateVideoPlaylist(newPlaylist) {
 }
 
 function applyDisplayLayout(layout) {
-  displayLayoutSetting = (layout === 'swapped') ? 'swapped' : 'standard';
+  const newLayout = (layout === 'swapped') ? 'swapped' : 'standard';
+
+  // Skip jika layout belum berubah — mencegah DOM thrashing & video freeze
+  if (newLayout === displayLayoutSetting) return;
+
+  displayLayoutSetting = newLayout;
   const contentArea = document.getElementById('content-area');
   const primarySlot = document.getElementById('primary-slot');
   const sidebarSlot = document.getElementById('sidebar-swappable-slot');
@@ -1114,7 +1119,7 @@ function syncVideoPlayers(displayMode) {
   if (currentDisplayMode === 'video') {
     // Mode Video Fullscreen Dedicated
     if (videoCard) videoCard.style.display = 'none';
-    sidebarPlayer.pause();
+    if (!sidebarPlayer.paused) sidebarPlayer.pause();
     sidebarPlayer.style.display = 'none';
     if (sidebarImage) sidebarImage.style.display = 'none';
     
@@ -1141,10 +1146,11 @@ function syncVideoPlayers(displayMode) {
         fullscreenImage.style.display = 'none';
         fullscreenImage.removeAttribute('src');
       }
-      fullscreenPlayer.style.display = 'block';
-      fullscreenPlayer.playbackRate = 1.0;
-      fullscreenPlayer.loop = (videoPlaylist.length === 1);
-      fullscreenPlayer.muted = videoFullscreenMuted;
+      // Hanya set properti DOM jika belum benar (mencegah freeze akibat DOM thrashing)
+      if (fullscreenPlayer.style.display !== 'block') fullscreenPlayer.style.display = 'block';
+      const fsLoop = (videoPlaylist.length === 1);
+      if (fullscreenPlayer.loop !== fsLoop) fullscreenPlayer.loop = fsLoop;
+      if (fullscreenPlayer.muted !== videoFullscreenMuted) fullscreenPlayer.muted = videoFullscreenMuted;
       
       if (currentActiveMediaUrl !== mediaUrl) {
         currentActiveMediaUrl = mediaUrl;
@@ -1171,7 +1177,7 @@ function syncVideoPlayers(displayMode) {
   } else if (currentDisplayMode === 'queue') {
     // Mode Antrian Standar / Swapped
     if (fullscreenContainer) fullscreenContainer.style.display = 'none';
-    fullscreenPlayer.pause();
+    if (!fullscreenPlayer.paused) fullscreenPlayer.pause();
     fullscreenPlayer.style.display = 'none';
     if (fullscreenImage) fullscreenImage.style.display = 'none';
     
@@ -1198,10 +1204,11 @@ function syncVideoPlayers(displayMode) {
         sidebarImage.style.display = 'none';
         sidebarImage.removeAttribute('src');
       }
-      sidebarPlayer.style.display = 'block';
-      sidebarPlayer.playbackRate = 1.0;
-      sidebarPlayer.loop = (videoPlaylist.length === 1);
-      sidebarPlayer.muted = videoSidebarMuted;
+      // Hanya set properti DOM jika video belum dalam state yang benar (mencegah freeze)
+      if (sidebarPlayer.style.display !== 'block') sidebarPlayer.style.display = 'block';
+      const targetLoop = (videoPlaylist.length === 1);
+      if (sidebarPlayer.loop !== targetLoop) sidebarPlayer.loop = targetLoop;
+      if (sidebarPlayer.muted !== videoSidebarMuted) sidebarPlayer.muted = videoSidebarMuted;
       
       if (currentActiveMediaUrl !== mediaUrl) {
         currentActiveMediaUrl = mediaUrl;
@@ -1327,8 +1334,8 @@ let mirrorStream = null;
 let activeMirrorWindowName = '';
 
 async function updateMirrorState(displayMode, windowName, mirrorCropTop) {
-  // Sinkronkan pemutar video berdasarkan display mode yang aktif
-  if (typeof syncVideoPlayers === 'function') {
+  // Sinkronkan pemutar video HANYA jika display mode berubah — mencegah video freeze
+  if (typeof syncVideoPlayers === 'function' && displayMode && displayMode !== currentDisplayMode) {
     syncVideoPlayers(displayMode);
   }
 
