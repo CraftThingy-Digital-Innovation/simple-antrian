@@ -23,42 +23,54 @@ let reconnectTimer = null;
 // Ambil info koneksi & hubungkan ke server websocket yang tepat
 async function initDisplayConnection() {
   try {
-    const info = await window.api.getSystemInfo();
-    currentMode = info.mode;
-    serverPort = info.port || 8080;
+    if (typeof window !== 'undefined' && window.api && typeof window.api.getSystemInfo === 'function') {
+      const info = await window.api.getSystemInfo();
+      currentMode = info.mode;
+      serverPort = info.port || 8080;
 
-    const dbSettings = await window.api.getSettings();
-    globalSettings = dbSettings;
+      const dbSettings = await window.api.getSettings();
+      globalSettings = dbSettings;
 
-    if (currentMode === 'server') {
-      // Connect ke server lokal
-      connectWebSocket(`ws://localhost:${serverPort}`);
-    } else {
-      // Mode Client: Coba endpoint dari DB, lalu localStorage, lalu default
-      const activeEndpoint = dbSettings.active_server_endpoint || localStorage.getItem('last_connected_server') || `localhost:${serverPort}`;
-      connectWebSocket(`ws://${activeEndpoint}`);
+      if (currentMode === 'server') {
+        // Connect ke server lokal
+        connectWebSocket(`ws://localhost:${serverPort}`);
+        return;
+      } else {
+        // Mode Client: Coba endpoint dari DB, lalu localStorage, lalu default
+        const activeEndpoint = dbSettings.active_server_endpoint || localStorage.getItem('last_connected_server') || `localhost:${serverPort}`;
+        connectWebSocket(`ws://${activeEndpoint}`);
 
-      // Dengarkan penemuan server via UDP Discovery
-      window.api.onServersUpdated((servers) => {
-        if (servers && servers.length > 0) {
-          const srv = servers[0];
-          const srvEndpoint = `${srv.ip}:${srv.port}`;
-          if (!ws || ws.readyState !== WebSocket.OPEN) {
-            console.log(`[Display UDP] Menghubungkan otomatis ke server terdeteksi: ${srvEndpoint}`);
-            connectWebSocket(`ws://${srvEndpoint}`);
-          }
+        // Dengarkan penemuan server via UDP Discovery
+        if (typeof window.api.onServersUpdated === 'function') {
+          window.api.onServersUpdated((servers) => {
+            if (servers && servers.length > 0) {
+              const srv = servers[0];
+              const srvEndpoint = `${srv.ip}:${srv.port}`;
+              if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.log(`[Display UDP] Menghubungkan otomatis ke server terdeteksi: ${srvEndpoint}`);
+                connectWebSocket(`ws://${srvEndpoint}`);
+              }
+            }
+          });
         }
-      });
-    }
 
-    // Dengarkan perubahan endpoint server dari Operator Panel secara realtime
-    window.api.onServerEndpointChanged((newEndpoint) => {
-      console.log(`[Display] Server endpoint diubah oleh operator menjadi: ${newEndpoint}`);
-      connectWebSocket(`ws://${newEndpoint}`);
-    });
+        // Dengarkan perubahan endpoint server dari Operator Panel secara realtime
+        if (typeof window.api.onServerEndpointChanged === 'function') {
+          window.api.onServerEndpointChanged((newEndpoint) => {
+            console.log(`[Display] Server endpoint diubah oleh operator menjadi: ${newEndpoint}`);
+            connectWebSocket(`ws://${newEndpoint}`);
+          });
+        }
+        return;
+      }
+    } else {
+      // Fallback jika dibuka di browser biasa (misal TV, browser eksternal)
+      const host = (window.location && window.location.host) || localStorage.getItem('last_connected_server') || 'localhost:8080';
+      connectWebSocket(`ws://${host}`);
+    }
   } catch (err) {
     console.error('Failed to init display connection:', err);
-    setTimeout(initDisplayConnection, 5000);
+    setTimeout(initDisplayConnection, 3000);
   }
 }
 
@@ -318,7 +330,10 @@ function renderFeedbackSurvey(state) {
 
 // Render State Antrian di Layar Display
 function renderDisplayState(state) {
-  const { services, callingTickets } = state;
+  if (!state) return;
+  const services = Array.isArray(state.services) ? state.services : [];
+  const callingTickets = Array.isArray(state.callingTickets) ? state.callingTickets : [];
+
   try {
     renderFeedbackSurvey(state);
   } catch (err) {
@@ -330,47 +345,46 @@ function renderDisplayState(state) {
   const mainDeskEl = document.getElementById('lbl-call-desk');
   const mainDisplayPanel = document.getElementById('main-display-panel');
 
-  if (callingTickets && callingTickets.length > 0) {
-    // Tiket yang paling baru dipanggil adalah yang pertama
-    const currentTicket = callingTickets[0];
-    
-    // Perbarui teks jika berbeda (nomor tiket atau nomor loket berubah)
-    if (mainNumberEl.innerText !== currentTicket.ticket_number || mainDeskEl.innerText !== currentTicket.desk_number || mainDisplayPanel.classList.contains('standby')) {
-      mainDisplayPanel.classList.remove('standby');
-      mainNumberEl.innerText = currentTicket.ticket_number;
-      mainDeskEl.innerText = currentTicket.desk_number;
-      mainDisplayPanel.classList.add('animate-call-blink');
-      setTimeout(() => mainDisplayPanel.classList.remove('animate-call-blink'), 5000);
+  if (mainNumberEl && mainDeskEl && mainDisplayPanel) {
+    if (callingTickets.length > 0) {
+      const currentTicket = callingTickets[0];
+      if (mainNumberEl.innerText !== currentTicket.ticket_number || mainDeskEl.innerText !== currentTicket.desk_number || mainDisplayPanel.classList.contains('standby')) {
+        mainDisplayPanel.classList.remove('standby');
+        mainNumberEl.innerText = currentTicket.ticket_number;
+        mainDeskEl.innerText = currentTicket.desk_number;
+        mainDisplayPanel.classList.add('animate-call-blink');
+        setTimeout(() => mainDisplayPanel.classList.remove('animate-call-blink'), 5000);
+      }
+    } else {
+      mainDisplayPanel.classList.add('standby');
+      mainNumberEl.innerText = '---';
+      mainDeskEl.innerText = 'Belum ada antrian';
     }
-  } else {
-    // Tidak ada panggilan aktif, tampilkan default/standby
-    mainDisplayPanel.classList.add('standby');
-    mainNumberEl.innerText = '---';
-    mainDeskEl.innerText = 'Belum ada antrian';
   }
 
   // 2. Tampilkan Layanan Lain di Sidebar
   const otherListEl = document.getElementById('lst-other-services');
-  otherListEl.innerHTML = '';
+  if (otherListEl) {
+    otherListEl.innerHTML = '';
 
-  if (services.length === 0) {
-    otherListEl.innerHTML = '<div style="text-align: center; color: var(--text-muted); margin-top: 20px;">Belum ada layanan aktif.</div>';
-    return;
+    if (services.length === 0) {
+      otherListEl.innerHTML = '<div style="text-align: center; color: var(--text-muted); margin-top: 20px;">Belum ada layanan aktif.</div>';
+      return;
+    }
+
+    services.forEach(srv => {
+      const activeCall = callingTickets.find(t => t.service_id === srv.id);
+      const num = activeCall ? activeCall.ticket_number : (srv.prefix + String(srv.current_number || 0).padStart(3, '0'));
+
+      const div = document.createElement('div');
+      div.className = 'other-service-item animate-pop-in';
+      div.innerHTML = `
+        <span class="other-service-name">${srv.name}</span>
+        <span class="other-service-number">${num}</span>
+      `;
+      otherListEl.appendChild(div);
+    });
   }
-
-  services.forEach(srv => {
-    // Cari nomor terakhir yang sedang dipanggil
-    const activeCall = callingTickets.find(t => t.service_id === srv.id);
-    const num = activeCall ? activeCall.ticket_number : (srv.prefix + String(srv.current_number).padStart(3, '0'));
-
-    const div = document.createElement('div');
-    div.className = 'other-service-item animate-pop-in';
-    div.innerHTML = `
-      <span class="other-service-name">${srv.name}</span>
-      <span class="other-service-number">${num}</span>
-    `;
-    otherListEl.appendChild(div);
-  });
 }
 
 // Animasi Scale-Up pada Panggilan Baru
@@ -876,7 +890,6 @@ function initCanvasVisualizer() {
 
 // ==================== PLAYLIST MEDIA DISPLAY (VIDEO & FOTO) ====================
 let isLocalServer = false;
-let serverPort = '8080';
 
 if (typeof window !== 'undefined' && window.api && window.api.getSystemInfo) {
   window.api.getSystemInfo().then(info => {
