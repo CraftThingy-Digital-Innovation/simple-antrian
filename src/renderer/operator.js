@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load nomor loket yang tersimpan di localStorage
   const savedDesks = localStorage.getItem('local_desk_settings');
   if (savedDesks) {
-    localDeskSettings = JSON.parse(savedDesks);
+    try { localDeskSettings = JSON.parse(savedDesks); } catch (_) { console.warn('[Operator] Corrupt local_desk_settings in localStorage, resetting.'); localStorage.removeItem('local_desk_settings'); }
   }
 
   // Setup tab navigation
