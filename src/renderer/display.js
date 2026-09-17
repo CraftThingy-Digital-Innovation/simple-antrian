@@ -136,38 +136,40 @@ function handleWebSocketMessage(message) {
 
   switch (type) {
     case 'STATE_UPDATE':
-      renderDisplayState(payload);
-      if (payload.videoSidebarMuted !== undefined) {
-        videoSidebarMuted = payload.videoSidebarMuted;
-      }
-      if (payload.videoFullscreenMuted !== undefined) {
-        videoFullscreenMuted = payload.videoFullscreenMuted;
-      }
-      if (typeof updateVideoPlaylist === 'function') {
-        updateVideoPlaylist(payload.videoPlaylist);
-      }
-      if (typeof updateMirrorState === 'function') {
-        updateMirrorState(payload.displayMode, payload.mirrorWindowName, payload.mirrorCropTop);
-      }
-      if (payload.colorTheme !== undefined) {
-        document.body.className = payload.colorTheme === 'imigrasi' ? 'theme-imigrasi' : '';
-      }
-      if (payload.displayLayout !== undefined) {
-        applyDisplayLayout(payload.displayLayout);
-      }
-      if (payload.feedbackSurveyUrl !== undefined || payload.feedbackDisplayMode !== undefined) {
-        renderFeedbackSurvey(payload);
-      }
-      if (payload.displayTitle !== undefined || payload.displayLogo !== undefined) {
-        applyDisplayCustomization({
-          display_title: payload.displayTitle,
-          display_subtitle: payload.displaySubtitle,
-          display_logo: payload.displayLogo
-        });
-      }
-      if (payload.photoDuration !== undefined) {
-        photoDurationSetting = parseInt(payload.photoDuration, 10) || 10;
-      }
+      // Setiap langkah dibungkus try-catch terpisah agar satu kegagalan
+      // tidak membunuh seluruh rantai pemrosesan (error isolation)
+      try { renderDisplayState(payload); } catch (e) { console.error('[Display] renderDisplayState error:', e); }
+      try {
+        if (payload.videoSidebarMuted !== undefined) videoSidebarMuted = payload.videoSidebarMuted;
+        if (payload.videoFullscreenMuted !== undefined) videoFullscreenMuted = payload.videoFullscreenMuted;
+      } catch (e) { console.error('[Display] mute flags error:', e); }
+      try {
+        if (typeof updateVideoPlaylist === 'function') updateVideoPlaylist(payload.videoPlaylist);
+      } catch (e) { console.error('[Display] updateVideoPlaylist error:', e); }
+      try {
+        if (typeof updateMirrorState === 'function') updateMirrorState(payload.displayMode, payload.mirrorWindowName, payload.mirrorCropTop);
+      } catch (e) { console.error('[Display] updateMirrorState error:', e); }
+      try {
+        if (payload.colorTheme !== undefined) document.body.className = payload.colorTheme === 'imigrasi' ? 'theme-imigrasi' : '';
+      } catch (e) {}
+      try {
+        if (payload.displayLayout !== undefined) applyDisplayLayout(payload.displayLayout);
+      } catch (e) { console.error('[Display] applyDisplayLayout error:', e); }
+      try {
+        if (payload.feedbackSurveyUrl !== undefined || payload.feedbackDisplayMode !== undefined) renderFeedbackSurvey(payload);
+      } catch (e) { console.error('[Display] renderFeedbackSurvey error:', e); }
+      try {
+        if (payload.displayTitle !== undefined || payload.displayLogo !== undefined) {
+          applyDisplayCustomization({
+            display_title: payload.displayTitle,
+            display_subtitle: payload.displaySubtitle,
+            display_logo: payload.displayLogo
+          });
+        }
+      } catch (e) { console.error('[Display] applyDisplayCustomization error:', e); }
+      try {
+        if (payload.photoDuration !== undefined) photoDurationSetting = parseInt(payload.photoDuration, 10) || 10;
+      } catch (e) {}
       break;
 
     case 'ANNOUNCE_CALL':
@@ -1061,16 +1063,25 @@ function syncVideoPlayers(displayMode) {
   
   if (emptyPlaceholder) emptyPlaceholder.style.display = 'none';
   
-  // Tentukan host berdasarkan lokasi server (127.0.0.1 jika di server agar bebas lag/stutter)
-  let host = window.location.host;
+  // Tentukan host berdasarkan koneksi WebSocket aktif (paling akurat untuk client maupun server)
+  let host = '';
+  // Prioritas 1: Server lokal → gunakan 127.0.0.1 loopback ultra-cepat
   if (isLocalServer) {
     host = '127.0.0.1:' + serverPort;
-  } else if (window.location.protocol === 'file:') {
-    const lastConnectedServer = localStorage.getItem('last_connected_server');
-    if (lastConnectedServer) {
-      host = lastConnectedServer;
+  }
+  // Prioritas 2: Ambil host dari koneksi WebSocket yang aktif (paling tepat untuk mode client)
+  if (!host && currentWsUrl) {
+    try {
+      const wsUrl = new URL(currentWsUrl);
+      host = wsUrl.host;
+    } catch (_) {}
+  }
+  // Prioritas 3: Fallback dari localStorage atau window.location
+  if (!host) {
+    if (window.location.protocol === 'file:') {
+      host = localStorage.getItem('last_connected_server') || 'localhost:' + serverPort;
     } else {
-      host = '127.0.0.1:8080';
+      host = window.location.host || 'localhost:' + serverPort;
     }
   }
   

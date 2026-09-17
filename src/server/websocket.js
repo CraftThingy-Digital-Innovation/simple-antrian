@@ -362,6 +362,16 @@ async function handleClientAction(action, ws) {
         await sendStateToClient(ws);
         break;
 
+      case 'GET_SETTINGS': {
+        // Kirim pengaturan lengkap ke client yang memintanya
+        const allSettings = await db.getSettings();
+        ws.send(JSON.stringify({
+          type: 'SETTINGS_RESPONSE',
+          payload: allSettings
+        }));
+        break;
+      }
+
       case 'WA_STATUS': {
         const waStatus = require('./whatsapp').getWaStatus();
         ws.send(JSON.stringify({ type: 'WA_STATUS_UPDATE', payload: waStatus }));
