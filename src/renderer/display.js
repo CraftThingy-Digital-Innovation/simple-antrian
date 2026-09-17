@@ -193,30 +193,28 @@ function handleWebSocketMessage(message) {
 
     case 'SETTINGS_RESPONSE':
       globalSettings = payload;
-      applyDisplayCustomization(payload);
-      if (payload.video_sidebar_muted !== undefined) {
-        videoSidebarMuted = payload.video_sidebar_muted !== 'false';
-      }
-      if (payload.video_fullscreen_muted !== undefined) {
-        videoFullscreenMuted = payload.video_fullscreen_muted === 'true';
-      }
-      if (typeof updateVideoPlaylist === 'function' && payload.video_playlist) {
-        try {
+      try { applyDisplayCustomization(payload); } catch (e) { console.error('[Display] SETTINGS applyDisplayCustomization error:', e); }
+      try {
+        if (payload.video_sidebar_muted !== undefined) videoSidebarMuted = payload.video_sidebar_muted !== 'false';
+        if (payload.video_fullscreen_muted !== undefined) videoFullscreenMuted = payload.video_fullscreen_muted === 'true';
+      } catch (e) {}
+      try {
+        if (typeof updateVideoPlaylist === 'function' && payload.video_playlist) {
           updateVideoPlaylist(JSON.parse(payload.video_playlist));
-        } catch (_) {}
-      }
-      if (typeof updateMirrorState === 'function') {
-        updateMirrorState(payload.display_mode || 'queue', payload.mirror_window_name || '', payload.mirror_crop_top === 'true');
-      }
-      if (payload.color_theme !== undefined) {
-        document.body.className = payload.color_theme === 'imigrasi' ? 'theme-imigrasi' : '';
-      }
-      if (payload.display_layout !== undefined) {
-        applyDisplayLayout(payload.display_layout);
-      }
-      if (payload.photo_duration !== undefined) {
-        photoDurationSetting = parseInt(payload.photo_duration, 10) || 10;
-      }
+        }
+      } catch (e) { console.error('[Display] SETTINGS updateVideoPlaylist error:', e); }
+      try {
+        if (typeof updateMirrorState === 'function') updateMirrorState(payload.display_mode || 'queue', payload.mirror_window_name || '', payload.mirror_crop_top === 'true');
+      } catch (e) { console.error('[Display] SETTINGS updateMirrorState error:', e); }
+      try {
+        if (payload.color_theme !== undefined) document.body.className = payload.color_theme === 'imigrasi' ? 'theme-imigrasi' : '';
+      } catch (e) {}
+      try {
+        if (payload.display_layout !== undefined) applyDisplayLayout(payload.display_layout);
+      } catch (e) { console.error('[Display] SETTINGS applyDisplayLayout error:', e); }
+      try {
+        if (payload.photo_duration !== undefined) photoDurationSetting = parseInt(payload.photo_duration, 10) || 10;
+      } catch (e) {}
       break;
 
     case 'VIDEO_PLAYLIST_UPDATE':
@@ -229,29 +227,35 @@ function handleWebSocketMessage(message) {
       break;
 
     case 'DISPLAY_CUSTOM_UPDATE':
-      if (globalSettings) {
-        globalSettings.display_title = payload.title;
-        globalSettings.display_subtitle = payload.subtitle;
-        globalSettings.display_logo = payload.logo;
-        if (payload.theme) globalSettings.color_theme = payload.theme;
-      }
-      applyDisplayCustomization({
-        display_title: payload.title,
-        display_subtitle: payload.subtitle,
-        display_logo: payload.logo
-      });
-      if (payload.layout !== undefined) {
-        applyDisplayLayout(payload.layout);
-      }
-      if (payload.theme !== undefined) {
-        document.body.className = payload.theme === 'imigrasi' ? 'theme-imigrasi' : '';
-      }
-      if (payload.feedbackSurveyUrl !== undefined) {
-        renderFeedbackSurvey({
-          feedbackSurveyUrl: payload.feedbackSurveyUrl,
-          feedbackDisplayMode: payload.feedbackDisplayMode
+      try {
+        if (globalSettings) {
+          globalSettings.display_title = payload.title;
+          globalSettings.display_subtitle = payload.subtitle;
+          globalSettings.display_logo = payload.logo;
+          if (payload.theme) globalSettings.color_theme = payload.theme;
+        }
+      } catch (e) {}
+      try {
+        applyDisplayCustomization({
+          display_title: payload.title,
+          display_subtitle: payload.subtitle,
+          display_logo: payload.logo
         });
-      }
+      } catch (e) { console.error('[Display] CUSTOM applyDisplayCustomization error:', e); }
+      try {
+        if (payload.layout !== undefined) applyDisplayLayout(payload.layout);
+      } catch (e) { console.error('[Display] CUSTOM applyDisplayLayout error:', e); }
+      try {
+        if (payload.theme !== undefined) document.body.className = payload.theme === 'imigrasi' ? 'theme-imigrasi' : '';
+      } catch (e) {}
+      try {
+        if (payload.feedbackSurveyUrl !== undefined) {
+          renderFeedbackSurvey({
+            feedbackSurveyUrl: payload.feedbackSurveyUrl,
+            feedbackDisplayMode: payload.feedbackDisplayMode
+          });
+        }
+      } catch (e) { console.error('[Display] CUSTOM renderFeedbackSurvey error:', e); }
       break;
 
     case 'TTS_SETTING_UPDATE':
