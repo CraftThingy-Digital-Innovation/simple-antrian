@@ -237,20 +237,24 @@ function triggerTicketPrint(ticket) {
   const service = currentServices.find(s => s.id === ticket.service_id);
   const srvName = service ? service.name : 'Layanan Umum';
   
-  document.getElementById('print-header-name').innerText = serverName.toUpperCase();
-  document.getElementById('print-service-name').innerText = srvName;
-  document.getElementById('print-ticket-no').innerText = ticket.ticket_number;
+  const srvEl = document.getElementById('print-service-name');
+  if (srvEl) srvEl.innerText = srvName;
+
+  const ticketNoEl = document.getElementById('print-ticket-no');
+  if (ticketNoEl) ticketNoEl.innerText = ticket.ticket_number;
   
   const nameLbl = document.getElementById('print-customer-lbl');
-  if (ticket.customer_name && ticket.customer_name !== 'Pelanggan Mandiri') {
-    nameLbl.innerText = `Nama: ${ticket.customer_name}`;
+  const cleanName = (ticket.customer_name || '').trim();
+  if (cleanName && cleanName !== '-' && cleanName !== 'Pelanggan' && cleanName !== 'Pelanggan Mandiri') {
+    nameLbl.innerText = `Nama: ${cleanName}`;
     nameLbl.style.display = 'block';
   } else {
     nameLbl.innerText = '';
     nameLbl.style.display = 'none';
   }
   
-  document.getElementById('print-time-lbl').innerText = `Waktu: ${new Date(ticket.created_at).toLocaleString('id-ID')}`;
+  const timeEl = document.getElementById('print-time-lbl');
+  if (timeEl) timeEl.innerText = `Waktu: ${new Date(ticket.created_at).toLocaleString('id-ID')}`;
   
   // Trigger cetak biner/dialog
   window.print();

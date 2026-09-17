@@ -143,6 +143,9 @@ function handleWebSocketMessage(message) {
       if (payload.displayLayout !== undefined) {
         applyDisplayLayout(payload.displayLayout);
       }
+      if (payload.feedbackSurveyUrl !== undefined || payload.feedbackDisplayMode !== undefined) {
+        renderFeedbackSurvey(payload);
+      }
       if (payload.displayTitle !== undefined || payload.displayLogo !== undefined) {
         applyDisplayCustomization({
           display_title: payload.displayTitle,
@@ -229,6 +232,12 @@ function handleWebSocketMessage(message) {
       if (payload.theme !== undefined) {
         document.body.className = payload.theme === 'imigrasi' ? 'theme-imigrasi' : '';
       }
+      if (payload.feedbackSurveyUrl !== undefined) {
+        renderFeedbackSurvey({
+          feedbackSurveyUrl: payload.feedbackSurveyUrl,
+          feedbackDisplayMode: payload.feedbackDisplayMode
+        });
+      }
       break;
 
     case 'TTS_SETTING_UPDATE':
@@ -272,6 +281,7 @@ function applyDisplayCustomization(settings) {
 // Render State Antrian di Layar Display
 function renderDisplayState(state) {
   const { services, callingTickets } = state;
+  renderFeedbackSurvey(state);
 
   // 1. Tampilkan Panggilan Aktif Utama
   const mainNumberEl = document.getElementById('lbl-call-number');

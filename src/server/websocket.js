@@ -288,6 +288,21 @@ async function getCurrentState() {
   const displayLayout = settings.display_layout || 'standard';
   const photoDuration = parseInt(settings.photo_duration, 10) || 10;
   
+  const surveyUrl = settings.feedback_survey_url ? settings.feedback_survey_url.trim() : '';
+  let feedbackQrDataUrl = '';
+  if (surveyUrl) {
+    try {
+      const QRCode = require('qrcode');
+      feedbackQrDataUrl = await QRCode.toDataURL(surveyUrl, {
+        margin: 1,
+        width: 140,
+        color: { dark: '#0b0f19', light: '#ffffff' }
+      });
+    } catch (err) {
+      console.error('[WebSocket] Error generating survey QR code:', err.message);
+    }
+  }
+
   return {
     serverName: settings.server_name || 'Server Utama',
     serverUuid: settings.server_uuid || '',
@@ -306,7 +321,10 @@ async function getCurrentState() {
     ttsLanguage: settings.tts_language || 'id',
     displayTitle: settings.display_title || 'SimpleAntrian',
     displaySubtitle: settings.display_subtitle || '',
-    displayLogo: settings.display_logo || ''
+    displayLogo: settings.display_logo || '',
+    feedbackSurveyUrl: surveyUrl,
+    feedbackDisplayMode: settings.feedback_display_mode || 'both',
+    feedbackQrDataUrl
   };
 }
 
@@ -612,21 +630,23 @@ async function handleClientAction(action, ws) {
       }
 
       case 'SAVE_DISPLAY_CUSTOM': {
-        const { title, subtitle, logo, theme, layout } = payload;
+        const { title, subtitle, logo, theme, layout, feedbackSurveyUrl, feedbackDisplayMode } = payload;
         const dbMod = require('./db');
         if (title !== undefined) await dbMod.saveSetting('display_title', title);
         if (subtitle !== undefined) await dbMod.saveSetting('display_subtitle', subtitle);
         if (logo !== undefined) await dbMod.saveSetting('display_logo', logo);
         if (theme !== undefined) await dbMod.saveSetting('color_theme', theme);
         if (layout !== undefined) await dbMod.saveSetting('display_layout', layout);
+        if (feedbackSurveyUrl !== undefined) await dbMod.saveSetting('feedback_survey_url', feedbackSurveyUrl.trim());
+        if (feedbackDisplayMode !== undefined) await dbMod.saveSetting('feedback_display_mode', feedbackDisplayMode);
         
         // Broadcast ke semua client
         broadcast({
           type: 'DISPLAY_CUSTOM_UPDATE',
-          payload: { title, subtitle, logo, theme, layout }
+          payload: { title, subtitle, logo, theme, layout, feedbackSurveyUrl, feedbackDisplayMode }
         });
         await broadcastStateUpdate();
-        ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Pengaturan Tampilan berhasil disimpan!' } }));
+        ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Pengaturan Tampilan & Survei berhasil disimpan!' } }));
         break;
       }
 

@@ -132,7 +132,9 @@ async function initDb() {
     { key: 'photo_duration', value: '10' },
     { key: 'tts_language', value: 'id' },
     { key: 'display_target_monitor', value: 'auto' },
-    { key: 'display_lock_fullscreen', value: 'true' }
+    { key: 'display_lock_fullscreen', value: 'true' },
+    { key: 'feedback_survey_url', value: '' },
+    { key: 'feedback_display_mode', value: 'both' }
   ];
 
   for (const s of defaultSettings) {

@@ -1997,12 +1997,17 @@ function setupEventListeners() {
         });
       }
 
+      const feedbackUrl = document.getElementById('setting-feedback-url')?.value.trim() || '';
+      const feedbackMode = document.getElementById('setting-feedback-mode')?.value || 'both';
+
       sendAction('SAVE_DISPLAY_CUSTOM', {
         title: title || 'SimpleAntrian',
         subtitle: subtitle || 'Budayakan antri demi kenyamanan bersama. Silakan siapkan tiket Anda dan perhatikan panggilan layar.',
         logo: currentLogoBase64,
         theme: theme,
-        layout: layout
+        layout: layout,
+        feedbackSurveyUrl: feedbackUrl,
+        feedbackDisplayMode: feedbackMode
       });
       showToast('Pengaturan tampilan display berhasil disimpan & diperbarui!', 'success');
     });
@@ -2312,25 +2317,26 @@ async function triggerSearch() {
 
 // Fungsi Cetak Tiket untuk Printer Thermal / Dot Matrix
 window.printTicketHistory = function(ticketNumber, serviceName, customerName, createdAt) {
-  // Ambil nama server untuk kepala tiket dari data sistem
-  window.api.getSystemInfo().then(info => {
-    document.getElementById('print-header-name').innerText = (info.serverName || 'SIMPLE ANTRIAN').toUpperCase();
-    document.getElementById('print-service-name').innerText = serviceName;
-    document.getElementById('print-ticket-no').innerText = ticketNumber;
-    
-    const nameLbl = document.getElementById('print-customer-lbl');
-    if (customerName && customerName !== '-' && customerName !== '') {
-      nameLbl.innerText = `Nama: ${customerName}`;
-      nameLbl.style.display = 'block';
-    } else {
-      nameLbl.innerText = '';
-      nameLbl.style.display = 'none';
-    }
-    
-    document.getElementById('print-time-lbl').innerText = `Waktu: ${new Date(createdAt).toLocaleString('id-ID')}`;
-    
-    window.print();
-  });
+  const srvEl = document.getElementById('print-service-name');
+  if (srvEl) srvEl.innerText = serviceName || 'Layanan';
+
+  const ticketNoEl = document.getElementById('print-ticket-no');
+  if (ticketNoEl) ticketNoEl.innerText = ticketNumber;
+  
+  const nameLbl = document.getElementById('print-customer-lbl');
+  const cleanName = (customerName || '').trim();
+  if (cleanName && cleanName !== '-' && cleanName !== 'Pelanggan' && cleanName !== 'Pelanggan Mandiri') {
+    nameLbl.innerText = `Nama: ${cleanName}`;
+    nameLbl.style.display = 'block';
+  } else {
+    nameLbl.innerText = '';
+    nameLbl.style.display = 'none';
+  }
+  
+  const timeEl = document.getElementById('print-time-lbl');
+  if (timeEl) timeEl.innerText = `Waktu: ${new Date(createdAt).toLocaleString('id-ID')}`;
+  
+  window.print();
 };
 
 // Muat Statistik Harian
@@ -2590,6 +2596,16 @@ async function loadSettings() {
   const photoDurationInput = document.getElementById('setting-photo-duration');
   if (photoDurationInput) {
     photoDurationInput.value = settings.photo_duration || '10';
+  }
+
+  // Feedback Survey UI
+  const feedbackUrlInput = document.getElementById('setting-feedback-url');
+  if (feedbackUrlInput) {
+    feedbackUrlInput.value = settings.feedback_survey_url || '';
+  }
+  const feedbackModeSelect = document.getElementById('setting-feedback-mode');
+  if (feedbackModeSelect) {
+    feedbackModeSelect.value = settings.feedback_display_mode || 'both';
   }
 
   // Video Audio Settings UI

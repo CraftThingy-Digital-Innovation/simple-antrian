@@ -378,6 +378,19 @@
     </div>
   </div>
 
+  <!-- BANNER SURVEI KEPUASAN (Hanya tampil jika ada URL yang diisi di Pengaturan) -->
+  <div id="feedback-survey-bar" style="display: none; height: 56px; background: rgba(13, 20, 36, 0.95); backdrop-filter: blur(16px); border-top: 1px solid rgba(99, 102, 241, 0.25); border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding: 0 30px; align-items: center; justify-content: center; gap: 20px; z-index: 5; box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4); flex-shrink: 0;">
+    <div style="font-size: 1.15rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 10px; letter-spacing: -0.3px;">
+      <span style="font-size: 1.3rem;">⭐</span> Puas dengan layanan kami? silakan nilai di:
+    </div>
+    <div id="feedback-qr-wrapper" style="display: none; align-items: center; background: #ffffff; padding: 4px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);">
+      <img id="feedback-qr-img" src="" alt="Scan QR Code" style="width: 44px; height: 44px; display: block; image-rendering: pixelated;">
+    </div>
+    <div id="feedback-url-wrapper" style="display: none; align-items: center; font-size: 1.05rem; font-weight: 700; color: #a5b4fc; background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(129, 140, 248, 0.4); padding: 6px 16px; border-radius: 10px; font-family: monospace; letter-spacing: 0.5px;">
+      <span id="feedback-url-text">https://...</span>
+    </div>
+  </div>
+
   <!-- FOOTER: Cycling Running Text -->
   <footer class="footer-bar">
     <!-- Label bahasa (opsional, muncul di kiri) -->

@@ -955,6 +955,33 @@
             Saat aktif, jendela Customer Display dikunci fullscreen dan Always-on-Top (level screen-saver). Display akan tetap tampil tanpa gangguan dan tidak bisa tertutup walaupun Anda membuka aplikasi lain di PC operator.
           </div>
 
+          <!-- Pengaturan Survei Kepuasan Pelanggan (IKM) -->
+          <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border-glass);">
+            <div style="font-weight: 700; font-size: 0.95rem; color: #fff; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+              <span>⭐</span> Survei Kepuasan Pelanggan (Layar Display)
+            </div>
+            
+            <div class="form-group">
+              <label for="setting-feedback-url">Link Website Survei / Penilaian Kepuasan</label>
+              <input type="url" class="input-control" id="setting-feedback-url" placeholder="Contoh: https://ikm.imigrasi.go.id atau https://forms.gle/...">
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                Jika link ini dikosongkan (default), bagian tulisan "Puas dengan layanan kami?" dan QR code akan otomatis tersembunyi dari layar display pelanggan.
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 12px;">
+              <label for="setting-feedback-mode">Format Tampilan Nilai Layanan</label>
+              <select class="input-control" id="setting-feedback-mode">
+                <option value="both">Keduanya (QR Code & Link Website)</option>
+                <option value="qr">QR Code Saja</option>
+                <option value="url">Link Website Saja</option>
+              </select>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                Pilih apakah layar display akan menampilkan kode QR untuk discan, tautan website teks saja, atau keduanya secara berdampingan.
+              </div>
+            </div>
+          </div>
+
           <button class="btn btn-primary" id="btn-save-display-custom" style="margin-top: 15px; width: 100%;">
             💾 Simpan Pengaturan Tampilan
           </button>
@@ -1286,16 +1313,13 @@
 
   <div id="print-ticket" style="display: none;">
     <div style="text-align: center; font-family: monospace; color: #000; font-size: 11pt; line-height: 1.4; padding: 10px; width: 58mm; box-sizing: border-box; margin: 0;">
-      <h3 style="margin: 0 0 4px 0; font-size: 13pt; font-weight: bold; letter-spacing: -0.5px;">NOMOR ANTRIAN</h3>
-      <p style="margin: 0; font-size: 8pt; font-weight: bold;" id="print-header-name">SIMPLE ANTRIAN</p>
+      <h3 style="margin: 0 0 2px 0; font-size: 13pt; font-weight: bold; letter-spacing: -0.5px;">NOMOR ANTRIAN</h3>
+      <div style="font-size: 10.5pt; font-weight: bold; margin: 4px 0;" id="print-service-name">...</div>
       <hr style="border-top: 1px dashed #000; margin: 6px 0; border-bottom: none; border-left: none; border-right: none;">
-      
-      <div style="font-size: 8pt; margin: 4px 0;">Kategori Layanan:</div>
-      <div style="font-size: 9pt; font-weight: bold;" id="print-service-name">...</div>
       
       <div style="font-size: 42pt; font-weight: 800; margin: 8px 0; letter-spacing: -1px;" id="print-ticket-no">A-001</div>
       
-      <div style="font-size: 8pt; margin: 2px 0;" id="print-customer-lbl"></div>
+      <div style="font-size: 8.5pt; margin: 2px 0; display: none;" id="print-customer-lbl"></div>
       
       <hr style="border-top: 1px dashed #000; margin: 6px 0; border-bottom: none; border-left: none; border-right: none;">
       <div style="font-size: 7.5pt; margin: 2px 0;" id="print-time-lbl">Waktu: ...</div>

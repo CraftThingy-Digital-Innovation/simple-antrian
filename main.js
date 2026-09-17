@@ -97,6 +97,7 @@ const whatsapp = require('./src/server/whatsapp');
 
 let mainWindow = null;
 let displayWindow = null;
+let currentDisplayMonitorId = null;
 let kioskWindow = null;
 let currentMode = 'server'; // default mode
 let isDiscoveryRunning = false;
@@ -189,6 +190,9 @@ function createMainWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, 'src/renderer/operator.html'));
   }
+
+  // Lindungi layar customer display agar jendela operator tidak bisa menyasar ke monitor display
+  setupMainWindowScreenConstraint();
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -317,6 +321,38 @@ ipcMain.handle('set-active-server-endpoint', (event, endpoint) => {
 });
 
 // Helper untuk menempatkan dan mengunci Display Window di monitor target
+// Cegah jendela admin/operator masuk ke monitor yang dipakai oleh Customer Display
+function checkAndConstrainMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed() || !displayWindow || displayWindow.isDestroyed() || !currentDisplayMonitorId) return;
+  const displays = screen.getAllDisplays();
+  if (displays.length <= 1) return;
+
+  const targetDisplay = displays.find(d => String(d.id) === String(currentDisplayMonitorId));
+  if (!targetDisplay) return;
+
+  const bounds = mainWindow.getBounds();
+  const midX = bounds.x + bounds.width / 2;
+  const midY = bounds.y + bounds.height / 2;
+  const db = targetDisplay.bounds;
+
+  const isInsideDisplayScreen = (
+    midX >= db.x && midX < db.x + db.width &&
+    midY >= db.y && midY < db.y + db.height
+  );
+
+  if (isInsideDisplayScreen) {
+    const allowedDisplay = displays.find(d => String(d.id) !== String(currentDisplayMonitorId)) || screen.getPrimaryDisplay();
+    if (allowedDisplay) {
+      mainWindow.setPosition(allowedDisplay.workArea.x + 40, allowedDisplay.workArea.y + 40);
+    }
+  }
+}
+
+function setupMainWindowScreenConstraint() {
+  if (!mainWindow) return;
+  mainWindow.on('move', checkAndConstrainMainWindow);
+}
+
 function applyTargetDisplay(win, targetMonitorId = 'auto', isLocked = true) {
   if (!win || win.isDestroyed()) return;
   const displays = screen.getAllDisplays();
@@ -331,6 +367,8 @@ function applyTargetDisplay(win, targetMonitorId = 'auto', isLocked = true) {
     // Deteksi otomatis: utamakan display eksternal / sekunder jika ada
     targetDisplay = displays.find(d => d.id !== primaryDisplay.id) || primaryDisplay;
   }
+
+  currentDisplayMonitorId = targetDisplay.id;
 
   // Set bounds sesuai monitor target
   win.setBounds(targetDisplay.bounds);
@@ -348,6 +386,9 @@ function applyTargetDisplay(win, targetMonitorId = 'auto', isLocked = true) {
     win.setAlwaysOnTop(false);
     win.setFullScreen(true);
   }
+
+  // Jika mainWindow berada di monitor display saat layar display diaktifkan, pindahkan mainWindow ke monitor operator
+  checkAndConstrainMainWindow();
 }
 
 // Deteksi Monitor & Window Display Layar Kedua
@@ -410,6 +451,7 @@ ipcMain.handle('open-display-window', (event, options = {}) => {
 
   displayWindow.on('closed', () => {
     displayWindow = null;
+    currentDisplayMonitorId = null;
   });
 
   return true;
@@ -428,6 +470,7 @@ ipcMain.handle('close-display-window', () => {
   if (displayWindow) {
     displayWindow.close();
     displayWindow = null;
+    currentDisplayMonitorId = null;
     return true;
   }
   return false;
