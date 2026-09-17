@@ -875,6 +875,19 @@ function initCanvasVisualizer() {
 }
 
 // ==================== PLAYLIST MEDIA DISPLAY (VIDEO & FOTO) ====================
+let isLocalServer = false;
+let serverPort = '8080';
+
+if (typeof window !== 'undefined' && window.api && window.api.getSystemInfo) {
+  window.api.getSystemInfo().then(info => {
+    if (info && info.mode === 'server') {
+      isLocalServer = true;
+      serverPort = info.port || '8080';
+      console.log('[Display] Running on Server machine -> using ultra-fast 127.0.0.1 loopback for media streaming.');
+    }
+  }).catch(() => {});
+}
+
 let videoPlaylist = [];
 let currentMediaIndex = 0;
 let currentActiveMediaUrl = '';
@@ -1035,14 +1048,16 @@ function syncVideoPlayers(displayMode) {
   
   if (emptyPlaceholder) emptyPlaceholder.style.display = 'none';
   
-  // Tentukan host berdasarkan lokasi WebSocket
+  // Tentukan host berdasarkan lokasi server (127.0.0.1 jika di server agar bebas lag/stutter)
   let host = window.location.host;
-  if (window.location.protocol === 'file:') {
+  if (isLocalServer) {
+    host = '127.0.0.1:' + serverPort;
+  } else if (window.location.protocol === 'file:') {
     const lastConnectedServer = localStorage.getItem('last_connected_server');
     if (lastConnectedServer) {
       host = lastConnectedServer;
     } else {
-      host = 'localhost:8080';
+      host = '127.0.0.1:8080';
     }
   }
   

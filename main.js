@@ -5,10 +5,13 @@ const fs = require('fs');
 // Matikan Autoplay Policy agar audio bisa berputar otomatis tanpa interaksi user
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
-// GPU Hardware Acceleration Switches untuk video playback & rendering super lancar
+// GPU Hardware Acceleration & Background Throttling Switches untuk video playback 60 FPS lancar
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('enable-accelerated-video-decode');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
 // Sanitasi data sensitif untuk telemetry log
 function sanitizeLogMessage(msg) {
@@ -177,7 +180,8 @@ function createMainWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      backgroundThrottling: false
     },
     show: false,
     title: "SimpleAntrian - Operator Panel"
@@ -436,7 +440,8 @@ ipcMain.handle('open-display-window', (event, options = {}) => {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      backgroundThrottling: false
     },
     title: "SimpleAntrian - Customer Display"
   };

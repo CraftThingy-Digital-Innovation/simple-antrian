@@ -109,9 +109,8 @@ function startWebSocketServer(port) {
           const partialend = parts[1];
           
           const start = parseInt(partialstart, 10);
-          // Batasi chunk buffer maksimal 2MB per request agar playback video super lancar tanpa membebani I/O
-          const CHUNK_SIZE = 2 * 1024 * 1024;
-          const end = partialend ? parseInt(partialend, 10) : Math.min(start + CHUNK_SIZE - 1, total - 1);
+          // Gunakan range penuh yang diminta browser dengan buffer 512KB agar video bitrate tinggi tidak buffer-stall
+          const end = partialend ? parseInt(partialend, 10) : total - 1;
           const chunksize = (end - start) + 1;
           
           res.writeHead(206, {
@@ -122,7 +121,7 @@ function startWebSocketServer(port) {
             'Access-Control-Allow-Origin': '*'
           });
           
-          const stream = fs.createReadStream(filePath, { start, end, highWaterMark: 64 * 1024 });
+          const stream = fs.createReadStream(filePath, { start, end, highWaterMark: 512 * 1024 });
           stream.pipe(res);
           res.on('close', () => stream.destroy());
         } else {
