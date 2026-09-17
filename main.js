@@ -5,6 +5,11 @@ const fs = require('fs');
 // Matikan Autoplay Policy agar audio bisa berputar otomatis tanpa interaksi user
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
+// GPU Hardware Acceleration Switches untuk video playback & rendering super lancar
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+
 // Sanitasi data sensitif untuk telemetry log
 function sanitizeLogMessage(msg) {
   if (typeof msg !== 'string') return msg;
@@ -311,31 +316,82 @@ ipcMain.handle('set-active-server-endpoint', (event, endpoint) => {
   return true;
 });
 
+// Helper untuk menempatkan dan mengunci Display Window di monitor target
+function applyTargetDisplay(win, targetMonitorId = 'auto', isLocked = true) {
+  if (!win || win.isDestroyed()) return;
+  const displays = screen.getAllDisplays();
+  const primaryDisplay = screen.getPrimaryDisplay();
+  let targetDisplay = null;
+
+  if (targetMonitorId && targetMonitorId !== 'auto') {
+    targetDisplay = displays.find(d => String(d.id) === String(targetMonitorId) || String(d.index) === String(targetMonitorId));
+  }
+
+  if (!targetDisplay) {
+    // Deteksi otomatis: utamakan display eksternal / sekunder jika ada
+    targetDisplay = displays.find(d => d.id !== primaryDisplay.id) || primaryDisplay;
+  }
+
+  // Set bounds sesuai monitor target
+  win.setBounds(targetDisplay.bounds);
+
+  if (isLocked) {
+    // Mode Kiosk & Always On Top 'screen-saver' level agar tidak bisa tertutup atau terganggu aplikasi lain
+    try {
+      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    } catch (_) {}
+    win.setAlwaysOnTop(true, 'screen-saver', 1);
+    win.setFullScreen(true);
+    win.setKiosk(true);
+  } else {
+    win.setKiosk(false);
+    win.setAlwaysOnTop(false);
+    win.setFullScreen(true);
+  }
+}
+
 // Deteksi Monitor & Window Display Layar Kedua
 ipcMain.handle('get-monitors', () => {
-  return screen.getAllDisplays().map((d, index) => ({
-    index,
-    id: d.id,
-    bounds: d.bounds,
-    workArea: d.workArea,
-    isPrimary: d.bounds.x === 0 && d.bounds.y === 0
-  }));
+  const primaryDisplay = screen.getPrimaryDisplay();
+  return screen.getAllDisplays().map((d, index) => {
+    const isPrimary = d.id === primaryDisplay.id || (d.bounds.x === 0 && d.bounds.y === 0);
+    return {
+      index,
+      id: d.id,
+      bounds: d.bounds,
+      workArea: d.workArea,
+      isPrimary,
+      label: `Monitor ${index + 1} (${d.bounds.width}x${d.bounds.height}${isPrimary ? ' - Layar Utama' : ' - Eksternal'})`
+    };
+  });
 });
 
-ipcMain.handle('open-display-window', () => {
-  if (displayWindow) {
+ipcMain.handle('open-display-window', (event, options = {}) => {
+  const { targetMonitorId = 'auto', isLocked = true } = options;
+
+  if (displayWindow && !displayWindow.isDestroyed()) {
+    applyTargetDisplay(displayWindow, targetMonitorId, isLocked);
     displayWindow.focus();
     return true;
   }
 
   const displays = screen.getAllDisplays();
-  let externalDisplay = displays.find((display) => {
-    return display.bounds.x !== 0 || display.bounds.y !== 0;
-  });
+  const primaryDisplay = screen.getPrimaryDisplay();
+  let targetDisplay = null;
+  if (targetMonitorId && targetMonitorId !== 'auto') {
+    targetDisplay = displays.find(d => String(d.id) === String(targetMonitorId) || String(d.index) === String(targetMonitorId));
+  }
+  if (!targetDisplay) {
+    targetDisplay = displays.find(d => d.id !== primaryDisplay.id) || primaryDisplay;
+  }
 
   const windowOptions = {
-    width: 1024,
-    height: 768,
+    x: targetDisplay.bounds.x,
+    y: targetDisplay.bounds.y,
+    width: targetDisplay.bounds.width,
+    height: targetDisplay.bounds.height,
+    fullscreen: true,
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -344,26 +400,28 @@ ipcMain.handle('open-display-window', () => {
     title: "SimpleAntrian - Customer Display"
   };
 
-  if (externalDisplay) {
-    // Jika ada monitor kedua (Extended), buka langsung fullscreen di sana
-    windowOptions.x = externalDisplay.bounds.x;
-    windowOptions.y = externalDisplay.bounds.y;
-    windowOptions.fullscreen = true;
-    windowOptions.frame = false;
-  } else {
-    // Jika hanya 1 monitor, buka windowed biasa
-    windowOptions.center = true;
-  }
-
   displayWindow = new BrowserWindow(windowOptions);
   captureWindowLogs(displayWindow, 'Display');
   displayWindow.loadFile(path.join(__dirname, 'src/renderer/display.html'));
+
+  displayWindow.once('ready-to-show', () => {
+    applyTargetDisplay(displayWindow, targetMonitorId, isLocked);
+  });
 
   displayWindow.on('closed', () => {
     displayWindow = null;
   });
 
   return true;
+});
+
+ipcMain.handle('update-display-target', (event, options = {}) => {
+  const { targetMonitorId = 'auto', isLocked = true } = options;
+  if (displayWindow && !displayWindow.isDestroyed()) {
+    applyTargetDisplay(displayWindow, targetMonitorId, isLocked);
+    return true;
+  }
+  return false;
 });
 
 ipcMain.handle('close-display-window', () => {

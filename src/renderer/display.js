@@ -728,39 +728,40 @@ function initCanvasVisualizer() {
   const canvas = document.getElementById('visualizer-canvas');
   if (!canvas) return;
 
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { alpha: true });
   let animationFrameId;
 
   // Resize canvas sesuai panel pembungkus
   const resizeCanvas = () => {
+    if (!canvas.parentElement) return;
     const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    if (rect.width > 0 && rect.height > 0) {
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+    }
   };
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
 
-  // Class Partikel
+  // Class Partikel Ringan
   class Particle {
     constructor() {
       this.reset();
     }
 
     reset() {
-      this.x = Math.random() * canvas.width;
-      this.y = Math.random() * canvas.height;
-      this.size = Math.random() * 2 + 1;
-      this.speedX = Math.random() * 0.4 - 0.2;
-      this.speedY = Math.random() * 0.4 - 0.2;
-      this.opacity = Math.random() * 0.5 + 0.1;
-      this.life = Math.random() * 100 + 100;
+      this.x = Math.random() * (canvas.width || 800);
+      this.y = Math.random() * (canvas.height || 600);
+      this.size = Math.random() * 1.5 + 1;
+      this.speedX = Math.random() * 0.3 - 0.15;
+      this.speedY = Math.random() * 0.3 - 0.15;
+      this.opacity = Math.random() * 0.4 + 0.1;
     }
 
     update() {
       this.x += this.speedX;
       this.y += this.speedY;
 
-      // Pantul pinggir
       if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
       if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
     }
@@ -768,62 +769,57 @@ function initCanvasVisualizer() {
     draw() {
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(99, 102, 241, ${this.opacity})`; // Indigo particles
+      ctx.fillStyle = `rgba(99, 102, 241, ${this.opacity})`;
       ctx.fill();
     }
   }
 
-  // Inisialisasi Kumpulan Partikel
-  const particleCount = 45;
+  // Cukup 18 partikel ringan agar CPU/GPU video decoding tetap maksimal
+  const particleCount = 18;
   const particles = [];
   for (let i = 0; i < particleCount; i++) {
     particles.push(new Particle());
   }
 
-  // Loop Animasi
-  const animate = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw grid neon samar
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
-    ctx.lineWidth = 1;
-    const step = 40;
-    for (let x = 0; x < canvas.width; x += step) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
-    for (let y = 0; y < canvas.height; y += step) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
+  // Loop Animasi Efisien
+  let lastFrameTime = 0;
+  const targetFpsInterval = 1000 / 30; // 30 FPS untuk background ambient sudah sangat mulus & hemat daya
 
-    // Draw partikel & garis hubung
+  const animate = (timestamp) => {
+    animationFrameId = requestAnimationFrame(animate);
+
+    // Jangan buang daya jika mode video fullscreen sedang aktif
+    if (currentDisplayMode === 'video') return;
+
+    if (timestamp - lastFrameTime < targetFpsInterval) return;
+    lastFrameTime = timestamp;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw partikel & garis hubung (menggunakan jarak kuadrat tanpa Math.hypot berat)
+    const maxDistSq = 90 * 90;
     particles.forEach((p, index) => {
       p.update();
       p.draw();
 
-      // Hubungkan garis antar partikel yang dekat
       for (let j = index + 1; j < particles.length; j++) {
         const other = particles[j];
-        const dist = Math.hypot(p.x - other.x, p.y - other.y);
-        if (dist < 100) {
+        const dx = p.x - other.x;
+        const dy = p.y - other.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < maxDistSq) {
           ctx.beginPath();
           ctx.moveTo(p.x, p.y);
           ctx.lineTo(other.x, other.y);
-          ctx.strokeStyle = `rgba(99, 102, 241, ${0.1 * (1 - dist / 100)})`;
+          const ratio = 1 - (distSq / maxDistSq);
+          ctx.strokeStyle = `rgba(99, 102, 241, ${0.12 * ratio})`;
           ctx.stroke();
         }
       }
     });
-
-    animationFrameId = requestAnimationFrame(animate);
   };
 
-  animate();
+  requestAnimationFrame(animate);
 }
 
 // ==================== PLAYLIST MEDIA DISPLAY (VIDEO & FOTO) ====================

@@ -358,7 +358,7 @@
       <div id="sidebar-swappable-slot" class="sidebar-swappable-slot" style="flex: 6; display: flex; flex-direction: column; min-height: 0;">
         <!-- Playlist Media Player Card (Video & Foto) -->
         <div class="glass-panel video-playlist-card" id="video-card" style="flex: 1; width: 100%; height: 100%; overflow: hidden; display: none; border-radius: 16px; position: relative; background: #000; box-shadow: var(--shadow-main); padding: 0;">
-          <video id="display-video-player" style="width: 100%; height: 100%; object-fit: contain; border-radius: 16px; display: none;" autoplay muted playsinline></video>
+          <video id="display-video-player" style="width: 100%; height: 100%; object-fit: contain; border-radius: 16px; display: none;" autoplay muted playsinline preload="auto"></video>
           <img id="display-image-player" style="width: 100%; height: 100%; object-fit: contain; border-radius: 16px; display: none;" alt="Media Display">
           <!-- Placeholder saat mode swapped namun playlist media kosong -->
           <div id="video-card-empty-placeholder" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-muted); font-size: 0.95rem;">
@@ -397,7 +397,7 @@
 
   <!-- FULLSCREEN MEDIA CONTAINER (Video & Foto) -->
   <div id="video-fullscreen-container" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 90; display: none; align-items: center; justify-content: center;">
-    <video id="fullscreen-video-player" style="width: 100%; height: 100%; object-fit: contain; display: none;" autoplay playsinline></video>
+    <video id="fullscreen-video-player" style="width: 100%; height: 100%; object-fit: contain; display: none;" autoplay playsinline preload="auto"></video>
     <img id="fullscreen-image-player" style="width: 100%; height: 100%; object-fit: contain; display: none;" alt="Media Display">
     <div id="fullscreen-video-placeholder" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 15px; text-align: center; color: var(--text-secondary); font-family: sans-serif; z-index: 92;">
       <div style="font-size: 3rem;">📹</div>
@@ -408,7 +408,7 @@
 
   <!-- FULLSCREEN MIRROR CONTAINER -->
   <div id="mirror-container" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 100; display: none; align-items: center; justify-content: center;">
-    <video id="mirror-video-player" style="width: 100%; height: 100%; object-fit: contain;" autoplay playsinline></video>
+    <video id="mirror-video-player" style="width: 100%; height: 100%; object-fit: contain;" autoplay playsinline preload="auto"></video>
     <div id="mirror-placeholder" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 15px; text-align: center; color: var(--text-secondary); font-family: sans-serif; z-index: 102;">
       <div style="font-size: 3rem;">🖥️</div>
       <div style="font-size: 1.5rem; font-weight: 700;" id="mirror-placeholder-title">Menghubungkan Duplikasi Layar...</div>

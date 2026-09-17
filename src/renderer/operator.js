@@ -1706,7 +1706,12 @@ function setupEventListeners() {
       await window.api.closeDisplayWindow();
       showToast('Layar Display ditutup.', 'info');
     } else {
-      await window.api.openDisplayWindow();
+      const targetMonitor = document.getElementById('setting-display-monitor')?.value || 'auto';
+      const lockKiosk = document.getElementById('setting-display-lock-kiosk') ? document.getElementById('setting-display-lock-kiosk').checked : true;
+      await window.api.openDisplayWindow({
+        targetMonitorId: targetMonitor,
+        isLocked: lockKiosk
+      });
       showToast('Layar Display berhasil dibuka/diproyeksikan!', 'success');
     }
   });
@@ -1922,9 +1927,10 @@ function setupEventListeners() {
     btnSaveTts.addEventListener('click', () => {
       const enabled = document.getElementById('setting-tts-enabled').checked ? 'true' : 'false';
       const callName = document.getElementById('setting-call-customer-name').checked ? 'true' : 'false';
-      const multilang = document.getElementById('setting-multilang-enabled').checked ? 'true' : 'false';
+      const ttsLanguage = document.getElementById('setting-tts-language') ? document.getElementById('setting-tts-language').value : 'id';
+      const multilang = ttsLanguage === 'id_en' ? 'true' : 'false';
       const autoCallNext = document.getElementById('setting-auto-call-next') ? (document.getElementById('setting-auto-call-next').checked ? 'true' : 'false') : 'false';
-      sendAction('SAVE_TTS', { enabled, multilang, callName, autoCallNext });
+      sendAction('SAVE_TTS', { enabled, multilang, ttsLanguage, callName, autoCallNext });
       showToast('Menyimpan pengaturan Suara & Alur Panggilan...', 'info');
     });
   }
@@ -1969,11 +1975,27 @@ function setupEventListeners() {
 
   const btnSaveDisplayCustom = document.getElementById('btn-save-display-custom');
   if (btnSaveDisplayCustom) {
-    btnSaveDisplayCustom.addEventListener('click', () => {
+    btnSaveDisplayCustom.addEventListener('click', async () => {
       const title = document.getElementById('setting-display-title').value.trim();
       const subtitle = document.getElementById('setting-display-subtitle').value.trim();
       const theme = document.getElementById('setting-color-theme').value;
       const layout = document.getElementById('setting-display-layout')?.value || 'standard';
+      const targetMonitor = document.getElementById('setting-display-monitor')?.value || 'auto';
+      const lockKiosk = document.getElementById('setting-display-lock-kiosk')?.checked ? 'true' : 'false';
+
+      // Simpan preferensi monitor & kiosk lock ke DB lokal
+      if (window.api && window.api.saveSetting) {
+        await window.api.saveSetting('display_target_monitor', targetMonitor);
+        await window.api.saveSetting('display_lock_fullscreen', lockKiosk);
+      }
+
+      // Terapkan langsung ke display window yang sedang aktif tanpa restart
+      if (window.api && window.api.updateDisplayTarget) {
+        await window.api.updateDisplayTarget({
+          targetMonitorId: targetMonitor,
+          isLocked: lockKiosk === 'true'
+        });
+      }
 
       sendAction('SAVE_DISPLAY_CUSTOM', {
         title: title || 'SimpleAntrian',
@@ -1982,7 +2004,7 @@ function setupEventListeners() {
         theme: theme,
         layout: layout
       });
-      showToast('Menyimpan pengaturan tampilan display...', 'info');
+      showToast('Pengaturan tampilan display berhasil disimpan & diperbarui!', 'success');
     });
   }
 
@@ -2502,13 +2524,34 @@ async function loadSettings() {
   if (callNameCheckbox) {
     callNameCheckbox.checked = settings.call_customer_name !== 'false';
   }
-  const multilangCheckbox = document.getElementById('setting-multilang-enabled');
-  if (multilangCheckbox) {
-    multilangCheckbox.checked = settings.multilang_enabled === 'true';
+  const ttsLangSelect = document.getElementById('setting-tts-language');
+  if (ttsLangSelect) {
+    ttsLangSelect.value = settings.tts_language || (settings.multilang_enabled === 'true' ? 'id_en' : 'id');
   }
   const autoCallCheckbox = document.getElementById('setting-auto-call-next');
   if (autoCallCheckbox) {
     autoCallCheckbox.checked = settings.auto_call_next_on_complete !== 'false';
+  }
+
+  // Display Monitor & Kiosk Lock UI
+  const monitorSelect = document.getElementById('setting-display-monitor');
+  const lockKioskCheckbox = document.getElementById('setting-display-lock-kiosk');
+  if (lockKioskCheckbox) {
+    lockKioskCheckbox.checked = settings.display_lock_fullscreen !== 'false';
+  }
+  if (monitorSelect && window.api && window.api.getMonitors) {
+    window.api.getMonitors().then(monitors => {
+      monitorSelect.innerHTML = '<option value="auto">Deteksi Otomatis (Layar Kedua / Eksternal jika ada)</option>';
+      monitors.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.label || `Monitor ${m.index + 1} (${m.bounds.width}x${m.bounds.height}${m.isPrimary ? ' - Utama' : ''})`;
+        monitorSelect.appendChild(opt);
+      });
+      if (settings.display_target_monitor) {
+        monitorSelect.value = settings.display_target_monitor;
+      }
+    }).catch(err => console.error("Gagal membaca daftar monitor:", err));
   }
 
   // WA Settings UI

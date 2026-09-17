@@ -15,7 +15,8 @@ contextBridge.exposeInMainWorld('api', {
   
   // Dual Screen / Monitors
   getMonitors: () => ipcRenderer.invoke('get-monitors'),
-  openDisplayWindow: () => ipcRenderer.invoke('open-display-window'),
+  openDisplayWindow: (options) => ipcRenderer.invoke('open-display-window', options),
+  updateDisplayTarget: (options) => ipcRenderer.invoke('update-display-target', options),
   closeDisplayWindow: () => ipcRenderer.invoke('close-display-window'),
   isDisplayWindowOpen: () => ipcRenderer.invoke('is-display-window-open'),
   openKioskWindow: () => ipcRenderer.invoke('open-kiosk-window'),

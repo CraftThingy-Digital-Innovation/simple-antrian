@@ -109,7 +109,9 @@ function startWebSocketServer(port) {
           const partialend = parts[1];
           
           const start = parseInt(partialstart, 10);
-          const end = partialend ? parseInt(partialend, 10) : total - 1;
+          // Batasi chunk buffer maksimal 2MB per request agar playback video super lancar tanpa membebani I/O
+          const CHUNK_SIZE = 2 * 1024 * 1024;
+          const end = partialend ? parseInt(partialend, 10) : Math.min(start + CHUNK_SIZE - 1, total - 1);
           const chunksize = (end - start) + 1;
           
           res.writeHead(206, {
@@ -120,7 +122,9 @@ function startWebSocketServer(port) {
             'Access-Control-Allow-Origin': '*'
           });
           
-          fs.createReadStream(filePath, { start: start, end: end }).pipe(res);
+          const stream = fs.createReadStream(filePath, { start, end, highWaterMark: 64 * 1024 });
+          stream.pipe(res);
+          res.on('close', () => stream.destroy());
         } else {
           res.writeHead(200, {
             'Content-Length': total,
@@ -128,7 +132,9 @@ function startWebSocketServer(port) {
             'Accept-Ranges': 'bytes',
             'Access-Control-Allow-Origin': '*'
           });
-          fs.createReadStream(filePath).pipe(res);
+          const stream = fs.createReadStream(filePath, { highWaterMark: 64 * 1024 });
+          stream.pipe(res);
+          res.on('close', () => stream.destroy());
         }
       } else {
         res.writeHead(404);
@@ -297,6 +303,7 @@ async function getCurrentState() {
     colorTheme,
     displayLayout,
     photoDuration,
+    ttsLanguage: settings.tts_language || 'id',
     displayTitle: settings.display_title || 'SimpleAntrian',
     displaySubtitle: settings.display_subtitle || '',
     displayLogo: settings.display_logo || ''
@@ -568,11 +575,15 @@ async function handleClientAction(action, ws) {
       }
 
       case 'SAVE_TTS': {
-        const { enabled, multilang, callName, autoCallNext } = payload;
+        const { enabled, multilang, ttsLanguage, callName, autoCallNext } = payload;
         const dbMod = require('./db');
-        await dbMod.saveSetting('tts_enabled', enabled);
-        if (multilang !== undefined) {
+        if (enabled !== undefined) await dbMod.saveSetting('tts_enabled', enabled);
+        if (ttsLanguage !== undefined) {
+          await dbMod.saveSetting('tts_language', ttsLanguage);
+          await dbMod.saveSetting('multilang_enabled', ttsLanguage === 'id_en' ? 'true' : 'false');
+        } else if (multilang !== undefined) {
           await dbMod.saveSetting('multilang_enabled', multilang);
+          await dbMod.saveSetting('tts_language', multilang === 'true' ? 'id_en' : 'id');
         }
         if (callName !== undefined) {
           await dbMod.saveSetting('call_customer_name', callName);
@@ -583,7 +594,7 @@ async function handleClientAction(action, ws) {
         // Broadcast ke semua client
         broadcast({
           type: 'TTS_SETTING_UPDATE',
-          payload: { enabled, multilang, callName, autoCallNext }
+          payload: { enabled, multilang, ttsLanguage: ttsLanguage || 'id', callName, autoCallNext }
         });
         // Kirim status TTS engine terkini ke seluruh klien agar progress bar muncul
         const currentTtsStatus = ttsGenerator.getLastStatus();
@@ -879,10 +890,10 @@ function getChineseNumberTokens(num) {
 
 async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName) {
   const prefix = ticketNumber.charAt(0);
-  const num = parseInt(ticketNumber.substring(1));
+  const num = parseInt(ticketNumber.substring(1), 10);
   
   const deskWord = deskNumber.replace(/[0-9]+/g, '').trim();
-  const deskNum = parseInt(deskNumber.replace(/[^0-9]/g, ''));
+  const deskNum = parseInt(deskNumber.replace(/[^0-9]/g, ''), 10);
   
   const files = [];
 
@@ -892,7 +903,6 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName)
     // Map standard words directly to static vocabulary files to avoid redundant TTS generation
     if (lang === 'id' && cleanWord === 'loket') return 'id_loket.wav';
     if (lang === 'en' && cleanWord === 'counter') return 'en_counter.wav';
-    if (lang === 'zh' && cleanWord === '柜台') return 'zh_counter.wav';
     
     // Custom phrase generation
     const crypto = require('crypto');
@@ -910,41 +920,41 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName)
   };
 
   const settings = await db.getSettings();
-  const isMultilang = settings.multilang_enabled === 'true';
+  const ttsLanguage = settings.tts_language || (settings.multilang_enabled === 'true' ? 'id_en' : 'id');
   const isCallNameEnabled = settings.call_customer_name !== 'false';
   const cleanName = customerName ? customerName.trim() : '';
 
-  // 1. Indonesian
-  files.push('id_nomor_antrian.wav');
-  files.push(`id_letter_${prefix}.wav`);
-  const idNumTokens = getIndonesianNumberTokens(num);
-  idNumTokens.forEach(t => files.push(`id_${t}.wav`));
+  // Helper untuk panggil nomor antrian dalam Bahasa Indonesia
+  const appendIndonesianVoice = async () => {
+    files.push('id_nomor_antrian.wav');
+    files.push(`id_letter_${prefix}.wav`);
+    const idNumTokens = getIndonesianNumberTokens(num);
+    idNumTokens.forEach(t => files.push(`id_${t}.wav`));
 
-  // Panggil Nama Pelanggan setelah nomor antrian jika ada & aktif (langsung panggil nama pengantri tanpa 'atas nama')
-  if (isCallNameEnabled && cleanName) {
-    try {
-      const namePhraseFile = await ttsGenerator.generatePhraseIfNeeded(cleanName, 'id');
-      if (namePhraseFile) {
-        files.push(namePhraseFile);
+    if (isCallNameEnabled && cleanName) {
+      try {
+        const ttsGenerator = require('./tts-generator');
+        const namePhraseFile = await ttsGenerator.generatePhraseIfNeeded(cleanName, 'id');
+        if (namePhraseFile) files.push(namePhraseFile);
+      } catch (err) {
+        console.error(`[TTS] Gagal generate audio nama "${cleanName}":`, err.message);
       }
-    } catch (err) {
-      console.error(`[TTS] Gagal generate audio nama "${cleanName}":`, err.message);
     }
-  }
 
-  files.push('id_silakan_menuju.wav');
-  if (deskWord) {
-    files.push(await getDeskWordFile(deskWord, 'id'));
-  } else {
-    files.push('id_loket.wav');
-  }
-  if (!isNaN(deskNum)) {
-    const idDeskTokens = getIndonesianNumberTokens(deskNum);
-    idDeskTokens.forEach(t => files.push(`id_${t}.wav`));
-  }
+    files.push('id_silakan_menuju.wav');
+    if (deskWord) {
+      files.push(await getDeskWordFile(deskWord, 'id'));
+    } else {
+      files.push('id_loket.wav');
+    }
+    if (!isNaN(deskNum)) {
+      const idDeskTokens = getIndonesianNumberTokens(deskNum);
+      idDeskTokens.forEach(t => files.push(`id_${t}.wav`));
+    }
+  };
 
-  if (isMultilang) {
-    // 2. English
+  // Helper untuk panggil nomor antrian dalam Bahasa Inggris
+  const appendEnglishVoice = async () => {
     files.push('en_queue_number.wav');
     files.push(`en_letter_${prefix}.wav`);
     const enNumTokens = getEnglishNumberTokens(num);
@@ -952,6 +962,7 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName)
 
     if (isCallNameEnabled && cleanName) {
       try {
+        const ttsGenerator = require('./tts-generator');
         const enNameFile = await ttsGenerator.generatePhraseIfNeeded(cleanName, 'en');
         if (enNameFile) files.push(enNameFile);
       } catch (_) {}
@@ -968,34 +979,18 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName)
       const enDeskTokens = getEnglishNumberTokens(deskNum);
       enDeskTokens.forEach(t => files.push(`en_${t}.wav`));
     }
+  };
 
-    // 3. Chinese
-    files.push('zh_queue_number.wav');
-    files.push(`zh_letter_${prefix}.wav`);
-    const zhNumTokens = getChineseNumberTokens(num);
-    zhNumTokens.forEach(t => files.push(`zh_${t}.wav`));
-
-    if (isCallNameEnabled && cleanName) {
-      try {
-        const zhNameFile = await ttsGenerator.generatePhraseIfNeeded(cleanName, 'zh');
-        if (zhNameFile) files.push(zhNameFile);
-      } catch (_) {}
-    }
-
-    files.push('zh_please_proceed_to.wav');
-    if (deskWord) {
-      const zhWord = deskWord
-        .replace(/loket/i, '柜台')
-        .replace(/customer\s*service/i, '客户服务')
-        .replace(/teller/i, '出纳柜台');
-      files.push(await getDeskWordFile(zhWord, 'zh'));
-    } else {
-      files.push('zh_counter.wav');
-    }
-    if (!isNaN(deskNum)) {
-      const zhDeskTokens = getChineseNumberTokens(deskNum);
-      zhDeskTokens.forEach(t => files.push(`zh_${t}.wav`));
-    }
+  if (ttsLanguage === 'en') {
+    // Mode Bahasa Inggris murni (English Only)
+    await appendEnglishVoice();
+  } else if (ttsLanguage === 'id_en') {
+    // Mode Dua Bahasa (Bahasa Indonesia kemudian Bahasa Inggris)
+    await appendIndonesianVoice();
+    await appendEnglishVoice();
+  } else {
+    // Default: Bahasa Indonesia murni (Indonesian Only)
+    await appendIndonesianVoice();
   }
 
   return files;

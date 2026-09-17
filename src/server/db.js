@@ -129,7 +129,10 @@ async function initDb() {
     { key: 'call_customer_name', value: 'true' },
     { key: 'auto_call_next_on_complete', value: 'true' },
     { key: 'display_layout', value: 'standard' },
-    { key: 'photo_duration', value: '10' }
+    { key: 'photo_duration', value: '10' },
+    { key: 'tts_language', value: 'id' },
+    { key: 'display_target_monitor', value: 'auto' },
+    { key: 'display_lock_fullscreen', value: 'true' }
   ];
 
   for (const s of defaultSettings) {
