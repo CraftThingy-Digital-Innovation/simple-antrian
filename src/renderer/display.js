@@ -1,3 +1,9 @@
+// HTML Escape utility untuk mencegah XSS saat rendering data dari server
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 let ws = null;
 let currentMode = 'server';
 let serverPort = 8080;
@@ -385,7 +391,7 @@ function renderDisplayState(state) {
       const div = document.createElement('div');
       div.className = 'other-service-item animate-pop-in';
       div.innerHTML = `
-        <span class="other-service-name">${srv.name}</span>
+        <span class="other-service-name">${escHtml(srv.name)}</span>
         <span class="other-service-number">${num}</span>
       `;
       otherListEl.appendChild(div);

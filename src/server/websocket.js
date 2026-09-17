@@ -38,30 +38,47 @@ function startWebSocketServer(port) {
         const total = stat.size;
         const range = req.headers.range;
         
-        if (range) {
+        // Deteksi tipe MIME berdasarkan ekstensi file
+          const audioExt = path.extname(filePath).toLowerCase();
+          const audioMime = { '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.opus': 'audio/opus', '.flac': 'audio/flac' };
+          const audioContentType = audioMime[audioExt] || 'audio/wav';
+
+          if (range) {
           const parts = range.replace(/bytes=/, "").split("-");
           const partialstart = parts[0];
           const partialend = parts[1];
           
           const start = parseInt(partialstart, 10);
           const end = partialend ? parseInt(partialend, 10) : total - 1;
+
+          // Validasi range bounds
+          if (isNaN(start) || start < 0 || start >= total || end < start || end >= total) {
+            res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+            res.end();
+            return;
+          }
+
           const chunksize = (end - start) + 1;
           
           res.writeHead(206, {
             'Content-Range': `bytes ${start}-${end}/${total}`,
             'Accept-Ranges': 'bytes',
             'Content-Length': chunksize,
-            'Content-Type': 'audio/wav'
+            'Content-Type': audioContentType
           });
           
-          fs.createReadStream(filePath, { start: start, end: end }).pipe(res);
+          const stream = fs.createReadStream(filePath, { start: start, end: end });
+          stream.pipe(res);
+          res.on('close', () => stream.destroy());
         } else {
           res.writeHead(200, {
             'Content-Length': total,
-            'Content-Type': 'audio/wav',
+            'Content-Type': audioContentType,
             'Accept-Ranges': 'bytes'
           });
-          fs.createReadStream(filePath).pipe(res);
+          const stream = fs.createReadStream(filePath);
+          stream.pipe(res);
+          res.on('close', () => stream.destroy());
         }
       } else {
         res.writeHead(404);
@@ -113,6 +130,14 @@ function startWebSocketServer(port) {
           const start = parseInt(partialstart, 10);
           // Gunakan range penuh yang diminta browser dengan buffer 512KB agar video bitrate tinggi tidak buffer-stall
           const end = partialend ? parseInt(partialend, 10) : total - 1;
+
+          // Validasi range bounds
+          if (isNaN(start) || start < 0 || start >= total || end < start || end >= total) {
+            res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+            res.end();
+            return;
+          }
+
           const chunksize = (end - start) + 1;
           
           res.writeHead(206, {

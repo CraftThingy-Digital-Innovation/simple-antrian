@@ -56,7 +56,17 @@ function sanitizeLogMessage(msg) {
 
 // Redirect console logs to a local file for debugging
 const debugLogPath = app ? path.join(app.getPath('userData'), 'app-debug.log') : path.join(__dirname, 'app-debug.log');
+const LOG_MAX_SIZE = 5 * 1024 * 1024; // 5MB max log size
 const logStdout = process.stdout;
+
+// Rotasi log: hapus file lama jika melebihi batas ukuran saat startup
+try {
+  if (fs.existsSync(debugLogPath) && fs.statSync(debugLogPath).size > LOG_MAX_SIZE) {
+    const archivePath = debugLogPath + '.old';
+    try { fs.unlinkSync(archivePath); } catch (_) {}
+    fs.renameSync(debugLogPath, archivePath);
+  }
+} catch (_) {}
 
 console.log = function (...args) {
   const rawMsg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ') + '\n';
