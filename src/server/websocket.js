@@ -10,6 +10,8 @@ let wss = null;
 let httpServer = null;
 let heartbeatInterval = null;
 let dayRolloverInterval = null;
+let cachedQrUrl = '';
+let cachedQrDataUrl = '';
 
 // Mulai server WebSocket
 function startWebSocketServer(port) {
@@ -277,7 +279,10 @@ async function getCurrentState() {
   const waitingTickets = await db.getWaitingTickets();
   const callingTickets = await db.getCallingTickets();
   const settings = await db.getSettings();
-  const videoPlaylist = settings.video_playlist ? JSON.parse(settings.video_playlist) : [];
+  let videoPlaylist = [];
+  if (settings.video_playlist) {
+    try { videoPlaylist = JSON.parse(settings.video_playlist); } catch (_) { console.error('[WebSocket] Malformed video_playlist JSON in DB, using empty playlist'); }
+  }
   const displayMode = settings.display_mode || 'queue';
   const mirrorWindowName = settings.mirror_window_name || '';
   const mirrorCropTop = settings.mirror_crop_top === 'true';
@@ -290,16 +295,26 @@ async function getCurrentState() {
   const surveyUrl = settings.feedback_survey_url ? settings.feedback_survey_url.trim() : '';
   let feedbackQrDataUrl = '';
   if (surveyUrl) {
-    try {
-      const QRCode = require('qrcode');
-      feedbackQrDataUrl = await QRCode.toDataURL(surveyUrl, {
-        margin: 1,
-        width: 140,
-        color: { dark: '#0b0f19', light: '#ffffff' }
-      });
-    } catch (err) {
-      console.error('[WebSocket] Error generating survey QR code:', err.message);
+    // Cache QR agar tidak di-regenerate setiap broadcast (CPU-intensive)
+    if (cachedQrUrl === surveyUrl && cachedQrDataUrl) {
+      feedbackQrDataUrl = cachedQrDataUrl;
+    } else {
+      try {
+        const QRCode = require('qrcode');
+        feedbackQrDataUrl = await QRCode.toDataURL(surveyUrl, {
+          margin: 1,
+          width: 140,
+          color: { dark: '#0b0f19', light: '#ffffff' }
+        });
+        cachedQrUrl = surveyUrl;
+        cachedQrDataUrl = feedbackQrDataUrl;
+      } catch (err) {
+        console.error('[WebSocket] Error generating survey QR code:', err.message);
+      }
     }
+  } else {
+    cachedQrUrl = '';
+    cachedQrDataUrl = '';
   }
 
   return {
@@ -361,16 +376,6 @@ async function handleClientAction(action, ws) {
       case 'GET_STATE':
         await sendStateToClient(ws);
         break;
-
-      case 'GET_SETTINGS': {
-        // Kirim pengaturan lengkap ke client yang memintanya
-        const allSettings = await db.getSettings();
-        ws.send(JSON.stringify({
-          type: 'SETTINGS_RESPONSE',
-          payload: allSettings
-        }));
-        break;
-      }
 
       case 'WA_STATUS': {
         const waStatus = require('./whatsapp').getWaStatus();

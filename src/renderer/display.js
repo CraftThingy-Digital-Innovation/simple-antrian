@@ -399,6 +399,8 @@ function triggerCallAnimation(ticketNumber, deskNumber) {
   const deskEl = document.getElementById('lbl-call-desk');
   const mainDisplayPanel = document.getElementById('main-display-panel');
   
+  if (!numberEl || !deskEl) return;
+
   if (mainDisplayPanel) {
     mainDisplayPanel.classList.remove('standby');
   }
@@ -901,7 +903,7 @@ if (typeof window !== 'undefined' && window.api && window.api.getSystemInfo) {
   window.api.getSystemInfo().then(info => {
     if (info && info.mode === 'server') {
       isLocalServer = true;
-      serverPort = info.port || '8080';
+      serverPort = parseInt(info.port, 10) || 8080;
       console.log('[Display] Running on Server machine -> using ultra-fast 127.0.0.1 loopback for media streaming.');
     }
   }).catch(() => {});

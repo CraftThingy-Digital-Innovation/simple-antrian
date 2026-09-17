@@ -337,11 +337,11 @@ function checkAndConstrainMainWindow() {
   const bounds = mainWindow.getBounds();
   const midX = bounds.x + bounds.width / 2;
   const midY = bounds.y + bounds.height / 2;
-  const db = targetDisplay.bounds;
+  const displayBounds = targetDisplay.bounds;
 
   const isInsideDisplayScreen = (
-    midX >= db.x && midX < db.x + db.width &&
-    midY >= db.y && midY < db.y + db.height
+    midX >= displayBounds.x && midX < displayBounds.x + displayBounds.width &&
+    midY >= displayBounds.y && midY < displayBounds.y + displayBounds.height
   );
 
   if (isInsideDisplayScreen) {
