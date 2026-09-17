@@ -278,10 +278,52 @@ function applyDisplayCustomization(settings) {
   }
 }
 
+// Render Banner Survei Kepuasan Pelanggan (IKM)
+function renderFeedbackSurvey(state) {
+  const bar = document.getElementById('feedback-survey-bar');
+  const qrWrapper = document.getElementById('feedback-qr-wrapper');
+  const qrImg = document.getElementById('feedback-qr-img');
+  const urlWrapper = document.getElementById('feedback-url-wrapper');
+  const urlText = document.getElementById('feedback-url-text');
+  if (!bar) return;
+
+  const url = (state && (state.feedbackSurveyUrl || state.feedback_survey_url)) ? String(state.feedbackSurveyUrl || state.feedback_survey_url).trim() : '';
+  const mode = (state && (state.feedbackDisplayMode || state.feedback_display_mode)) || 'both';
+  const qrData = state && state.feedbackQrDataUrl ? state.feedbackQrDataUrl : '';
+
+  // Tersembunyi secara default dan atau jika tidak ada teks link website yang disediakan
+  if (!url) {
+    bar.style.display = 'none';
+    return;
+  }
+
+  bar.style.display = 'flex';
+
+  // Tampilkan QR Code jika mode 'both' atau 'qr'
+  if ((mode === 'both' || mode === 'qr') && qrData) {
+    if (qrImg) qrImg.src = qrData;
+    if (qrWrapper) qrWrapper.style.display = 'flex';
+  } else {
+    if (qrWrapper) qrWrapper.style.display = 'none';
+  }
+
+  // Tampilkan Link Website jika mode 'both' atau 'url'
+  if (mode === 'both' || mode === 'url') {
+    if (urlText) urlText.innerText = url;
+    if (urlWrapper) urlWrapper.style.display = 'flex';
+  } else {
+    if (urlWrapper) urlWrapper.style.display = 'none';
+  }
+}
+
 // Render State Antrian di Layar Display
 function renderDisplayState(state) {
   const { services, callingTickets } = state;
-  renderFeedbackSurvey(state);
+  try {
+    renderFeedbackSurvey(state);
+  } catch (err) {
+    console.error('Error rendering feedback survey:', err);
+  }
 
   // 1. Tampilkan Panggilan Aktif Utama
   const mainNumberEl = document.getElementById('lbl-call-number');
