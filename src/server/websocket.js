@@ -299,7 +299,9 @@ async function sendStateToClient(ws) {
 
 // Ambil state gabungan saat ini
 async function getCurrentState() {
-  await db.handleDayRollover();
+  // handleDayRollover DIHAPUS dari sini — sudah dijalankan oleh dayRolloverInterval (60 detik)
+  // dan oleh callNextTicket/createTicket. Memanggil di sini menambah 5+ query SQL
+  // pada SETIAP broadcast, menyebabkan lag/freeze video.
   const services = await db.getServices();
   const waitingTickets = await db.getWaitingTickets();
   const callingTickets = await db.getCallingTickets();

@@ -904,13 +904,15 @@ function initCanvasVisualizer() {
 
 // ==================== PLAYLIST MEDIA DISPLAY (VIDEO & FOTO) ====================
 let isLocalServer = false;
+let localVideoDir = '';
 
 if (typeof window !== 'undefined' && window.api && window.api.getSystemInfo) {
   window.api.getSystemInfo().then(info => {
     if (info && info.mode === 'server') {
       isLocalServer = true;
       serverPort = parseInt(info.port, 10) || 8080;
-      console.log('[Display] Running on Server machine -> using ultra-fast 127.0.0.1 loopback for media streaming.');
+      localVideoDir = info.videoDir || '';
+      console.log('[Display] Running on Server machine -> akan gunakan file:// langsung jika tersedia untuk video lokal.');
     }
   }).catch(() => {});
 }
@@ -1111,7 +1113,14 @@ function syncVideoPlayers(displayMode) {
   let rawUrl = currentItem.url || '';
   let mediaUrl = rawUrl;
   if (!mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://')) {
-    mediaUrl = 'http://' + host + rawUrl;
+    // Server lokal: gunakan file:// langsung untuk zero-overhead native Chromium playback
+    // Menghindari bottleneck HTTP server single-thread Node.js
+    if (isLocalServer && localVideoDir && rawUrl.startsWith('/video/')) {
+      const filename = decodeURIComponent(rawUrl.split('?')[0].replace('/video/', ''));
+      mediaUrl = 'file:///' + localVideoDir.replace(/\\/g, '/') + '/' + filename;
+    } else {
+      mediaUrl = 'http://' + host + rawUrl;
+    }
   }
   
   const isImg = isImageMedia(currentItem);

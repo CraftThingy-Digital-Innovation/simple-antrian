@@ -279,6 +279,8 @@ async function startServicesBasedOnMode(settings) {
 ipcMain.handle('get-system-info', async () => {
   const settings = await db.getSettings();
   const appVersion = require('./package.json').version;
+  // videoDir dikirim ke display.js agar bisa gunakan file:// langsung (bypass HTTP server bottleneck)
+  const videoDir = app ? path.join(app.getPath('userData'), 'data', 'videos') : path.join(process.cwd(), 'data', 'videos');
   return {
     mode: currentMode,
     serverUuid: runtimeServerUuid,
@@ -286,7 +288,8 @@ ipcMain.handle('get-system-info', async () => {
     port: settings.port || '8080',
     localIp: discovery.getLocalIp(),
     allLocalIps: discovery.getAllLocalIps(),
-    appVersion: appVersion
+    appVersion: appVersion,
+    videoDir: videoDir
   };
 });
 
