@@ -14,6 +14,14 @@
       background-color: #060913;
     }
 
+    /* GPU Layer Promotion: Video elements get their own compositor layer
+       mencegah DOM changes lain menyebabkan video re-compositing/freeze */
+    video, #display-video-player, #fullscreen-video-player, #mirror-video-player {
+      will-change: transform;
+      transform: translateZ(0);
+      backface-visibility: hidden;
+    }
+
     /* Top Section containing Main Call + Right Panel */
     .content-area {
       flex: 1;

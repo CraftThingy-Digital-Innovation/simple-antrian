@@ -863,13 +863,25 @@ function initCanvasVisualizer() {
 
   // Loop Animasi Efisien
   let lastFrameTime = 0;
-  const targetFpsInterval = 1000 / 30; // 30 FPS untuk background ambient sudah sangat mulus & hemat daya
+  let canvasRunning = true;
+  const targetFpsInterval = 1000 / 20; // 20 FPS cukup untuk ambient particles
 
   const animate = (timestamp) => {
-    animationFrameId = requestAnimationFrame(animate);
+    // STOP canvas sepenuhnya jika ada video yang sedang diputar
+    // Canvas dan video berbagi GPU compositor — menggambar canvas saat video bermain
+    // menyebabkan freeze/stutter karena compositor frame conflict
+    const anyVideoPlaying = (videoPlaylist && videoPlaylist.length > 0 && currentActiveMediaUrl);
+    if (anyVideoPlaying || currentDisplayMode === 'video') {
+      if (canvasRunning) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvasRunning = false;
+      }
+      animationFrameId = requestAnimationFrame(animate);
+      return;
+    }
+    canvasRunning = true;
 
-    // Jangan buang daya jika mode video fullscreen sedang aktif
-    if (currentDisplayMode === 'video') return;
+    animationFrameId = requestAnimationFrame(animate);
 
     if (timestamp - lastFrameTime < targetFpsInterval) return;
     lastFrameTime = timestamp;
