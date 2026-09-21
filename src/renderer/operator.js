@@ -1161,9 +1161,10 @@ function renderWaStatus(waState) {
 
 // Play Voice Announce menggunakan Web Speech API & Web Audio Ding-Dong (3 bahasa)
 async function playVoiceAnnounce(ticketNumber, deskNumber, voiceFiles) {
-  // Hanya bunyikan jika dicentang di setelan audio (opsional, untuk operator)
+  // Bunyikan di operator panel (bisa diatur di localStorage / settings)
   const settings = await window.api.getSettings();
-  if (settings.play_audio_operator !== 'true') return;
+  const isOperatorAudioMuted = localStorage.getItem('operator_audio_muted') === 'true';
+  if (isOperatorAudioMuted) return;
 
   if (!voiceFiles || voiceFiles.length === 0) return;
 
@@ -1173,7 +1174,10 @@ async function playVoiceAnnounce(ticketNumber, deskNumber, voiceFiles) {
 
     // Get current server host from WebSocket connection to build absolute URLs
     const wsUrlObj = new URL(ws.url);
-    const audioBaseUrl = `http://${wsUrlObj.host}/audio`;
+    const host = (wsUrlObj.hostname === 'localhost' || wsUrlObj.hostname === '::1')
+      ? `127.0.0.1:${wsUrlObj.port || 8080}`
+      : wsUrlObj.host;
+    const audioBaseUrl = `http://${host}/audio`;
 
     // Map filenames to full URLs
     const urls = voiceFiles.map(file => `${audioBaseUrl}/${file}`);

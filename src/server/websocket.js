@@ -989,8 +989,15 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName)
   const prefix = ticketNumber.charAt(0);
   const num = parseInt(ticketNumber.substring(1), 10);
   
-  const deskWord = deskNumber.replace(/[0-9]+/g, '').trim();
-  const deskNum = parseInt(deskNumber.replace(/[^0-9]/g, ''), 10);
+  let safeDesk = (deskNumber || 'Loket 1').trim();
+  const digits = safeDesk.replace(/[^0-9]/g, '');
+  const deskNum = digits ? parseInt(digits, 10) : 1;
+  let deskWord = safeDesk.replace(/[0-9]+/g, '').trim().toLowerCase();
+  
+  // Jika deskWord kosong atau kata kategori layanan (bukan kata loket/counter/meja/ruang), fallback ke 'loket'
+  if (!deskWord || (!deskWord.includes('loket') && !deskWord.includes('counter') && !deskWord.includes('meja') && !deskWord.includes('ruang') && !deskWord.includes('desk') && !deskWord.includes('cs'))) {
+    deskWord = 'loket';
+  }
   
   const files = [];
 

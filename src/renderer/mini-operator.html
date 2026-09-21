@@ -309,7 +309,10 @@
   <div class="mini-container">
     <!-- Title Bar (draggable) -->
     <div class="mini-titlebar">
-      <span class="title">⚡ MINI OPERATOR</span>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span class="title">⚡ MINI OPERATOR</span>
+        <button id="mini-btn-sound" type="button" title="Suara Panggilan (Aktif/Mute)" style="background: none; border: none; font-size: 0.85rem; cursor: pointer; padding: 0 4px; line-height: 1;">🔊</button>
+      </div>
       <div class="controls">
         <button class="btn-close" id="btn-restore" title="Buka kembali jendela utama">✕</button>
       </div>
@@ -329,6 +332,12 @@
       </div>
 
       <!-- 4 Important Buttons -->
+      <!-- Loket Saya Input -->
+      <div style="display: flex; gap: 6px; align-items: center; margin: 3px 0;">
+        <span style="font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Loket:</span>
+        <input type="text" id="mini-operator-desk" class="mini-input" style="flex: 1; padding: 4px 8px; font-size: 0.75rem; font-weight: bold; text-align: center;" value="Loket 1" title="Nomor atau nama loket Anda (misal: Loket 1, Loket 2, Loket 7)">
+      </div>
+
       <div class="section-label">Aksi Panggilan</div>
       <div class="action-grid">
         <button class="btn-action primary" id="mini-btn-call" title="Panggil Berikutnya">📢 Panggil</button>

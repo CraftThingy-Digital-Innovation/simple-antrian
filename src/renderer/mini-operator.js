@@ -117,6 +117,14 @@ function handleMessage(msg) {
     setActiveMode(mode);
   }
 
+  if (type === 'ANNOUNCE_CALL' && payload) {
+    playMiniAnnouncement(payload.ticketNumber, payload.deskNumber, payload.voiceFiles);
+  }
+
+  if (type === 'STOP_ANNOUNCEMENT') {
+    stopMiniAudio();
+  }
+
   if (type === 'STATE_UPDATE' && payload) {
     if (payload.serverName) currentServerName = payload.serverName;
   }
@@ -204,13 +212,15 @@ function getActiveTicket() {
 }
 
 function getDeskNumber(serviceId) {
-  // Coba ambil dari localStorage dulu
+  const deskInput = document.getElementById('mini-operator-desk');
+  if (deskInput && deskInput.value.trim()) {
+    return deskInput.value.trim();
+  }
   try {
     const local = JSON.parse(localStorage.getItem('local_desk_settings') || '{}');
-    if (local[serviceId]) return local[serviceId];
+    if (local && local[serviceId]) return local[serviceId];
   } catch (_) {}
-  const srv = servicesList.find(s => s.id === serviceId);
-  return srv ? srv.name : 'Loket 1';
+  return localStorage.getItem('mini_operator_desk') || 'Loket 1';
 }
 
 // ==================== EVENT LISTENERS ====================
@@ -258,6 +268,34 @@ document.addEventListener('DOMContentLoaded', () => {
     sendAction('SKIP', { ticketId: ticket.id });
     showToast('Antrian dilewati.', 'warning');
   });
+
+  // Sound toggle button
+  const soundBtn = document.getElementById('mini-btn-sound');
+  if (soundBtn) {
+    const isMuted = localStorage.getItem('mini_audio_muted') === 'true';
+    soundBtn.textContent = isMuted ? '🔇' : '🔊';
+    soundBtn.addEventListener('click', () => {
+      const currentlyMuted = localStorage.getItem('mini_audio_muted') === 'true';
+      const newMuted = !currentlyMuted;
+      localStorage.setItem('mini_audio_muted', newMuted ? 'true' : 'false');
+      soundBtn.textContent = newMuted ? '🔇' : '🔊';
+      showToast(newMuted ? 'Suara panggilan dinonaktifkan' : 'Suara panggilan diaktifkan', 'info');
+      if (newMuted) stopMiniAudio();
+    });
+  }
+
+  // Loket input listener & restore
+  const deskInput = document.getElementById('mini-operator-desk');
+  if (deskInput) {
+    const savedDesk = localStorage.getItem('mini_operator_desk') || 'Loket 1';
+    deskInput.value = savedDesk;
+    deskInput.addEventListener('change', () => {
+      const val = deskInput.value.trim() || 'Loket 1';
+      deskInput.value = val;
+      localStorage.setItem('mini_operator_desk', val);
+      showToast('Loket diatur ke: ' + val, 'info');
+    });
+  }
 
   // Muat daftar printer sistem
   loadPrinters();
@@ -428,5 +466,132 @@ async function triggerMiniTicketPrint(ticket) {
   } else {
     // Fallback native print dialog
     window.print();
+  }
+}
+
+
+// ==================== MINI OPERATOR AUDIO ENGINE ====================
+let currentMiniAudio = null;
+let isMiniAnnouncing = false;
+
+function stopMiniAudio() {
+  isMiniAnnouncing = false;
+  if (currentMiniAudio) {
+    try {
+      currentMiniAudio.pause();
+      currentMiniAudio.currentTime = 0;
+      currentMiniAudio.src = '';
+    } catch (_) {}
+    currentMiniAudio = null;
+  }
+}
+
+// Ding-Dong Chime 2-Nada via Web Audio API
+function playMiniDingDong() {
+  return new Promise((resolve) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return resolve();
+      const ctx = new AudioCtx();
+
+      const playTone = (freq, start, duration) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime + start);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + duration);
+      };
+
+      playTone(587.33, 0, 0.35);    // D5
+      playTone(880.00, 0.22, 0.55);  // A5
+      setTimeout(() => {
+        try { ctx.close(); } catch (_) {}
+        resolve();
+      }, 850);
+    } catch (_) {
+      resolve();
+    }
+  });
+}
+
+// Putar rangkaian audio pengumuman (voice clips)
+function playMiniAudioSequence(urls) {
+  return new Promise((resolve) => {
+    if (!urls || urls.length === 0 || !isMiniAnnouncing) {
+      resolve();
+      return;
+    }
+
+    let index = 0;
+    const audio = new Audio();
+    currentMiniAudio = audio;
+
+    const playNext = () => {
+      if (!isMiniAnnouncing || index >= urls.length) {
+        currentMiniAudio = null;
+        resolve();
+        return;
+      }
+      audio.src = urls[index];
+      audio.play().catch(err => {
+        console.warn('[Mini Audio] Clip playback failed:', urls[index], err);
+        index++;
+        playNext();
+      });
+    };
+
+    audio.onended = () => {
+      index++;
+      playNext();
+    };
+
+    audio.onerror = () => {
+      index++;
+      playNext();
+    };
+
+    playNext();
+  });
+}
+
+async function playMiniAnnouncement(ticketNumber, deskNumber, voiceFiles) {
+  const isMuted = localStorage.getItem('mini_audio_muted') === 'true';
+  if (isMuted) return;
+  if (!voiceFiles || voiceFiles.length === 0) return;
+
+  stopMiniAudio();
+  isMiniAnnouncing = true;
+
+  try {
+    // 1. Bunyikan Bel Ding-Dong
+    await playMiniDingDong();
+
+    if (!isMiniAnnouncing) return;
+
+    // 2. Putar Suara Nomor Antrian & Loket
+    let host = '127.0.0.1:8080';
+    if (ws && ws.url) {
+      try {
+        const u = new URL(ws.url);
+        host = (u.hostname === 'localhost' || u.hostname === '::1') ? `127.0.0.1:${u.port || 8080}` : u.host;
+      } catch (_) {}
+    } else if (currentWsUrl) {
+      try {
+        const u = new URL(currentWsUrl);
+        host = (u.hostname === 'localhost' || u.hostname === '::1') ? `127.0.0.1:${u.port || 8080}` : u.host;
+      } catch (_) {}
+    }
+
+    const audioBaseUrl = `http://${host}/audio`;
+    const urls = voiceFiles.map(file => `${audioBaseUrl}/${file}`);
+
+    await playMiniAudioSequence(urls);
+  } catch (err) {
+    console.warn('[Mini Operator] Audio error:', err);
   }
 }

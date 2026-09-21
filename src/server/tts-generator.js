@@ -5,10 +5,37 @@ const https = require('https');
 const crypto = require('crypto');
 const { app } = require('electron');
 
+// Bundled Piper directory inside application assets
+const bundledPiperDir = path.join(__dirname, '..', 'assets', 'piper');
+
 // Target Directories (userData agar aman dari permission EPERM saat dipaketkan)
 const dataDir = app ? path.join(app.getPath('userData'), 'data') : path.join(process.cwd(), 'data');
-const piperDir = path.join(dataDir, 'piper');
+const fallbackPiperDir = path.join(dataDir, 'piper');
 const cacheDir = path.join(dataDir, 'tts-cache');
+
+function getPiperDir() {
+  const isWin = process.platform === 'win32';
+  const binName = isWin ? 'piper.exe' : 'piper';
+  
+  // 1. Cek di src/assets/piper (bundled resources bawaan aplikasi)
+  if (fs.existsSync(path.join(bundledPiperDir, 'piper', binName))) {
+    return bundledPiperDir;
+  }
+  if (fs.existsSync(path.join(bundledPiperDir, binName))) {
+    return bundledPiperDir;
+  }
+
+  // 2. Cek di process.cwd()/data/piper (saat development / portable)
+  const cwdPiper = path.join(process.cwd(), 'data', 'piper');
+  if (fs.existsSync(path.join(cwdPiper, 'piper', binName))) {
+    return cwdPiper;
+  }
+
+  // 3. Fallback ke userData/data/piper
+  return fallbackPiperDir;
+}
+
+let piperDir = getPiperDir();
 
 // Ensure directories exist
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
@@ -46,11 +73,17 @@ const MODELS = {
 };
 
 function getBinaryPath() {
-  if (process.platform === 'win32') {
-    return path.join(piperDir, 'piper', 'piper.exe');
-  } else {
-    return path.join(piperDir, 'piper', 'piper');
+  const pDir = getPiperDir();
+  const isWin = process.platform === 'win32';
+  const binName = isWin ? 'piper.exe' : 'piper';
+  
+  if (fs.existsSync(path.join(pDir, 'piper', binName))) {
+    return path.join(pDir, 'piper', binName);
   }
+  if (fs.existsSync(path.join(pDir, binName))) {
+    return path.join(pDir, binName);
+  }
+  return path.join(pDir, 'piper', binName);
 }
 
 // Set status and notify
@@ -197,6 +230,27 @@ async function initTtsEngine(callback) {
     const binaryPath = getBinaryPath();
     const binaryExists = fileExistsAndNotEmpty(binaryPath);
 
+    // Jika Piper binary dan model sudah ada di bundled assets, langsung aktifkan tanpa download
+    if (binaryExists) {
+      const pDir = getPiperDir();
+      let allModelsReady = true;
+      for (const lang of Object.keys(MODELS)) {
+        const m = MODELS[lang];
+        if (!fileExistsAndNotEmpty(path.join(pDir, m.file)) && !fileExistsAndNotEmpty(path.join(bundledPiperDir, m.file))) {
+          allModelsReady = false;
+          break;
+        }
+      }
+      if (allModelsReady) {
+        piperDir = pDir;
+        isReady = true;
+        isInitializing = false;
+        setStatus('ready', 100, 'Piper TTS Engine siap digunakan dari assets offline.');
+        console.log('[TTS Engine] Piper Engine & model ONNX offline siap digunakan dari:', pDir);
+        return true;
+      }
+    }
+
     // 1. Download Piper Binary
     if (!binaryExists) {
       const platform = process.platform === 'win32' ? 'win32' : 'linux';
@@ -297,10 +351,15 @@ function generateWav(text, lang, outputPath) {
       return;
     }
 
-    const modelPath = path.join(piperDir, modelInfo.file);
+    const pDir = getPiperDir();
+    let modelPath = path.join(pDir, modelInfo.file);
+    if (!fileExistsAndNotEmpty(modelPath) && fileExistsAndNotEmpty(path.join(bundledPiperDir, modelInfo.file))) {
+      modelPath = path.join(bundledPiperDir, modelInfo.file);
+    }
+    const execCwd = path.dirname(binaryPath);
     const args = ['--model', modelPath, '--output_file', outputPath, '-l', '1.1'];
 
-    const child = spawn(binaryPath, args, { cwd: piperDir });
+    const child = spawn(binaryPath, args, { cwd: execCwd });
 
     child.stdin.write(text + '\n');
     child.stdin.end();
@@ -349,13 +408,11 @@ async function generatePhraseIfNeeded(text, lang) {
     // Pastikan biner Piper sudah terunduh & siap digunakan.
     const binaryPath = getBinaryPath();
     const binaryExists = fileExistsAndNotEmpty(binaryPath);
-    if (!binaryExists || !isReady) {
-      console.log("[TTS Engine] Frasa kustom baru dideteksi. Mengunduh dan menginisialisasi Piper Engine...");
-      const success = await initTtsEngine(null, true);
-      if (!success) {
-        throw new Error("Gagal menginisialisasi Piper Engine untuk suara kustom.");
-      }
+    if (!binaryExists) {
+      console.warn("[TTS Engine] Piper binary tidak ditemukan untuk teks:", text);
+      return null;
     }
+    isReady = true;
 
     await generateWav(text, lang, targetPath);
     console.log(`[TTS Engine] Generated custom phrase audio: ${filename}`);

@@ -764,16 +764,20 @@ async function playVoice(ticketNumber, deskNumber, voiceFiles) {
   }
 
   try {
-    let host = 'localhost:8080';
+    let host = '127.0.0.1:8080';
     if (ws && ws.url) {
       try {
         const wsUrlObj = new URL(ws.url);
-        host = wsUrlObj.host;
+        host = (wsUrlObj.hostname === 'localhost' || wsUrlObj.hostname === '::1')
+          ? `127.0.0.1:${wsUrlObj.port || 8080}`
+          : wsUrlObj.host;
       } catch (_) {}
     } else if (currentWsUrl) {
       try {
         const wsUrlObj = new URL(currentWsUrl);
-        host = wsUrlObj.host;
+        host = (wsUrlObj.hostname === 'localhost' || wsUrlObj.hostname === '::1')
+          ? `127.0.0.1:${wsUrlObj.port || 8080}`
+          : wsUrlObj.host;
       } catch (_) {}
     }
     const audioBaseUrl = `http://${host}/audio`;
