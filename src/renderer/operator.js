@@ -744,11 +744,16 @@ function renderDiscoveredServers(servers) {
 
     const div = document.createElement('div');
     div.className = `server-list-item animate-pop-in ${isConnected ? 'active-connected' : ''}`;
+    const methodBadge = srv.method === 'http'
+      ? '<span class="badge" style="background: rgba(14, 165, 233, 0.2); color: #38bdf8; font-size: 0.68rem; padding: 2px 7px; margin-left: 6px;">🌐 HTTP/Router</span>'
+      : '<span class="badge badge-waiting" style="font-size: 0.68rem; padding: 2px 7px; margin-left: 6px;">📡 UDP</span>';
+
     div.innerHTML = `
       <div>
         <div class="server-info-title">
           <span>🖥️</span> <strong>${escapeHtml(srv.name || 'Server Antrian')}</strong>
-          ${isConnected ? '<span class="badge badge-completed" style="font-size: 0.7rem; padding: 2px 8px;">✓ Terhubung</span>' : ''}
+          ${methodBadge}
+          ${isConnected ? '<span class="badge badge-completed" style="font-size: 0.7rem; padding: 2px 8px; margin-left: 6px;">✓ Terhubung</span>' : ''}
         </div>
         <div class="server-info-ip">${escapeHtml(srvIpPort)}</div>
       </div>

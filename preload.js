@@ -42,7 +42,7 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   // UDP Discovery (Client Mode)
-  refreshDiscovery: () => ipcRenderer.invoke('refresh-discovery'),
+  refreshDiscovery: (customTarget) => ipcRenderer.invoke('refresh-discovery', customTarget),
   onServersUpdated: (callback) => {
     // Remove existing listener before adding a new one to prevent memory leaks
     ipcRenderer.removeAllListeners('servers-updated');

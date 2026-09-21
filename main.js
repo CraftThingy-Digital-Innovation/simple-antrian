@@ -322,6 +322,11 @@ async function startServicesBasedOnMode(settings) {
     discovery.stopBroadcaster();
     whatsapp.stopWhatsAppClient();
 
+    // Muat endpoint server yang tersimpan ke daftar known servers
+    if (settings && settings.active_server_endpoint) {
+      discovery.addKnownServer(settings.active_server_endpoint);
+    }
+
     // Jalankan UDP Discovery Listener
     discovery.startDiscoveryListener((servers) => {
       // Kirim daftar server ke semua renderer window yang aktif
@@ -376,9 +381,9 @@ ipcMain.handle('save-mode-settings', async (event, modeSettings) => {
 });
 
 // Refresh / Trigger Scan UDP Discovery (Mode Client)
-ipcMain.handle('refresh-discovery', async () => {
+ipcMain.handle('refresh-discovery', async (event, customTarget) => {
   if (currentMode === 'client') {
-    discovery.sendDiscoveryQuery();
+    await discovery.sendDiscoveryQuery(customTarget);
     return discovery.getDiscoveredServersList();
   }
   return [];

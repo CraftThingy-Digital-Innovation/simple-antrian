@@ -172,6 +172,28 @@ function startWebSocketServer(port) {
           res.on('close', () => stream.destroy());
         }
       }); // tutup fs.stat callback
+    } else if (req.url === '/api/discovery' || req.url === '/discovery' || req.url === '/api/ping') {
+      db.getSettings().then(settings => {
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        });
+        res.end(JSON.stringify({
+          type: 'ping',
+          serverUuid: settings.server_uuid || '',
+          serverName: settings.server_name || 'Server Utama',
+          port: parseInt(settings.port, 10) || 8080,
+          timestamp: Date.now()
+        }));
+      }).catch(() => {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({
+          type: 'ping',
+          serverName: 'Server Antrian',
+          port: 8080,
+          timestamp: Date.now()
+        }));
+      });
     } else {
       res.writeHead(404);
       res.end();
