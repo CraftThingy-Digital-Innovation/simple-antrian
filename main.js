@@ -799,25 +799,73 @@ ipcMain.handle('get-printers', async (event) => {
 
 // IPC Handler: Cetak tiket antrian (dialog OS atau silent langsung ke printer)
 ipcMain.handle('print-ticket', async (event, options = {}) => {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
+    let printWin = null;
     try {
-      const win = BrowserWindow.fromWebContents(event.sender);
-      if (!win) {
-        return resolve({ success: false, reason: 'Window tidak ditemukan' });
-      }
-
       const isDialog = !options.deviceName || options.deviceName === '__DIALOG__';
+      const targetDevice = isDialog ? undefined : options.deviceName;
+      const isThermal = /pos|thermal|receipt|58|80|tm-/i.test(targetDevice || '');
+      const is80 = /80/i.test(targetDevice || '');
+
       const printOptions = {
         silent: !isDialog,
         printBackground: true,
         margins: { marginType: 'none' }
       };
 
-      if (!isDialog) {
-        printOptions.deviceName = options.deviceName;
+      if (!isDialog && targetDevice) {
+        printOptions.deviceName = targetDevice;
       }
 
-      // Jika membuka dialog cetak OS, pastikan window difokuskan
+      // Ukuran kertas spesifik printer thermal roll (58mm / 80mm dalam satuan mikron)
+      if (isThermal) {
+        printOptions.pageSize = {
+          width: is80 ? 80000 : 58000,
+          height: 160000 // 160mm continuous height in microns
+        };
+      } else {
+        printOptions.usePrinterDefaultPageSize = true;
+      }
+
+      // Jika HTML tiket mandiri disediakan, cetak lewat hidden BrowserWindow yang bersih
+      if (options.html) {
+        printWin = new BrowserWindow({
+          show: false,
+          width: 320,
+          height: 600,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true
+          }
+        });
+
+        await printWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(options.html));
+        await new Promise(r => setTimeout(r, 120));
+
+        if (isDialog) {
+          printWin.focus();
+        }
+
+        printWin.webContents.print(printOptions, (success, failureReason) => {
+          if (printWin && !printWin.isDestroyed()) {
+            printWin.destroy();
+          }
+          if (!success) {
+            console.warn('[Print] Result:', failureReason);
+            resolve({ success: false, reason: failureReason });
+          } else {
+            resolve({ success: true });
+          }
+        });
+        return;
+      }
+
+      // Fallback: Cetak langsung dari jendela pemanggil
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!win) {
+        return resolve({ success: false, reason: 'Window tidak ditemukan' });
+      }
+
       if (isDialog) {
         win.focus();
       }
@@ -831,6 +879,9 @@ ipcMain.handle('print-ticket', async (event, options = {}) => {
         }
       });
     } catch (err) {
+      if (printWin && !printWin.isDestroyed()) {
+        printWin.destroy();
+      }
       console.error('[Print] Gagal mengeksekusi print:', err);
       resolve({ success: false, reason: err.message });
     }

@@ -3,6 +3,8 @@ let serverPort = 8080;
 let serverName = 'Server Antrian';
 let selectedServiceId = null;
 let currentServices = [];
+let currentFeedbackSurveyUrl = '';
+let currentFeedbackQrDataUrl = '';
 let localIp = 'localhost';
 let transactionId = '';
 let isReconnecting = false; // Guard untuk mencegah double-reconnect
@@ -237,6 +239,10 @@ function triggerTicketPrint(ticket) {
   const service = currentServices.find(s => s.id === ticket.service_id);
   const srvName = service ? service.name : 'Layanan Umum';
   
+  const titleEl = document.getElementById('print-instansi-name');
+  const serverTitleEl = document.getElementById('kiosk-server-name');
+  if (titleEl) titleEl.innerText = (serverTitleEl && serverTitleEl.innerText ? serverTitleEl.innerText.trim() : 'SimpleAntrian').toUpperCase();
+
   const srvEl = document.getElementById('print-service-name');
   if (srvEl) srvEl.innerText = srvName;
 
@@ -246,18 +252,45 @@ function triggerTicketPrint(ticket) {
   const nameLbl = document.getElementById('print-customer-lbl');
   const cleanName = (ticket.customer_name || '').trim();
   if (cleanName && cleanName !== '-' && cleanName !== 'Pelanggan' && cleanName !== 'Pelanggan Mandiri') {
-    nameLbl.innerText = `Nama: ${cleanName}`;
+    nameLbl.innerText = 'Nama: ' + cleanName;
     nameLbl.style.display = 'block';
   } else {
     nameLbl.innerText = '';
     nameLbl.style.display = 'none';
   }
   
+  const dateObj = ticket.created_at ? new Date(ticket.created_at) : new Date();
   const timeEl = document.getElementById('print-time-lbl');
-  if (timeEl) timeEl.innerText = `Waktu: ${new Date(ticket.created_at).toLocaleString('id-ID')}`;
+  if (timeEl) timeEl.innerText = 'Waktu: ' + dateObj.toLocaleString('id-ID');
+
+  // Survei Kepuasan
+  const surveySec = document.getElementById('print-survey-section');
+  const surveyUrlEl = document.getElementById('print-survey-url');
+  const surveyQrEl = document.getElementById('print-survey-qr');
+  if (currentFeedbackSurveyUrl) {
+    if (surveySec) surveySec.style.display = 'block';
+    if (surveyUrlEl) surveyUrlEl.textContent = currentFeedbackSurveyUrl;
+    if (surveyQrEl) {
+      if (currentFeedbackQrDataUrl) {
+        surveyQrEl.src = currentFeedbackQrDataUrl;
+        surveyQrEl.style.display = 'block';
+      } else {
+        surveyQrEl.style.display = 'none';
+      }
+    }
+  } else if (surveySec) {
+    surveySec.style.display = 'none';
+  }
   
-  // Trigger cetak biner/dialog
-  window.print();
+  // Tampilkan sementara di DOM agar layout engine merender
+  const printTicketEl = document.getElementById('print-ticket');
+  if (printTicketEl) printTicketEl.style.display = 'block';
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => {
+      if (printTicketEl) printTicketEl.style.display = 'none';
+    }, 500);
+  }, 60);
 }
 
 // Hubungkan Kiosk saat halaman termuat + pasang event listener setelah DOM siap

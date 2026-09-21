@@ -949,6 +949,8 @@ function handleWebSocketMessage(message) {
         const activeNameEl = document.getElementById('client-active-server-name');
         if (activeNameEl) activeNameEl.innerText = payload.serverName;
       }
+      if (payload.feedbackSurveyUrl !== undefined) currentFeedbackSurveyUrl = payload.feedbackSurveyUrl || '';
+      if (payload.feedbackQrDataUrl !== undefined) currentFeedbackQrDataUrl = payload.feedbackQrDataUrl || '';
       renderQueueState(payload);
       break;
 
@@ -2537,6 +2539,12 @@ async function triggerSearch() {
 
 // Fungsi Cetak Tiket untuk Printer Thermal / Dot Matrix
 window.printTicketHistory = async function(ticketNumber, serviceName, customerName, createdAt) {
+  const activeNameEl = document.getElementById('client-active-server-name');
+  const instansiName = (activeNameEl && activeNameEl.innerText ? activeNameEl.innerText.trim() : 'SimpleAntrian').toUpperCase();
+
+  const titleEl = document.getElementById('print-instansi-name');
+  if (titleEl) titleEl.innerText = instansiName;
+
   const srvEl = document.getElementById('print-service-name');
   if (srvEl) srvEl.innerText = serviceName || 'Layanan';
 
@@ -2545,31 +2553,197 @@ window.printTicketHistory = async function(ticketNumber, serviceName, customerNa
   
   const nameLbl = document.getElementById('print-customer-lbl');
   const cleanName = (customerName || '').trim();
-  if (cleanName && cleanName !== '-' && cleanName !== 'Pelanggan' && cleanName !== 'Pelanggan Mandiri') {
-    nameLbl.innerText = `Nama: ${cleanName}`;
+  const validCustomer = (cleanName && cleanName !== '-' && cleanName !== 'Pelanggan' && cleanName !== 'Pelanggan Mandiri') ? cleanName : '';
+  if (validCustomer) {
+    nameLbl.innerText = 'Nama: ' + validCustomer;
     nameLbl.style.display = 'block';
   } else {
     nameLbl.innerText = '';
     nameLbl.style.display = 'none';
   }
   
+  const dateObj = createdAt ? new Date(createdAt) : new Date();
+  const timeStr = dateObj.toLocaleString('id-ID');
   const timeEl = document.getElementById('print-time-lbl');
-  if (timeEl) timeEl.innerText = `Waktu: ${new Date(createdAt).toLocaleString('id-ID')}`;
+  if (timeEl) timeEl.innerText = 'Waktu: ' + timeStr;
+
+  // Survei Kepuasan
+  const surveySec = document.getElementById('print-survey-section');
+  const surveyUrlEl = document.getElementById('print-survey-url');
+  const surveyQrEl = document.getElementById('print-survey-qr');
+  if (currentFeedbackSurveyUrl) {
+    if (surveySec) surveySec.style.display = 'block';
+    if (surveyUrlEl) surveyUrlEl.textContent = currentFeedbackSurveyUrl;
+    if (surveyQrEl) {
+      if (currentFeedbackQrDataUrl) {
+        surveyQrEl.src = currentFeedbackQrDataUrl;
+        surveyQrEl.style.display = 'block';
+      } else {
+        surveyQrEl.style.display = 'none';
+      }
+    }
+  } else if (surveySec) {
+    surveySec.style.display = 'none';
+  }
   
   const printerEl = document.getElementById('quick-printer');
   const targetPrinter = printerEl ? printerEl.value : (localStorage.getItem('mini_selected_printer') || '__DIALOG__');
+  const is80 = /80/i.test(targetPrinter || '');
+
+  // Bangun HTML cetak thermal mandiri yang presisi & terpusat
+  const paperWidth = is80 ? '80mm' : '58mm';
+  const contentWidth = is80 ? '72mm' : '48mm';
+  const numSize = is80 ? '36pt' : '32pt';
+  const qrSize = is80 ? '90px' : '75px';
+
+  const receiptHtml = '<!DOCTYPE html>' +
+'<html>' +
+'<head>' +
+'  <meta charset="utf-8">' +
+'  <style>' +
+'    @page { size: ' + paperWidth + ' auto; margin: 0; }' +
+'    * { box-sizing: border-box; margin: 0; padding: 0; }' +
+'    html, body {' +
+'      width: ' + paperWidth + ';' +
+'      margin: 0 auto;' +
+'      padding: 0;' +
+'      background: #ffffff !important;' +
+'      color: #000000 !important;' +
+'      font-family: \'Segoe UI\', Arial, -apple-system, sans-serif;' +
+'      -webkit-print-color-adjust: exact !important;' +
+'      print-color-adjust: exact !important;' +
+'      text-align: center;' +
+'    }' +
+'    .ticket {' +
+'      width: ' + contentWidth + ';' +
+'      margin: 0 auto;' +
+'      padding: 4px 0 14px 0;' +
+'      text-align: center;' +
+'    }' +
+'    .instansi {' +
+'      font-size: 8.5pt;' +
+'      font-weight: 700;' +
+'      line-height: 1.2;' +
+'      margin-bottom: 2px;' +
+'      text-transform: uppercase;' +
+'      word-wrap: break-word;' +
+'    }' +
+'    .title {' +
+'      font-size: 11pt;' +
+'      font-weight: 800;' +
+'      letter-spacing: -0.5px;' +
+'      margin: 2px 0;' +
+'    }' +
+'    .service {' +
+'      font-size: 9.5pt;' +
+'      font-weight: 700;' +
+'      margin: 2px 0;' +
+'    }' +
+'    .divider {' +
+'      border-top: 1px dashed #000000;' +
+'      margin: 6px 0;' +
+'    }' +
+'    .number {' +
+'      font-size: ' + numSize + ';' +
+'      font-weight: 900;' +
+'      letter-spacing: -1px;' +
+'      line-height: 1.1;' +
+'      margin: 4px 0;' +
+'      font-family: \'Segoe UI\', Arial, sans-serif;' +
+'    }' +
+'    .customer {' +
+'      font-size: 8.5pt;' +
+'      font-weight: 600;' +
+'      margin: 2px 0;' +
+'    }' +
+'    .time {' +
+'      font-size: 7.5pt;' +
+'      margin: 2px 0;' +
+'    }' +
+'    .survey-box {' +
+'      margin-top: 6px;' +
+'      padding-top: 5px;' +
+'      border-top: 1px dashed #000000;' +
+'      text-align: center;' +
+'    }' +
+'    .survey-title {' +
+'      font-size: 7.5pt;' +
+'      font-weight: 700;' +
+'      margin-bottom: 2px;' +
+'    }' +
+'    .survey-url {' +
+'      font-size: 7pt;' +
+'      word-break: break-all;' +
+'      margin-bottom: 3px;' +
+'      font-family: monospace;' +
+'    }' +
+'    .survey-qr {' +
+'      width: ' + qrSize + ';' +
+'      height: ' + qrSize + ';' +
+'      margin: 2px auto;' +
+'      display: block;' +
+'      image-rendering: pixelated;' +
+'    }' +
+'    .note {' +
+'      font-size: 7.5pt;' +
+'      margin-top: 6px;' +
+'      line-height: 1.2;' +
+'    }' +
+'    .thanks {' +
+'      font-size: 8pt;' +
+'      font-weight: 700;' +
+'      margin-top: 2px;' +
+'    }' +
+'  </style>' +
+'</head>' +
+'<body>' +
+'  <div class="ticket">' +
+'    <div class="instansi">' + instansiName + '</div>' +
+'    <div class="title">NOMOR ANTRIAN</div>' +
+'    <div class="service">' + (serviceName || 'Layanan') + '</div>' +
+'    <div class="divider"></div>' +
+'    <div class="number">' + ticketNumber + '</div>' +
+     (validCustomer ? '<div class="customer">Nama: ' + validCustomer + '</div>' : '') +
+'    <div class="divider"></div>' +
+'    <div class="time">Waktu: ' + timeStr + '</div>' +
+     (currentFeedbackSurveyUrl ? (
+'    <div class="survey-box">' +
+'      <div class="survey-title">⭐ Survei Kepuasan Layanan ⭐</div>' +
+'      <div class="survey-url">' + currentFeedbackSurveyUrl + '</div>' +
+       (currentFeedbackQrDataUrl ? '<img src="' + currentFeedbackQrDataUrl + '" class="survey-qr" alt="QR Survei">' : '') +
+'    </div>'
+     ) : '') +
+'    <div class="note">Silakan tunggu giliran Anda dipanggil.</div>' +
+'    <div class="thanks">Terima kasih</div>' +
+'  </div>' +
+'</body>' +
+'</html>';
 
   if (window.api && window.api.printTicket) {
     const isDialog = !targetPrinter || targetPrinter === '__DIALOG__';
+    const printTicketEl = document.getElementById('print-ticket');
+    if (printTicketEl) printTicketEl.style.display = 'block';
+
     const res = await window.api.printTicket({
       deviceName: isDialog ? undefined : targetPrinter,
-      silent: !isDialog
+      silent: !isDialog,
+      html: receiptHtml
     });
+
+    if (printTicketEl) printTicketEl.style.display = 'none';
+
     if (res && res.success && !isDialog) {
-      showToast(`Tiket ${ticketNumber} dicetak ke ${targetPrinter}`, 'success');
+      showToast('Tiket ' + ticketNumber + ' dicetak ke ' + targetPrinter, 'success');
     }
   } else {
-    window.print();
+    const printTicketEl = document.getElementById('print-ticket');
+    if (printTicketEl) printTicketEl.style.display = 'block';
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => {
+        if (printTicketEl) printTicketEl.style.display = 'none';
+      }, 500);
+    }, 60);
   }
 };
 

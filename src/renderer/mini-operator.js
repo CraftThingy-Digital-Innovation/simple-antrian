@@ -113,6 +113,8 @@ function handleMessage(msg) {
     latestCallingTickets = callingTickets;
     latestWaitingTickets = waitingTickets;
     if (payload.serverName) currentServerName = payload.serverName;
+    if (payload.feedbackSurveyUrl !== undefined) currentFeedbackSurveyUrl = payload.feedbackSurveyUrl || '';
+    if (payload.feedbackQrDataUrl !== undefined) currentFeedbackQrDataUrl = payload.feedbackQrDataUrl || '';
 
     updateActiveTickets(callingTickets);
     updateServiceDropdown(services);
@@ -597,6 +599,137 @@ async function loadPrinters() {
   }
 }
 
+// Helper: Bangun HTML cetak thermal mandiri yang presisi & terpusat
+function buildThermalReceiptHtml({ instansi, service, number, customer, time, surveyUrl, surveyQr, is80 = false }) {
+  const paperWidth = is80 ? '80mm' : '58mm';
+  const contentWidth = is80 ? '72mm' : '48mm';
+  const numSize = is80 ? '36pt' : '32pt';
+  const qrSize = is80 ? '90px' : '75px';
+
+  return '<!DOCTYPE html>' +
+'<html>' +
+'<head>' +
+'  <meta charset="utf-8">' +
+'  <style>' +
+'    @page { size: ' + paperWidth + ' auto; margin: 0; }' +
+'    * { box-sizing: border-box; margin: 0; padding: 0; }' +
+'    html, body {' +
+'      width: ' + paperWidth + ';' +
+'      margin: 0 auto;' +
+'      padding: 0;' +
+'      background: #ffffff !important;' +
+'      color: #000000 !important;' +
+'      font-family: \'Segoe UI\', Arial, -apple-system, sans-serif;' +
+'      -webkit-print-color-adjust: exact !important;' +
+'      print-color-adjust: exact !important;' +
+'      text-align: center;' +
+'    }' +
+'    .ticket {' +
+'      width: ' + contentWidth + ';' +
+'      margin: 0 auto;' +
+'      padding: 4px 0 14px 0;' +
+'      text-align: center;' +
+'    }' +
+'    .instansi {' +
+'      font-size: 8.5pt;' +
+'      font-weight: 700;' +
+'      line-height: 1.2;' +
+'      margin-bottom: 2px;' +
+'      text-transform: uppercase;' +
+'      word-wrap: break-word;' +
+'    }' +
+'    .title {' +
+'      font-size: 11pt;' +
+'      font-weight: 800;' +
+'      letter-spacing: -0.5px;' +
+'      margin: 2px 0;' +
+'    }' +
+'    .service {' +
+'      font-size: 9.5pt;' +
+'      font-weight: 700;' +
+'      margin: 2px 0;' +
+'    }' +
+'    .divider {' +
+'      border-top: 1px dashed #000000;' +
+'      margin: 6px 0;' +
+'    }' +
+'    .number {' +
+'      font-size: ' + numSize + ';' +
+'      font-weight: 900;' +
+'      letter-spacing: -1px;' +
+'      line-height: 1.1;' +
+'      margin: 4px 0;' +
+'      font-family: \'Segoe UI\', Arial, sans-serif;' +
+'    }' +
+'    .customer {' +
+'      font-size: 8.5pt;' +
+'      font-weight: 600;' +
+'      margin: 2px 0;' +
+'    }' +
+'    .time {' +
+'      font-size: 7.5pt;' +
+'      margin: 2px 0;' +
+'    }' +
+'    .survey-box {' +
+'      margin-top: 6px;' +
+'      padding-top: 5px;' +
+'      border-top: 1px dashed #000000;' +
+'      text-align: center;' +
+'    }' +
+'    .survey-title {' +
+'      font-size: 7.5pt;' +
+'      font-weight: 700;' +
+'      margin-bottom: 2px;' +
+'    }' +
+'    .survey-url {' +
+'      font-size: 7pt;' +
+'      word-break: break-all;' +
+'      margin-bottom: 3px;' +
+'      font-family: monospace;' +
+'    }' +
+'    .survey-qr {' +
+'      width: ' + qrSize + ';' +
+'      height: ' + qrSize + ';' +
+'      margin: 2px auto;' +
+'      display: block;' +
+'      image-rendering: pixelated;' +
+'    }' +
+'    .note {' +
+'      font-size: 7.5pt;' +
+'      margin-top: 6px;' +
+'      line-height: 1.2;' +
+'    }' +
+'    .thanks {' +
+'      font-size: 8pt;' +
+'      font-weight: 700;' +
+'      margin-top: 2px;' +
+'    }' +
+'  </style>' +
+'</head>' +
+'<body>' +
+'  <div class="ticket">' +
+'    <div class="instansi">' + instansi + '</div>' +
+'    <div class="title">NOMOR ANTRIAN</div>' +
+'    <div class="service">' + service + '</div>' +
+'    <div class="divider"></div>' +
+'    <div class="number">' + number + '</div>' +
+     (customer ? '<div class="customer">Nama: ' + customer + '</div>' : '') +
+'    <div class="divider"></div>' +
+'    <div class="time">Waktu: ' + time + '</div>' +
+     (surveyUrl ? (
+'    <div class="survey-box">' +
+'      <div class="survey-title">⭐ Survei Kepuasan Layanan ⭐</div>' +
+'      <div class="survey-url">' + surveyUrl + '</div>' +
+       (surveyQr ? '<img src="' + surveyQr + '" class="survey-qr" alt="QR Survei">' : '') +
+'    </div>'
+     ) : '') +
+'    <div class="note">Silakan tunggu giliran Anda dipanggil.</div>' +
+'    <div class="thanks">Terima kasih</div>' +
+'  </div>' +
+'</body>' +
+'</html>';
+}
+
 // Template thermal print trigger
 async function triggerMiniTicketPrint(ticket) {
   const instansiName = (currentServerName || 'SimpleAntrian').toUpperCase();
@@ -611,9 +744,10 @@ async function triggerMiniTicketPrint(ticket) {
 
   const nameLbl = document.getElementById('print-customer-lbl');
   const cleanName = (ticket.customer_name || '').trim();
-  if (cleanName && cleanName !== '-' && cleanName !== 'Pelanggan' && cleanName !== 'Pelanggan Mandiri') {
+  const validCustomer = (cleanName && cleanName !== '-' && cleanName !== 'Pelanggan' && cleanName !== 'Pelanggan Mandiri') ? cleanName : '';
+  if (validCustomer) {
     if (nameLbl) {
-      nameLbl.textContent = 'Nama: ' + cleanName;
+      nameLbl.textContent = 'Nama: ' + validCustomer;
       nameLbl.style.display = 'block';
     }
   } else if (nameLbl) {
@@ -621,32 +755,77 @@ async function triggerMiniTicketPrint(ticket) {
     nameLbl.style.display = 'none';
   }
 
+  const dateObj = ticket.created_at ? new Date(ticket.created_at) : new Date();
+  const timeStr = dateObj.toLocaleString('id-ID');
   const timeEl = document.getElementById('print-time-lbl');
-  if (timeEl) {
-    const dateObj = ticket.created_at ? new Date(ticket.created_at) : new Date();
-    timeEl.textContent = 'Waktu: ' + dateObj.toLocaleString('id-ID');
+  if (timeEl) timeEl.textContent = 'Waktu: ' + timeStr;
+
+  // Survei Kepuasan
+  const surveySec = document.getElementById('print-survey-section');
+  const surveyUrlEl = document.getElementById('print-survey-url');
+  const surveyQrEl = document.getElementById('print-survey-qr');
+  if (currentFeedbackSurveyUrl) {
+    if (surveySec) surveySec.style.display = 'block';
+    if (surveyUrlEl) surveyUrlEl.textContent = currentFeedbackSurveyUrl;
+    if (surveyQrEl) {
+      if (currentFeedbackQrDataUrl) {
+        surveyQrEl.src = currentFeedbackQrDataUrl;
+        surveyQrEl.style.display = 'block';
+      } else {
+        surveyQrEl.style.display = 'none';
+      }
+    }
+  } else if (surveySec) {
+    surveySec.style.display = 'none';
   }
 
   const printerSelect = document.getElementById('mini-printer-select');
   const selectedPrinter = printerSelect ? printerSelect.value : '__DIALOG__';
+  const is80 = /80/i.test(selectedPrinter || '');
+
+  // Bangun HTML cetak thermal mandiri yang presisi & terpusat
+  const receiptHtml = buildThermalReceiptHtml({
+    instansi: instansiName,
+    service: ticket.service_name || 'Layanan',
+    number: ticket.ticket_number || '---',
+    customer: validCustomer,
+    time: timeStr,
+    surveyUrl: currentFeedbackSurveyUrl,
+    surveyQr: currentFeedbackQrDataUrl,
+    is80: is80
+  });
 
   if (window.api && window.api.printTicket) {
     const isDialog = !selectedPrinter || selectedPrinter === '__DIALOG__';
-    showToast(isDialog ? 'Membuka dialog cetak tiket...' : `Mencetak ke ${selectedPrinter}...`, 'info');
+    showToast(isDialog ? 'Membuka dialog cetak tiket...' : ('Mencetak ke ' + selectedPrinter + '...'), 'info');
     
+    // Tampilkan elemen DOM secara sementara untuk fallback render
+    const printTicketEl = document.getElementById('print-ticket');
+    if (printTicketEl) printTicketEl.style.display = 'block';
+
     const res = await window.api.printTicket({
       deviceName: isDialog ? undefined : selectedPrinter,
-      silent: !isDialog
+      silent: !isDialog,
+      html: receiptHtml
     });
 
+    if (printTicketEl) printTicketEl.style.display = 'none';
+
     if (res && res.success) {
-      showToast(`Tiket ${ticket.ticket_number} berhasil dicetak!`, 'success');
+      showToast('Tiket ' + ticket.ticket_number + ' berhasil dicetak!', 'success');
     } else if (res && res.reason && res.reason !== 'cancelled') {
-      showToast(`Gagal mencetak: ${res.reason}`, 'error');
+      showToast('Gagal mencetak: ' + res.reason, 'error');
     }
   } else {
     // Fallback native print dialog
-    window.print();
+    const printTicketEl = document.getElementById('print-ticket');
+    if (printTicketEl) printTicketEl.style.display = 'block';
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => {
+        if (printTicketEl) printTicketEl.style.display = 'none';
+      }, 500);
+    }, 60);
   }
 }
 

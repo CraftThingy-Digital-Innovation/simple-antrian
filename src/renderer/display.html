@@ -461,26 +461,17 @@
   </footer>
 
   <!-- BANNER SURVEI KEPUASAN (Di bawah footer-bar, hanya tampil jika ada URL yang diisi di Pengaturan) -->
-  <div id="feedback-survey-bar" style="display: none; height: 56px; background: rgba(13, 20, 36, 0.98); border-top: 1px solid rgba(99, 102, 241, 0.25); padding: 0 30px; align-items: center; justify-content: center; gap: 20px; z-index: 5; box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4); flex-shrink: 0;">
-    <div style="font-size: 1.15rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 10px; letter-spacing: -0.3px;">
-      <span style="font-size: 1.3rem;">⭐</span> Puas dengan layanan kami? silakan nilai di:
-    </div>
-    <div id="feedback-qr-wrapper" style="display: none; align-items: center; background: #ffffff; padding: 4px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);">
-      <img id="feedback-qr-img" src="" alt="Scan QR Code" style="width: 44px; height: 44px; display: block; image-rendering: pixelated;">
-    </div>
-    <div id="feedback-url-wrapper" style="display: none; align-items: center; font-size: 1.05rem; font-weight: 700; color: #a5b4fc; background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(129, 140, 248, 0.4); padding: 6px 16px; border-radius: 10px; font-family: monospace; letter-spacing: 0.5px;">
-      <span id="feedback-url-text">https://...</span>
-    </div>
-  </div>
-
-  <!-- FULLSCREEN MEDIA CONTAINER (Video & Foto) -->
-  <div id="video-fullscreen-container" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 90; display: none; align-items: center; justify-content: center;">
-    <video id="fullscreen-video-player" style="width: 100%; height: 100%; object-fit: contain; display: none;" autoplay playsinline preload="auto"></video>
-    <img id="fullscreen-image-player" style="width: 100%; height: 100%; object-fit: contain; display: none;" alt="Media Display">
-    <div id="fullscreen-video-placeholder" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 15px; text-align: center; color: var(--text-secondary); font-family: sans-serif; z-index: 92;">
-      <div style="font-size: 3rem;">📹</div>
-      <div style="font-size: 1.5rem; font-weight: 700;">Playlist Media Kosong</div>
-      <div style="font-size: 1rem; color: var(--text-muted);">Silakan tambahkan file video atau foto di tab Pengaturan Operator.</div>
+  <div id="feedback-survey-bar" style="display: none; width: 100%; height: 56px; background: rgba(13, 20, 36, 0.98); border-top: 1px solid rgba(99, 102, 241, 0.25); padding: 0 24px; box-sizing: border-box; align-items: center; justify-content: center; z-index: 5; box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4); flex-shrink: 0; text-align: center;">
+    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 16px; margin: 0 auto; max-width: 100%;">
+      <div style="font-size: 1.15rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 8px; letter-spacing: -0.3px; white-space: nowrap;">
+        <span style="font-size: 1.3rem;">⭐</span> Puas dengan layanan kami? silakan nilai di:
+      </div>
+      <div id="feedback-qr-wrapper" style="display: none; align-items: center; background: #ffffff; padding: 4px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); flex-shrink: 0;">
+        <img id="feedback-qr-img" src="" alt="Scan QR Code" style="width: 44px; height: 44px; display: block; image-rendering: pixelated;">
+      </div>
+      <div id="feedback-url-wrapper" style="display: none; align-items: center; font-size: 1.05rem; font-weight: 700; color: #a5b4fc; background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(129, 140, 248, 0.4); padding: 6px 16px; border-radius: 10px; font-family: monospace; letter-spacing: 0.5px; word-break: break-all;">
+        <span id="feedback-url-text">https://...</span>
+      </div>
     </div>
   </div>
 
