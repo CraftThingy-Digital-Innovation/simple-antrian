@@ -1768,24 +1768,42 @@ function setupEventListeners() {
     }
   });
 
-  // Printer selection listener
+  // Printer selection listener (Quick Ticket & Header Sync)
+  const syncPrinterChange = (val) => {
+    localStorage.setItem('mini_selected_printer', val);
+    const qp = document.getElementById('quick-printer');
+    const hp = document.getElementById('desktop-header-printer');
+    if (qp) qp.value = val;
+    if (hp) hp.value = val;
+    const label = val === '__DIALOG__' ? 'Dialog Cetak OS' : val;
+    showToast('Target printer disimpan: ' + label, 'info');
+  };
+
   const quickPrinterSelect = document.getElementById('quick-printer');
   if (quickPrinterSelect) {
-    quickPrinterSelect.addEventListener('change', () => {
-      localStorage.setItem('mini_selected_printer', quickPrinterSelect.value);
-      const label = quickPrinterSelect.value === '__DIALOG__' ? 'Dialog Cetak OS' : quickPrinterSelect.value;
-      showToast('Target printer: ' + label, 'info');
-    });
+    quickPrinterSelect.addEventListener('change', () => syncPrinterChange(quickPrinterSelect.value));
   }
+
+  const headerPrinterSelect = document.getElementById('desktop-header-printer');
+  if (headerPrinterSelect) {
+    headerPrinterSelect.addEventListener('change', () => syncPrinterChange(headerPrinterSelect.value));
+  }
+
+  const refreshBothPrinters = async () => {
+    if (typeof loadOperatorPrinters === 'function') {
+      await loadOperatorPrinters();
+      showToast('Daftar printer diperbarui!', 'info');
+    }
+  };
 
   const btnRefreshQuickPrinter = document.getElementById('btn-refresh-quick-printer');
   if (btnRefreshQuickPrinter) {
-    btnRefreshQuickPrinter.addEventListener('click', async () => {
-      if (typeof loadOperatorPrinters === 'function') {
-        await loadOperatorPrinters();
-        showToast('Daftar printer diperbarui!', 'info');
-      }
-    });
+    btnRefreshQuickPrinter.addEventListener('click', refreshBothPrinters);
+  }
+
+  const btnRefreshHeaderPrinter = document.getElementById('btn-refresh-header-printer');
+  if (btnRefreshHeaderPrinter) {
+    btnRefreshHeaderPrinter.addEventListener('click', refreshBothPrinters);
   }
 
   // Buat Tiket Baru (Quick Ticket)
@@ -3105,11 +3123,17 @@ async function loadMirrorSources() {
 
 
 async function loadOperatorPrinters() {
-  const select = document.getElementById('quick-printer');
-  if (!select) return;
+  const selects = [
+    document.getElementById('quick-printer'),
+    document.getElementById('desktop-header-printer')
+  ].filter(Boolean);
+
+  if (selects.length === 0) return;
 
   const savedPrinter = localStorage.getItem('mini_selected_printer') || '';
-  select.innerHTML = '<option value="__DIALOG__">🖨️ Dialog Cetak (Pilih Manual)</option>';
+  selects.forEach(s => {
+    s.innerHTML = '<option value="__DIALOG__">🖨️ Dialog Cetak (Pilih Manual)</option>';
+  });
 
   if (window.api && window.api.getPrinters) {
     try {
@@ -3119,29 +3143,36 @@ async function loadOperatorPrinters() {
         let defaultPrinterName = '';
 
         printers.forEach(p => {
-          const opt = document.createElement('option');
-          opt.value = p.name;
           const isDef = !!p.isDefault;
           if (isDef) defaultPrinterName = p.name;
           const isThermal = /pos|thermal|receipt|58|80|tm-/i.test(p.name);
           const badge = isThermal ? '🧾 ' : (isDef ? '⭐ ' : '🖨️ ');
-          opt.textContent = `${badge}${p.displayName || p.name}${isDef ? ' (Default)' : ''}`;
-          select.appendChild(opt);
+          const label = `${badge}${p.displayName || p.name}${isDef ? ' (Default)' : ''}`;
+
+          selects.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = p.name;
+            opt.textContent = label;
+            s.appendChild(opt);
+          });
+
           if (p.name === savedPrinter) foundSaved = true;
         });
 
+        let targetVal = '__DIALOG__';
         if (savedPrinter && foundSaved) {
-          select.value = savedPrinter;
+          targetVal = savedPrinter;
         } else if (!savedPrinter) {
           const thermal = printers.find(p => /pos|thermal|receipt|58|80|tm-/i.test(p.name));
           if (thermal) {
-            select.value = thermal.name;
+            targetVal = thermal.name;
             localStorage.setItem('mini_selected_printer', thermal.name);
           } else if (defaultPrinterName) {
-            select.value = defaultPrinterName;
+            targetVal = defaultPrinterName;
             localStorage.setItem('mini_selected_printer', defaultPrinterName);
           }
         }
+        selects.forEach(s => s.value = targetVal);
       }
     } catch (err) {
       console.error('Gagal memuat printer operator:', err);

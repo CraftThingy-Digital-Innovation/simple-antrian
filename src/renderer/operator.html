@@ -397,6 +397,14 @@
       <div class="page-header">
         <h1 class="page-title">Panggilan & Antrian</h1>
         <div style="display: flex; gap: 10px; align-items: center;">
+          <!-- Target Printer Header Quick Selector -->
+          <div class="header-printer-selector" style="display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); border-radius: 8px; padding: 4px 10px;">
+            <span style="font-size: 0.85rem;">🖨️</span>
+            <select id="desktop-header-printer" class="input-control" style="padding: 2px 6px; font-size: 0.8rem; height: 32px; border: none; background: transparent; outline: none; min-width: 180px; color: var(--text-primary);" title="Pilih target printer untuk cetak langsung atau dialog OS">
+              <option value="__DIALOG__">Dialog Cetak (Pilih Manual)</option>
+            </select>
+            <button id="btn-refresh-header-printer" type="button" class="btn btn-secondary" style="padding: 4px 8px; height: 28px; font-size: 0.75rem;" title="Muat ulang daftar printer">🔄</button>
+          </div>
           <button class="btn btn-danger btn-sm" id="btn-stop-audio" style="display: flex; align-items: center; gap: 6px; font-weight: 700; background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);" title="Hentikan panggilan suara yang sedang berbunyi di Layar Display">
             <span>⏹️</span> Hentikan Suara
           </button>
