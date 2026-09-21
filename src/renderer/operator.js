@@ -186,6 +186,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load awal list window untuk mirroring
   loadMirrorSources();
 
+  // Load daftar printer untuk Quick Ticket
+  if (typeof loadOperatorPrinters === "function") {
+    loadOperatorPrinters();
+  }
+
   // Load awal tab statistik dengan tanggal hari ini
   const today = new Date().toLocaleDateString('sv-SE');
   document.getElementById('stats-date').value = today;
@@ -1760,6 +1765,26 @@ function setupEventListeners() {
     }
   });
 
+  // Printer selection listener
+  const quickPrinterSelect = document.getElementById('quick-printer');
+  if (quickPrinterSelect) {
+    quickPrinterSelect.addEventListener('change', () => {
+      localStorage.setItem('mini_selected_printer', quickPrinterSelect.value);
+      const label = quickPrinterSelect.value === '__DIALOG__' ? 'Dialog Cetak OS' : quickPrinterSelect.value;
+      showToast('Target printer: ' + label, 'info');
+    });
+  }
+
+  const btnRefreshQuickPrinter = document.getElementById('btn-refresh-quick-printer');
+  if (btnRefreshQuickPrinter) {
+    btnRefreshQuickPrinter.addEventListener('click', async () => {
+      if (typeof loadOperatorPrinters === 'function') {
+        await loadOperatorPrinters();
+        showToast('Daftar printer diperbarui!', 'info');
+      }
+    });
+  }
+
   // Buat Tiket Baru (Quick Ticket)
   const btnCreateTicket = document.getElementById('btn-create-ticket');
   btnCreateTicket.addEventListener('click', () => {
@@ -2479,7 +2504,7 @@ async function triggerSearch() {
 }
 
 // Fungsi Cetak Tiket untuk Printer Thermal / Dot Matrix
-window.printTicketHistory = function(ticketNumber, serviceName, customerName, createdAt) {
+window.printTicketHistory = async function(ticketNumber, serviceName, customerName, createdAt) {
   const srvEl = document.getElementById('print-service-name');
   if (srvEl) srvEl.innerText = serviceName || 'Layanan';
 
@@ -2499,7 +2524,21 @@ window.printTicketHistory = function(ticketNumber, serviceName, customerName, cr
   const timeEl = document.getElementById('print-time-lbl');
   if (timeEl) timeEl.innerText = `Waktu: ${new Date(createdAt).toLocaleString('id-ID')}`;
   
-  window.print();
+  const printerEl = document.getElementById('quick-printer');
+  const targetPrinter = printerEl ? printerEl.value : (localStorage.getItem('mini_selected_printer') || '__DIALOG__');
+
+  if (window.api && window.api.printTicket) {
+    const isDialog = !targetPrinter || targetPrinter === '__DIALOG__';
+    const res = await window.api.printTicket({
+      deviceName: isDialog ? undefined : targetPrinter,
+      silent: !isDialog
+    });
+    if (res && res.success && !isDialog) {
+      showToast(`Tiket ${ticketNumber} dicetak ke ${targetPrinter}`, 'success');
+    }
+  } else {
+    window.print();
+  }
 };
 
 // Muat Statistik Harian
@@ -3060,3 +3099,49 @@ async function loadMirrorSources() {
   }
 }
 
+
+
+async function loadOperatorPrinters() {
+  const select = document.getElementById('quick-printer');
+  if (!select) return;
+
+  const savedPrinter = localStorage.getItem('mini_selected_printer') || '';
+  select.innerHTML = '<option value="__DIALOG__">🖨️ Dialog Cetak (Pilih Manual)</option>';
+
+  if (window.api && window.api.getPrinters) {
+    try {
+      const printers = await window.api.getPrinters();
+      if (printers && printers.length > 0) {
+        let foundSaved = false;
+        let defaultPrinterName = '';
+
+        printers.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.name;
+          const isDef = !!p.isDefault;
+          if (isDef) defaultPrinterName = p.name;
+          const isThermal = /pos|thermal|receipt|58|80|tm-/i.test(p.name);
+          const badge = isThermal ? '🧾 ' : (isDef ? '⭐ ' : '🖨️ ');
+          opt.textContent = `${badge}${p.displayName || p.name}${isDef ? ' (Default)' : ''}`;
+          select.appendChild(opt);
+          if (p.name === savedPrinter) foundSaved = true;
+        });
+
+        if (savedPrinter && foundSaved) {
+          select.value = savedPrinter;
+        } else if (!savedPrinter) {
+          const thermal = printers.find(p => /pos|thermal|receipt|58|80|tm-/i.test(p.name));
+          if (thermal) {
+            select.value = thermal.name;
+            localStorage.setItem('mini_selected_printer', thermal.name);
+          } else if (defaultPrinterName) {
+            select.value = defaultPrinterName;
+            localStorage.setItem('mini_selected_printer', defaultPrinterName);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Gagal memuat printer operator:', err);
+    }
+  }
+}

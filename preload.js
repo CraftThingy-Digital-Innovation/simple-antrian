@@ -30,6 +30,9 @@ contextBridge.exposeInMainWorld('api', {
   clearLocalMediaFolder: () => ipcRenderer.invoke('clear-local-media-folder'),
   // Mini Operator Window: restore jendela utama
   restoreMainWindow: () => ipcRenderer.invoke('restore-main-window'),
+  // Printer API
+  getPrinters: () => ipcRenderer.invoke('get-printers'),
+  printTicket: (options) => ipcRenderer.invoke('print-ticket', options),
   performWaUpdate: () => ipcRenderer.invoke('wa-perform-update'),
   checkAppUpdates: () => ipcRenderer.invoke('check-app-updates'),
   onAppUpdateAvailable: (callback) => {

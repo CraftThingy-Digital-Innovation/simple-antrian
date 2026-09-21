@@ -452,6 +452,16 @@
             <input type="tel" class="input-control" id="quick-phone" placeholder="Contoh: 08123456789">
           </div>
 
+            <div class="form-group">
+              <label for="quick-printer">Target Printer Cetak</label>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <select class="input-control" id="quick-printer" style="flex: 1;">
+                  <option value="__DIALOG__">🖨️ Dialog Cetak (Pilih Manual)</option>
+                </select>
+                <button type="button" class="btn btn-secondary" id="btn-refresh-quick-printer" title="Muat ulang printer" style="padding: 6px 10px; border-radius: 6px; height: 38px;">🔄</button>
+              </div>
+            </div>
+
           <button class="btn btn-primary" id="btn-create-ticket" style="margin-top: 10px;">
             ➕ Cetak & Buat Tiket
           </button>

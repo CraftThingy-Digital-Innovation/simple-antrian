@@ -8,6 +8,8 @@ let reconnectTimer = null;
 let servicesList = [];
 let activeTickets = {};  // { serviceId: ticketData }
 let currentDisplayMode = 'queue';
+let currentTxId = '';
+let currentServerName = '';
 
 // ==================== TOAST ====================
 function showToast(msg, type = 'info') {
@@ -115,8 +117,19 @@ function handleMessage(msg) {
     setActiveMode(mode);
   }
 
+  if (type === 'STATE_UPDATE' && payload) {
+    if (payload.serverName) currentServerName = payload.serverName;
+  }
+
   if (type === 'TICKET_CREATED') {
-    showToast('Tiket ' + (payload.ticket_number || '') + ' berhasil dibuat!', 'success');
+    const ticket = payload;
+    showToast('Tiket ' + (ticket.ticket_number || '') + ' berhasil dibuat!', 'success');
+
+    // Jika tiket dibuat dari mini operator ini -> cetak tiket ke printer terpilih / buka dialog
+    if (ticket.tx_id && ticket.tx_id === currentTxId) {
+      currentTxId = ''; // Reset transaksi
+      triggerMiniTicketPrint(ticket);
+    }
   }
 }
 
@@ -246,18 +259,38 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Antrian dilewati.', 'warning');
   });
 
+  // Muat daftar printer sistem
+  loadPrinters();
+
+  const printerSelect = document.getElementById('mini-printer-select');
+  if (printerSelect) {
+    printerSelect.addEventListener('change', () => {
+      localStorage.setItem('mini_selected_printer', printerSelect.value);
+      const label = printerSelect.value === '__DIALOG__' ? 'Dialog Cetak OS' : printerSelect.value;
+      showToast('Printer target: ' + label, 'info');
+    });
+  }
+
+  const btnRefreshPrinters = document.getElementById('mini-btn-refresh-printers');
+  if (btnRefreshPrinters) {
+    btnRefreshPrinters.addEventListener('click', async () => {
+      await loadPrinters();
+      showToast('Daftar printer diperbarui!', 'info');
+    });
+  }
+
   // Cetak tiket
   document.getElementById('mini-btn-print').addEventListener('click', () => {
     const serviceId = document.getElementById('mini-service-select').value;
-    const name = document.getElementById('mini-ticket-name').value;
-    const phone = document.getElementById('mini-ticket-phone').value;
-    if (!serviceId) { showToast('Pilih layanan dulu!', 'error'); return; }
+    const name = (document.getElementById('mini-ticket-name').value || '').trim();
+    const phone = (document.getElementById('mini-ticket-phone').value || '').trim();
+    if (!serviceId) { showToast('Pilih kategori layanan dulu!', 'error'); return; }
     
-    const txId = 'mini-' + Date.now();
-    sendAction('CREATE_TICKET', { serviceId, name, phone, txId });
+    currentTxId = 'mini-' + Date.now();
+    sendAction('CREATE_TICKET', { serviceId, name, phone, txId: currentTxId });
     document.getElementById('mini-ticket-name').value = '';
     document.getElementById('mini-ticket-phone').value = '';
-    showToast('Membuat tiket...', 'info');
+    showToast('Membuat & menyiapkan cetak tiket...', 'info');
   });
 
   // Mode buttons
@@ -294,4 +327,106 @@ async function loadMirrorSources() {
       select.appendChild(opt);
     });
   } catch (_) {}
+}
+
+
+// ==================== PRINTER FUNCTIONS ====================
+async function loadPrinters() {
+  const select = document.getElementById('mini-printer-select');
+  if (!select) return;
+
+  const savedPrinter = localStorage.getItem('mini_selected_printer') || '';
+  select.innerHTML = '<option value="__DIALOG__">🖨️ Dialog Cetak (Pilih Manual)</option>';
+
+  if (window.api && window.api.getPrinters) {
+    try {
+      const printers = await window.api.getPrinters();
+      if (printers && printers.length > 0) {
+        let foundSaved = false;
+        let defaultPrinterName = '';
+
+        printers.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.name;
+          const isDef = !!p.isDefault;
+          if (isDef) defaultPrinterName = p.name;
+          const isThermal = /pos|thermal|receipt|58|80|tm-/i.test(p.name);
+          const badge = isThermal ? '🧾 ' : (isDef ? '⭐ ' : '🖨️ ');
+          opt.textContent = `${badge}${p.displayName || p.name}${isDef ? ' (Default)' : ''}`;
+          select.appendChild(opt);
+          if (p.name === savedPrinter) foundSaved = true;
+        });
+
+        if (savedPrinter && foundSaved) {
+          select.value = savedPrinter;
+        } else if (!savedPrinter) {
+          // Prioritaskan thermal printer (seperti POS-58) atau default printer sistem
+          const thermal = printers.find(p => /pos|thermal|receipt|58|80|tm-/i.test(p.name));
+          if (thermal) {
+            select.value = thermal.name;
+            localStorage.setItem('mini_selected_printer', thermal.name);
+          } else if (defaultPrinterName) {
+            select.value = defaultPrinterName;
+            localStorage.setItem('mini_selected_printer', defaultPrinterName);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Gagal mengambil daftar printer:', err);
+    }
+  }
+}
+
+async function triggerMiniTicketPrint(ticket) {
+  const instansiEl = document.getElementById('print-instansi-name');
+  if (instansiEl) {
+    instansiEl.textContent = currentServerName || '';
+    instansiEl.style.display = currentServerName ? 'block' : 'none';
+  }
+
+  const srvEl = document.getElementById('print-service-name');
+  if (srvEl) srvEl.textContent = ticket.service_name || 'Layanan';
+
+  const ticketNoEl = document.getElementById('print-ticket-no');
+  if (ticketNoEl) ticketNoEl.textContent = ticket.ticket_number || '---';
+
+  const nameLbl = document.getElementById('print-customer-lbl');
+  const cleanName = (ticket.customer_name || '').trim();
+  if (cleanName && cleanName !== '-' && cleanName !== 'Pelanggan' && cleanName !== 'Pelanggan Mandiri') {
+    if (nameLbl) {
+      nameLbl.textContent = 'Nama: ' + cleanName;
+      nameLbl.style.display = 'block';
+    }
+  } else if (nameLbl) {
+    nameLbl.textContent = '';
+    nameLbl.style.display = 'none';
+  }
+
+  const timeEl = document.getElementById('print-time-lbl');
+  if (timeEl) {
+    const dateObj = ticket.created_at ? new Date(ticket.created_at) : new Date();
+    timeEl.textContent = 'Waktu: ' + dateObj.toLocaleString('id-ID');
+  }
+
+  const printerSelect = document.getElementById('mini-printer-select');
+  const selectedPrinter = printerSelect ? printerSelect.value : '__DIALOG__';
+
+  if (window.api && window.api.printTicket) {
+    const isDialog = !selectedPrinter || selectedPrinter === '__DIALOG__';
+    showToast(isDialog ? 'Membuka dialog cetak tiket...' : `Mencetak ke ${selectedPrinter}...`, 'info');
+    
+    const res = await window.api.printTicket({
+      deviceName: isDialog ? undefined : selectedPrinter,
+      silent: !isDialog
+    });
+
+    if (res && res.success) {
+      showToast(`Tiket ${ticket.ticket_number} berhasil dicetak!`, 'success');
+    } else if (res && res.reason && res.reason !== 'cancelled') {
+      showToast(`Gagal mencetak: ${res.reason}`, 'error');
+    }
+  } else {
+    // Fallback native print dialog
+    window.print();
+  }
 }

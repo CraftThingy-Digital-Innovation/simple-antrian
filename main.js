@@ -253,8 +253,8 @@ function createMiniOperatorWindow() {
   const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
 
   // Posisi di pojok kanan bawah
-  const winWidth = 280;
-  const winHeight = 520;
+  const winWidth = 295;
+  const winHeight = 550;
   const x = screenW - winWidth - 16;
   const y = screenH - winHeight - 16;
 
@@ -267,7 +267,7 @@ function createMiniOperatorWindow() {
     transparent: true,
     alwaysOnTop: true,
     skipTaskbar: true,
-    resizable: false,
+    resizable: true,
     movable: true,
     hasShadow: true,
     webPreferences: {
@@ -769,6 +769,57 @@ function scanMediaFolder(folderPath) {
 
   return results;
 }
+
+// IPC Handler: Ambil daftar printer yang terinstall di sistem
+ipcMain.handle('get-printers', async (event) => {
+  try {
+    const printers = await event.sender.getPrintersAsync();
+    return printers || [];
+  } catch (err) {
+    console.error('[Printer] Gagal mengambil daftar printer:', err);
+    return [];
+  }
+});
+
+// IPC Handler: Cetak tiket antrian (dialog OS atau silent langsung ke printer)
+ipcMain.handle('print-ticket', async (event, options = {}) => {
+  return new Promise((resolve) => {
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!win) {
+        return resolve({ success: false, reason: 'Window tidak ditemukan' });
+      }
+
+      const isDialog = !options.deviceName || options.deviceName === '__DIALOG__';
+      const printOptions = {
+        silent: !isDialog,
+        printBackground: true,
+        margins: { marginType: 'none' }
+      };
+
+      if (!isDialog) {
+        printOptions.deviceName = options.deviceName;
+      }
+
+      // Jika membuka dialog cetak OS, pastikan window difokuskan
+      if (isDialog) {
+        win.focus();
+      }
+
+      win.webContents.print(printOptions, (success, failureReason) => {
+        if (!success) {
+          console.warn('[Print] Result:', failureReason);
+          resolve({ success: false, reason: failureReason });
+        } else {
+          resolve({ success: true });
+        }
+      });
+    } catch (err) {
+      console.error('[Print] Gagal mengeksekusi print:', err);
+      resolve({ success: false, reason: err.message });
+    }
+  });
+});
 
 // IPC Handler: Restore jendela utama (dipanggil dari mini operator)
 ipcMain.handle('restore-main-window', () => {
