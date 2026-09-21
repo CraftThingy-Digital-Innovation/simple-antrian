@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld('api', {
   closeKioskWindow: () => ipcRenderer.invoke('close-kiosk-window'),
   isKioskWindowOpen: () => ipcRenderer.invoke('is-kiosk-window-open'),
   addVideoFile: () => ipcRenderer.invoke('add-video-file'),
+  // Local Media Folder: folder lokal per-mesin untuk video/foto tanpa HTTP streaming
+  selectLocalMediaFolder: () => ipcRenderer.invoke('select-local-media-folder'),
+  getLocalMediaFolder: () => ipcRenderer.invoke('get-local-media-folder'),
+  clearLocalMediaFolder: () => ipcRenderer.invoke('clear-local-media-folder'),
   performWaUpdate: () => ipcRenderer.invoke('wa-perform-update'),
   checkAppUpdates: () => ipcRenderer.invoke('check-app-updates'),
   onAppUpdateAvailable: (callback) => {

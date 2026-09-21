@@ -563,6 +563,99 @@ ipcMain.handle('is-kiosk-window-open', () => {
   return kioskWindow !== null;
 });
 
+// IPC Handler: Pilih folder media lokal — tanpa copy, langsung pakai file://
+// Setiap mesin (server/client) bisa pilih folder sendiri.
+ipcMain.handle('select-local-media-folder', async () => {
+  if (!mainWindow) return { success: false, message: 'Window utama tidak ditemukan.' };
+
+  const { filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Pilih Folder Media Lokal (Video & Foto)',
+    properties: ['openDirectory']
+  });
+
+  if (!filePaths || filePaths.length === 0) {
+    return { success: false, message: 'Tidak ada folder dipilih.' };
+  }
+
+  const folderPath = filePaths[0];
+
+  // Scan folder untuk file media
+  const mediaFiles = scanMediaFolder(folderPath);
+
+  // Simpan path ke file lokal (per-mesin, bukan di server DB)
+  const configPath = app ? path.join(app.getPath('userData'), 'local-media-folder.json') : path.join(process.cwd(), 'local-media-folder.json');
+  try {
+    fs.writeFileSync(configPath, JSON.stringify({ folderPath, lastScan: Date.now() }), 'utf8');
+  } catch (err) {
+    console.error('[Local Media] Gagal menyimpan config:', err);
+  }
+
+  console.log('[Local Media] Folder dipilih:', folderPath, '- Ditemukan', mediaFiles.length, 'file media.');
+  return { success: true, folderPath, mediaFiles };
+});
+
+// IPC Handler: Ambil folder media lokal yang sudah disimpan
+ipcMain.handle('get-local-media-folder', async () => {
+  const configPath = app ? path.join(app.getPath('userData'), 'local-media-folder.json') : path.join(process.cwd(), 'local-media-folder.json');
+  try {
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (config.folderPath && fs.existsSync(config.folderPath)) {
+        const mediaFiles = scanMediaFolder(config.folderPath);
+        return { success: true, folderPath: config.folderPath, mediaFiles };
+      }
+    }
+  } catch (err) {
+    console.error('[Local Media] Gagal membaca config:', err);
+  }
+  return { success: false, folderPath: '', mediaFiles: [] };
+});
+
+// IPC Handler: Hapus setting folder media lokal
+ipcMain.handle('clear-local-media-folder', async () => {
+  const configPath = app ? path.join(app.getPath('userData'), 'local-media-folder.json') : path.join(process.cwd(), 'local-media-folder.json');
+  try {
+    if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
+  } catch (_) {}
+  return { success: true };
+});
+
+// Helper: Scan folder untuk menemukan file media (video & foto)
+function scanMediaFolder(folderPath) {
+  const mediaExtensions = ['.mp4','.webm','.ogg','.mkv','.mov','.avi','.flv','.wmv','.m4v','.3gp','.ts','.webp','.jpg','.jpeg','.png','.gif','.bmp','.svg','.avif'];
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg', '.avif'];
+  const results = [];
+
+  try {
+    const files = fs.readdirSync(folderPath);
+    for (const file of files) {
+      const ext = path.extname(file).toLowerCase();
+      if (mediaExtensions.includes(ext)) {
+        const fullPath = path.join(folderPath, file);
+        try {
+          const stat = fs.statSync(fullPath);
+          if (stat.isFile()) {
+            results.push({
+              name: file,
+              path: fullPath,
+              type: imageExtensions.includes(ext) ? 'image' : 'video',
+              size: stat.size,
+              // URL file:// untuk digunakan langsung oleh Chromium
+              fileUrl: 'file:///' + fullPath.replace(/\\/g, '/')
+            });
+          }
+        } catch (_) {}
+      }
+    }
+    // Sort abjad agar konsisten
+    results.sort((a, b) => a.name.localeCompare(b.name));
+  } catch (err) {
+    console.error('[Local Media] Gagal scan folder:', err);
+  }
+
+  return results;
+}
+
 // IPC Handler to pick and copy local video or photo files to data/videos/
 ipcMain.handle('add-video-file', async () => {
   if (!mainWindow) return { success: false, message: 'Window utama tidak ditemukan.' };

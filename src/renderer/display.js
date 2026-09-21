@@ -954,9 +954,21 @@ async function initLocalServerInfo() {
         isLocalServer = true;
         serverPort = parseInt(info.port, 10) || 8080;
         localVideoDir = info.videoDir || '';
-        console.log('[Display] Server mode confirmed. videoDir:', localVideoDir, '-> akan gunakan file:// langsung untuk video lokal.');
+        console.log('[Display] Server mode confirmed. videoDir:', localVideoDir);
       } else {
-        console.log('[Display] Client mode - video via HTTP.');
+        console.log('[Display] Client mode detected.');
+      }
+    }
+
+    // Cek apakah mesin ini punya folder media lokal yang dikonfigurasi
+    if (typeof window !== 'undefined' && window.api && typeof window.api.getLocalMediaFolder === 'function') {
+      const localResult = await window.api.getLocalMediaFolder();
+      if (localResult && localResult.success && localResult.mediaFiles && localResult.mediaFiles.length > 0) {
+        localMediaFolder = localResult.folderPath;
+        localMediaFiles = localResult.mediaFiles;
+        console.log('[Display] Local media folder aktif:', localMediaFolder, '(' + localMediaFiles.length + ' files) -> BYPASS HTTP playlist, gunakan file:// lokal.');
+      } else {
+        console.log('[Display] Tidak ada folder media lokal -> gunakan playlist server.');
       }
     }
   } catch (err) {
@@ -974,6 +986,11 @@ let photoDurationSetting = 10;
 let displayLayoutSetting = '';
 let mediaAdvanceTimer = null;
 
+// Local Media Folder: jika diset, display menggunakan file lokal (file://)
+// dan MENGABAIKAN playlist HTTP dari server — zero network, zero lag.
+let localMediaFolder = '';
+let localMediaFiles = [];
+
 function clearMediaTimer() {
   if (mediaAdvanceTimer) {
     clearTimeout(mediaAdvanceTimer);
@@ -989,6 +1006,29 @@ function isImageMedia(item) {
 }
 
 function updateVideoPlaylist(newPlaylist) {
+  // Jika ada folder media lokal, ABAIKAN playlist dari server
+  // dan gunakan file lokal sebagai sumber media
+  if (localMediaFiles.length > 0) {
+    const localPlaylist = localMediaFiles.map(f => ({
+      id: f.name,
+      type: f.type,
+      originalName: f.name,
+      filename: f.name,
+      url: f.fileUrl // file:///path/to/file
+    }));
+    const localJson = JSON.stringify(localPlaylist);
+    const currentJson = JSON.stringify(videoPlaylist);
+    if (localJson !== currentJson) {
+      videoPlaylist = localPlaylist;
+      currentMediaIndex = 0;
+      currentActiveMediaUrl = '';
+      clearMediaTimer();
+      console.log('[Display] Menggunakan', localPlaylist.length, 'media dari folder lokal:', localMediaFolder);
+      syncVideoPlayers(currentDisplayMode);
+    }
+    return;
+  }
+
   const playlist = Array.isArray(newPlaylist) ? newPlaylist : [];
   const playlistJson = JSON.stringify(playlist);
   const currentJson = JSON.stringify(videoPlaylist);
@@ -1159,7 +1199,10 @@ function syncVideoPlayers(displayMode) {
   const currentItem = videoPlaylist[currentMediaIndex];
   let rawUrl = currentItem.url || '';
   let mediaUrl = rawUrl;
-  if (!mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://')) {
+  if (mediaUrl.startsWith('file:///')) {
+    // URL file:// dari folder media lokal — langsung pakai, tanpa modifikasi
+    // Ini path tercepat: zero network, zero HTTP server, native Chromium playback
+  } else if (!mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://')) {
     // Server lokal: gunakan file:// langsung untuk zero-overhead native Chromium playback
     // Menghindari bottleneck HTTP server single-thread Node.js
     if (isLocalServer && localVideoDir && rawUrl.startsWith('/video/')) {
