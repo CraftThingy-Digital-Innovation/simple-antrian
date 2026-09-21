@@ -25,14 +25,14 @@ async function initKiosk() {
     let wsUrl = '';
     const dbSettings = await window.api.getSettings();
     if (info.mode === 'server') {
-      wsUrl = `ws://localhost:${serverPort}`;
+      wsUrl = `ws://127.0.0.1:${serverPort}`;
     } else {
       // Jika mode client, hubungkan ke server terakhir yang tersimpan di DB / localStorage
       const lastConnectedServer = dbSettings.active_server_endpoint || localStorage.getItem('last_connected_server');
       if (lastConnectedServer) {
         wsUrl = `ws://${lastConnectedServer}`;
       } else {
-        wsUrl = `ws://localhost:${serverPort}`;
+        wsUrl = `ws://127.0.0.1:${serverPort}`;
       }
 
       // Jalankan UDP Discovery Listener di Kiosk Client untuk auto-connect

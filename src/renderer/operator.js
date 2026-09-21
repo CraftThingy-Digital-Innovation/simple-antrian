@@ -168,6 +168,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Ambil info sistem dan inisialisasi koneksi
   await initSystemInfo();
 
+  
+  if (window.api && typeof window.api.onServerPortUpdated === 'function') {
+    window.api.onServerPortUpdated((newPort) => {
+      serverPort = newPort;
+      const portInput = document.getElementById('setting-port');
+      if (portInput) portInput.value = newPort;
+      if (currentMode === 'server') {
+        connectWebSocket(`ws://127.0.0.1:${newPort}`);
+      }
+    });
+  }
+
   // Setup event listeners
   setupEventListeners();
 
@@ -667,7 +679,7 @@ async function initSystemInfo() {
       if (dbConfig) dbConfig.style.display = 'block';
       
       // Connect ke WebSocket lokal
-      connectWebSocket(`ws://localhost:${serverPort}`);
+      connectWebSocket(`ws://127.0.0.1:${serverPort}`);
     } else {
       document.getElementById('network-status-title').innerText = 'Koneksi Server';
       document.getElementById('status-text').innerText = 'Mencari server...';
@@ -804,6 +816,9 @@ let operatorReconnectTimer = null;
 
 // Inisialisasi Koneksi WebSocket
 function connectWebSocket(url) {
+  if (url && typeof url === 'string') {
+    url = url.replace('ws://localhost:', 'ws://127.0.0.1:');
+  }
   currentOperatorWsUrl = url;
   if (operatorReconnectTimer) {
     clearTimeout(operatorReconnectTimer);
@@ -1904,8 +1919,9 @@ function setupEventListeners() {
       await window.api.saveModeSettings({ mode, serverName, port });
       showToast('Pengaturan mode berhasil disimpan! Sistem merestart service.', 'success');
       
-      // Muat ulang detail
+      // Muat ulang detail & tabel pengaturan layanan
       await initSystemInfo();
+      await loadSettings();
     });
   }
 

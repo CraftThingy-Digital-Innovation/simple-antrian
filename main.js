@@ -288,11 +288,48 @@ function createMiniOperatorWindow() {
   console.log('[Main] Mini Operator window dibuka di posisi', x, y);
 }
 
+const net = require('net');
+
+function isPortAvailable(port, host = '127.0.0.1') {
+  return new Promise((resolve) => {
+    const tester = net.createServer();
+    tester.once('error', () => resolve(false));
+    tester.once('listening', () => {
+      tester.close(() => resolve(true));
+    });
+    tester.listen(port, host);
+  });
+}
+
+async function resolveAvailableServerPort(desiredPort) {
+  let port = parseInt(desiredPort, 10) || 8080;
+  const isFree127 = await isPortAvailable(port, '127.0.0.1');
+  const isFree0 = await isPortAvailable(port, '0.0.0.0');
+  if (isFree127 && isFree0) {
+    return port;
+  }
+  console.warn(`[Main] Port ${port} sedang digunakan oleh aplikasi lain (misal PHP/Laragon/Web server). Mencari port pengganti...`);
+  const candidatePorts = [8088, 8082, 8083, 8084, 8085, 8089, 8090];
+  for (const p of candidatePorts) {
+    const free127 = await isPortAvailable(p, '127.0.0.1');
+    const free0 = await isPortAvailable(p, '0.0.0.0');
+    if (free127 && free0) {
+      console.log(`[Main] Menggunakan port bebas pengganti: ${p}`);
+      await db.saveSetting('port', p.toString());
+      return p;
+    }
+  }
+  return port;
+}
+
 const runtimeServerUuid = require('crypto').randomUUID();
 
 // Menjalankan/Menghentikan service secara dinamis
 async function startServicesBasedOnMode(settings) {
-  const wsPort = parseInt(settings.port || '8080');
+  let wsPort = parseInt(settings.port || '8080', 10);
+  if (currentMode === 'server') {
+    wsPort = await resolveAvailableServerPort(wsPort);
+  }
   const serverUuid = runtimeServerUuid;
   const serverName = settings.server_name || 'Server Antrian';
 
@@ -316,6 +353,10 @@ async function startServicesBasedOnMode(settings) {
     discovery.startBroadcaster(serverUuid, serverName, wsPort);
     // Jalankan WA Client
     whatsapp.startWhatsAppClient();
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('server-port-updated', wsPort);
+    }
   } else {
     // Mode Client: Matikan WS Server & Broadcaster
     websocket.stopWebSocketServer();

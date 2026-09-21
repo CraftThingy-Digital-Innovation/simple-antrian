@@ -44,11 +44,11 @@ async function initDisplayConnection() {
 
       if (currentMode === 'server') {
         // Connect ke server lokal
-        connectWebSocket(`ws://localhost:${serverPort}`);
+        connectWebSocket(`ws://127.0.0.1:${serverPort}`);
         return;
       } else {
         // Mode Client: Coba endpoint dari DB, lalu localStorage, lalu default
-        const activeEndpoint = dbSettings.active_server_endpoint || localStorage.getItem('last_connected_server') || `localhost:${serverPort}`;
+        const activeEndpoint = dbSettings.active_server_endpoint || localStorage.getItem('last_connected_server') || `127.0.0.1:${serverPort}`;
         connectWebSocket(`ws://${activeEndpoint}`);
 
         // Dengarkan penemuan server via UDP Discovery

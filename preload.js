@@ -51,6 +51,10 @@ contextBridge.exposeInMainWorld('api', {
 
   // Endpoint Sync (Display & Kiosk)
   setActiveServerEndpoint: (endpoint) => ipcRenderer.invoke('set-active-server-endpoint', endpoint),
+  onServerPortUpdated: (callback) => {
+    ipcRenderer.removeAllListeners('server-port-updated');
+    ipcRenderer.on('server-port-updated', (event, port) => callback(port));
+  },
   onServerEndpointChanged: (callback) => {
     ipcRenderer.removeAllListeners('server-endpoint-changed');
     ipcRenderer.on('server-endpoint-changed', (event, endpoint) => callback(endpoint));

@@ -25,7 +25,7 @@ async function initConnection() {
       const info = await window.api.getSystemInfo();
       if (info && info.mode === 'server') {
         const port = parseInt(info.port, 10) || 8080;
-        connectWebSocket('ws://localhost:' + port);
+        connectWebSocket('ws://127.0.0.1:' + port);
         return;
       }
     }

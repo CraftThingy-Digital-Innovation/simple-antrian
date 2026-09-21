@@ -280,8 +280,13 @@ function startWebSocketServer(port) {
     } catch (_) {}
   }, 60000);
 
-  httpServer.listen(port);
-  console.log('WebSocket & HTTP Audio Server started on port', port);
+  httpServer.on('error', (err) => {
+    console.error('[WebSocket/HTTP Server Error]:', err);
+  });
+
+  httpServer.listen(port, '0.0.0.0', () => {
+    console.log(`WebSocket & HTTP Audio Server listening on 0.0.0.0:${port}`);
+  });
 }
 
 // Hentikan server WebSocket
