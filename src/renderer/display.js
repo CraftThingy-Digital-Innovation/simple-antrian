@@ -16,6 +16,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Mulai animasi background canvas
   initCanvasVisualizer();
 
+  // PENTING: Ambil info sistem SEBELUM koneksi WebSocket agar isLocalServer & localVideoDir
+  // sudah terisi saat syncVideoPlayers dipanggil oleh STATE_UPDATE pertama.
+  // Sebelumnya ini dijalankan fire-and-forget di module scope -> race condition.
+  await initLocalServerInfo();
+
   // Ambil info sistem untuk inisialisasi koneksi
   await initDisplayConnection();
 
@@ -341,6 +346,11 @@ function renderFeedbackSurvey(state) {
 }
 
 // Render State Antrian di Layar Display
+// Cache state sebelumnya agar DOM hanya diubah jika data benar-benar berubah.
+// Mencegah layout reflow -> GPU compositor stall -> video freeze.
+let _prevCallTicketKey = '';
+let _prevServiceListKey = '';
+
 function renderDisplayState(state) {
   if (!state) return;
   const services = Array.isArray(state.services) ? state.services : [];
@@ -352,50 +362,65 @@ function renderDisplayState(state) {
     console.error('Error rendering feedback survey:', err);
   }
 
-  // 1. Tampilkan Panggilan Aktif Utama
+  // 1. Tampilkan Panggilan Aktif Utama - hanya update jika data berubah
   const mainNumberEl = document.getElementById('lbl-call-number');
   const mainDeskEl = document.getElementById('lbl-call-desk');
   const mainDisplayPanel = document.getElementById('main-display-panel');
 
-  if (mainNumberEl && mainDeskEl && mainDisplayPanel) {
-    if (callingTickets.length > 0) {
-      const currentTicket = callingTickets[0];
-      if (mainNumberEl.innerText !== currentTicket.ticket_number || mainDeskEl.innerText !== currentTicket.desk_number || mainDisplayPanel.classList.contains('standby')) {
+  const callKey = callingTickets.length > 0
+    ? callingTickets[0].ticket_number + '|' + callingTickets[0].desk_number
+    : 'standby';
+
+  if (callKey !== _prevCallTicketKey) {
+    _prevCallTicketKey = callKey;
+    if (mainNumberEl && mainDeskEl && mainDisplayPanel) {
+      if (callingTickets.length > 0) {
+        const currentTicket = callingTickets[0];
         mainDisplayPanel.classList.remove('standby');
         mainNumberEl.innerText = currentTicket.ticket_number;
         mainDeskEl.innerText = currentTicket.desk_number;
         mainDisplayPanel.classList.add('animate-call-blink');
         setTimeout(() => mainDisplayPanel.classList.remove('animate-call-blink'), 5000);
+      } else {
+        mainDisplayPanel.classList.add('standby');
+        mainNumberEl.innerText = '---';
+        mainDeskEl.innerText = 'Belum ada antrian';
       }
-    } else {
-      mainDisplayPanel.classList.add('standby');
-      mainNumberEl.innerText = '---';
-      mainDeskEl.innerText = 'Belum ada antrian';
     }
   }
 
-  // 2. Tampilkan Layanan Lain di Sidebar
-  const otherListEl = document.getElementById('lst-other-services');
-  if (otherListEl) {
-    otherListEl.innerHTML = '';
+  // 2. Tampilkan Layanan Lain di Sidebar - hanya rebuild jika data berubah
+  // Sebelumnya innerHTML di-nuke dan dibangun ulang SETIAP state update,
+  // menyebabkan layout reflow berat yang mem-freeze video playback.
+  const serviceKey = services.map(s => {
+    const ac = callingTickets.find(t => t.service_id === s.id);
+    return s.id + ':' + (ac ? ac.ticket_number : (s.prefix + String(s.current_number || 0).padStart(3, '0')));
+  }).join(',');
 
-    if (services.length === 0) {
-      otherListEl.innerHTML = '<div style="text-align: center; color: var(--text-muted); margin-top: 20px;">Belum ada layanan aktif.</div>';
-      return;
+  if (serviceKey !== _prevServiceListKey) {
+    _prevServiceListKey = serviceKey;
+    const otherListEl = document.getElementById('lst-other-services');
+    if (otherListEl) {
+      otherListEl.innerHTML = '';
+
+      if (services.length === 0) {
+        otherListEl.innerHTML = '<div style="text-align: center; color: var(--text-muted); margin-top: 20px;">Belum ada layanan aktif.</div>';
+        return;
+      }
+
+      services.forEach(srv => {
+        const activeCall = callingTickets.find(t => t.service_id === srv.id);
+        const num = activeCall ? activeCall.ticket_number : (srv.prefix + String(srv.current_number || 0).padStart(3, '0'));
+
+        const div = document.createElement('div');
+        div.className = 'other-service-item animate-pop-in';
+        div.innerHTML = `
+          <span class="other-service-name">${escHtml(srv.name)}</span>
+          <span class="other-service-number">${num}</span>
+        `;
+        otherListEl.appendChild(div);
+      });
     }
-
-    services.forEach(srv => {
-      const activeCall = callingTickets.find(t => t.service_id === srv.id);
-      const num = activeCall ? activeCall.ticket_number : (srv.prefix + String(srv.current_number || 0).padStart(3, '0'));
-
-      const div = document.createElement('div');
-      div.className = 'other-service-item animate-pop-in';
-      div.innerHTML = `
-        <span class="other-service-name">${escHtml(srv.name)}</span>
-        <span class="other-service-number">${num}</span>
-      `;
-      otherListEl.appendChild(div);
-    });
   }
 }
 
@@ -918,15 +943,25 @@ function initCanvasVisualizer() {
 let isLocalServer = false;
 let localVideoDir = '';
 
-if (typeof window !== 'undefined' && window.api && window.api.getSystemInfo) {
-  window.api.getSystemInfo().then(info => {
-    if (info && info.mode === 'server') {
-      isLocalServer = true;
-      serverPort = parseInt(info.port, 10) || 8080;
-      localVideoDir = info.videoDir || '';
-      console.log('[Display] Running on Server machine -> akan gunakan file:// langsung jika tersedia untuk video lokal.');
+// Inisialisasi info server lokal - HARUS selesai SEBELUM WebSocket terhubung
+// agar isLocalServer sudah benar saat syncVideoPlayers pertama kali dipanggil.
+// Sebelumnya ini fire-and-forget -> race condition -> server display pakai http:// bukan file://
+async function initLocalServerInfo() {
+  try {
+    if (typeof window !== 'undefined' && window.api && typeof window.api.getSystemInfo === 'function') {
+      const info = await window.api.getSystemInfo();
+      if (info && info.mode === 'server') {
+        isLocalServer = true;
+        serverPort = parseInt(info.port, 10) || 8080;
+        localVideoDir = info.videoDir || '';
+        console.log('[Display] Server mode confirmed. videoDir:', localVideoDir, '-> akan gunakan file:// langsung untuk video lokal.');
+      } else {
+        console.log('[Display] Client mode - video via HTTP.');
+      }
     }
-  }).catch(() => {});
+  } catch (err) {
+    console.warn('[Display] Gagal ambil system info, fallback ke HTTP:', err);
+  }
 }
 
 let videoPlaylist = [];
@@ -1133,6 +1168,11 @@ function syncVideoPlayers(displayMode) {
     } else {
       mediaUrl = 'http://' + host + rawUrl;
     }
+  }
+  
+  // Debug: log URL video yang sebenarnya digunakan agar bisa diverifikasi
+  if (currentActiveMediaUrl !== mediaUrl) {
+    console.log('[Display] Media URL:', mediaUrl, '(isLocalServer=' + isLocalServer + ', localVideoDir=' + (localVideoDir || 'N/A') + ')');
   }
   
   const isImg = isImageMedia(currentItem);

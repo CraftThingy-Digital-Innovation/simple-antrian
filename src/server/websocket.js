@@ -89,8 +89,15 @@ function startWebSocketServer(port) {
       const videoDir = app ? path.join(app.getPath('userData'), 'data', 'videos') : path.join(process.cwd(), 'data', 'videos');
       const filePath = path.join(videoDir, filename);
       
-      if (fs.existsSync(filePath)) {
-        const stat = fs.statSync(filePath);
+      // Gunakan fs.stat async agar tidak memblokir event loop saat melayani video
+      // fs.existsSync + fs.statSync sebelumnya SYNCHRONOUS -> memblokir event loop
+      // pada setiap range request -> menyebabkan stutter pada SEMUA stream aktif
+      fs.stat(filePath, (statErr, stat) => {
+      if (statErr || !stat) {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
         const total = stat.size;
         const range = req.headers.range;
         
@@ -145,10 +152,11 @@ function startWebSocketServer(port) {
             'Accept-Ranges': 'bytes',
             'Content-Length': chunksize,
             'Content-Type': contentType,
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'public, max-age=86400, immutable'
           });
           
-          const stream = fs.createReadStream(filePath, { start, end, highWaterMark: 512 * 1024 });
+          const stream = fs.createReadStream(filePath, { start, end, highWaterMark: 1024 * 1024 });
           stream.pipe(res);
           res.on('close', () => stream.destroy());
         } else {
@@ -156,16 +164,14 @@ function startWebSocketServer(port) {
             'Content-Length': total,
             'Content-Type': contentType,
             'Accept-Ranges': 'bytes',
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'public, max-age=86400, immutable'
           });
-          const stream = fs.createReadStream(filePath, { highWaterMark: 64 * 1024 });
+          const stream = fs.createReadStream(filePath, { highWaterMark: 1024 * 1024 });
           stream.pipe(res);
           res.on('close', () => stream.destroy());
         }
-      } else {
-        res.writeHead(404);
-        res.end();
-      }
+      }); // tutup fs.stat callback
     } else {
       res.writeHead(404);
       res.end();
