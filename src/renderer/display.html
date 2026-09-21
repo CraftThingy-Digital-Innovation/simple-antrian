@@ -24,11 +24,12 @@
 
     /* Top Section containing Main Call + Right Panel */
     .content-area {
-      flex: 1;
+      flex: 1 1 0%;
       display: flex;
-      padding: 30px;
-      gap: 30px;
+      padding: 20px 26px;
+      gap: 24px;
       min-height: 0;
+      overflow: hidden;
     }
 
     /* Left Side: Big Queue Call Panel */
@@ -38,47 +39,48 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      padding: 40px;
+      padding: 24px;
       text-align: center;
       position: relative;
       overflow: hidden;
+      min-height: 0;
     }
 
     .main-call-label {
-      font-size: 2rem;
+      font-size: clamp(1.2rem, 3.2vh, 2rem);
       font-weight: 700;
       color: var(--text-secondary);
       text-transform: uppercase;
-      letter-spacing: 4px;
+      letter-spacing: 3px;
     }
 
     .main-call-number {
-      font-size: 10rem;
+      font-size: clamp(4.5rem, 15vh, 9rem);
       font-weight: 800;
       color: var(--accent-warning);
       text-shadow: 0 2px 10px rgba(245, 158, 11, 0.3), 0 0 25px rgba(245, 158, 11, 0.2);
-      margin: 20px 0;
+      margin: clamp(6px, 1.5vh, 16px) 0;
       letter-spacing: -2px;
       line-height: 1;
       transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 
     .main-call-desk-label {
-      font-size: 2.2rem;
+      font-size: clamp(1.1rem, 2.8vh, 1.9rem);
       font-weight: 600;
       color: var(--text-primary);
-      margin-top: 10px;
+      margin-top: clamp(4px, 1vh, 8px);
       letter-spacing: 1px;
     }
 
     .main-call-desk {
-      font-size: 4rem;
+      font-size: clamp(2rem, 5.5vh, 3.6rem);
       font-weight: 800;
       color: var(--accent-primary);
       text-shadow: 0 2px 8px rgba(99, 102, 241, 0.25), 0 0 20px rgba(99, 102, 241, 0.15);
       text-transform: uppercase;
       letter-spacing: 2px;
-      margin-top: 10px;
+      margin-top: clamp(4px, 1vh, 8px);
     }
 
     /* Right Side: Media / Info + Other Services */
@@ -86,7 +88,8 @@
       flex: 5;
       display: flex;
       flex-direction: column;
-      gap: 30px;
+      gap: 20px;
+      min-height: 0;
     }
 
     /* Premium Decorative Canvas Card */
@@ -98,6 +101,7 @@
       align-items: center;
       justify-content: center;
       border-radius: 16px;
+      min-height: 0;
     }
 
     #visualizer-canvas {
@@ -135,10 +139,12 @@
     /* Other Services Grid List */
     .other-services-card {
       flex: 5;
-      padding: 24px;
+      padding: 16px 20px;
       display: flex;
       flex-direction: column;
-      gap: 15px;
+      gap: 10px;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .sidebar-title {
@@ -235,10 +241,10 @@
     /* Label bahasa kecil di kiri */
     .running-text-lang-badge {
       position: absolute;
-      left: 0;
+      left: 20px;
       top: 50%;
       transform: translateY(-50%);
-      font-size: 0.7rem;
+      font-size: 0.72rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 1px;
@@ -246,7 +252,7 @@
       background: rgba(99,102,241,0.12);
       border: 1px solid rgba(99,102,241,0.25);
       border-radius: 4px;
-      padding: 2px 6px;
+      padding: 3px 8px;
       z-index: 5;
       white-space: nowrap;
       transition: opacity 0.4s ease;
@@ -454,24 +460,35 @@
     </div>
     
     <!-- Premium Clock & Date widget in the bottom-right corner -->
-    <div id="footer-datetime" style="position: absolute; right: 0; top: 0; bottom: 0; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; background: linear-gradient(to right, transparent, rgba(10, 16, 32, 0.98) 15%, rgba(10, 16, 32, 1)); padding: 0 24px 0 50px; z-index: 10;">
-      <div id="footer-time" style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary); font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; line-height: 1;">00:00:00</div>
-      <div id="footer-date" style="font-size: 0.9rem; font-weight: 700; color: var(--accent-primary); margin-top: 4px; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap;">Kamis, 21 Agustus 2026</div>
+    <div id="footer-datetime" style="position: absolute; right: 0; top: 0; bottom: 0; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; background: linear-gradient(to right, transparent, rgba(10, 16, 32, 0.98) 15%, rgba(10, 16, 32, 1)); padding: 0 24px 0 40px; z-index: 10;">
+      <div id="footer-time" style="font-size: 1.6rem; font-weight: 800; color: var(--text-primary); font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; line-height: 1;">00:00:00</div>
+      <div id="footer-date" style="font-size: 0.82rem; font-weight: 700; color: var(--accent-primary); margin-top: 3px; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; line-height: 1;">Kamis, 21 Agustus 2026</div>
     </div>
   </footer>
 
   <!-- BANNER SURVEI KEPUASAN (Di bawah footer-bar, hanya tampil jika ada URL yang diisi di Pengaturan) -->
-  <div id="feedback-survey-bar" style="display: none; width: 100%; height: 56px; background: rgba(13, 20, 36, 0.98); border-top: 1px solid rgba(99, 102, 241, 0.25); padding: 0 24px; box-sizing: border-box; align-items: center; justify-content: center; z-index: 5; box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4); flex-shrink: 0; text-align: center;">
+  <div id="feedback-survey-bar" style="display: none; width: 100%; height: 50px; background: rgba(13, 20, 36, 0.98); border-top: 1px solid rgba(99, 102, 241, 0.25); padding: 0 24px; box-sizing: border-box; align-items: center; justify-content: center; z-index: 9; box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4); flex-shrink: 0; text-align: center;">
     <div style="display: inline-flex; align-items: center; justify-content: center; gap: 16px; margin: 0 auto; max-width: 100%;">
-      <div style="font-size: 1.15rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 8px; letter-spacing: -0.3px; white-space: nowrap;">
-        <span style="font-size: 1.3rem;">⭐</span> Puas dengan layanan kami? silakan nilai di:
+      <div style="font-size: 1.05rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 8px; letter-spacing: -0.3px; white-space: nowrap;">
+        <span style="font-size: 1.2rem;">⭐</span> Puas dengan layanan kami? silakan nilai di:
       </div>
-      <div id="feedback-qr-wrapper" style="display: none; align-items: center; background: #ffffff; padding: 4px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); flex-shrink: 0;">
-        <img id="feedback-qr-img" src="" alt="Scan QR Code" style="width: 44px; height: 44px; display: block; image-rendering: pixelated;">
+      <div id="feedback-qr-wrapper" style="display: none; align-items: center; background: #ffffff; padding: 3px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); flex-shrink: 0;">
+        <img id="feedback-qr-img" src="" alt="Scan QR Code" style="width: 38px; height: 38px; display: block; image-rendering: pixelated;">
       </div>
-      <div id="feedback-url-wrapper" style="display: none; align-items: center; font-size: 1.05rem; font-weight: 700; color: #a5b4fc; background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(129, 140, 248, 0.4); padding: 6px 16px; border-radius: 10px; font-family: monospace; letter-spacing: 0.5px; word-break: break-all;">
+      <div id="feedback-url-wrapper" style="display: none; align-items: center; font-size: 0.95rem; font-weight: 700; color: #a5b4fc; background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(129, 140, 248, 0.4); padding: 4px 14px; border-radius: 8px; font-family: monospace; letter-spacing: 0.5px; word-break: break-all;">
         <span id="feedback-url-text">https://...</span>
       </div>
+    </div>
+  </div>
+
+  <!-- FULLSCREEN MEDIA CONTAINER (Video & Foto) -->
+  <div id="video-fullscreen-container" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 90; display: none; align-items: center; justify-content: center;">
+    <video id="fullscreen-video-player" style="width: 100%; height: 100%; object-fit: contain; display: none;" autoplay playsinline preload="auto"></video>
+    <img id="fullscreen-image-player" style="width: 100%; height: 100%; object-fit: contain; display: none;" alt="Media Display">
+    <div id="fullscreen-video-placeholder" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 15px; text-align: center; color: var(--text-secondary); font-family: sans-serif; z-index: 92;">
+      <div style="font-size: 3rem;">📹</div>
+      <div style="font-size: 1.5rem; font-weight: 700;">Playlist Media Kosong</div>
+      <div style="font-size: 1rem; color: var(--text-muted);">Silakan tambahkan file video atau foto di tab Pengaturan Operator.</div>
     </div>
   </div>
 

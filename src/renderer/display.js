@@ -975,17 +975,7 @@ async function initLocalServerInfo() {
       }
     }
 
-    // Cek apakah mesin ini punya folder media lokal yang dikonfigurasi
-    if (typeof window !== 'undefined' && window.api && typeof window.api.getLocalMediaFolder === 'function') {
-      const localResult = await window.api.getLocalMediaFolder();
-      if (localResult && localResult.success && localResult.mediaFiles && localResult.mediaFiles.length > 0) {
-        localMediaFolder = localResult.folderPath;
-        localMediaFiles = localResult.mediaFiles;
-        console.log('[Display] Local media folder aktif:', localMediaFolder, '(' + localMediaFiles.length + ' files) -> BYPASS HTTP playlist, gunakan file:// lokal.');
-      } else {
-        console.log('[Display] Tidak ada folder media lokal -> gunakan playlist server.');
-      }
-    }
+    // Inisialisasi info server lokal selesai
   } catch (err) {
     console.warn('[Display] Gagal ambil system info, fallback ke HTTP:', err);
   }
@@ -1000,11 +990,6 @@ let videoFullscreenMuted = false;
 let photoDurationSetting = 10;
 let displayLayoutSetting = '';
 let mediaAdvanceTimer = null;
-
-// Local Media Folder: jika diset, display menggunakan file lokal (file://)
-// dan MENGABAIKAN playlist HTTP dari server — zero network, zero lag.
-let localMediaFolder = '';
-let localMediaFiles = [];
 
 function clearMediaTimer() {
   if (mediaAdvanceTimer) {
@@ -1021,29 +1006,6 @@ function isImageMedia(item) {
 }
 
 function updateVideoPlaylist(newPlaylist) {
-  // Jika ada folder media lokal, ABAIKAN playlist dari server
-  // dan gunakan file lokal sebagai sumber media
-  if (localMediaFiles.length > 0) {
-    const localPlaylist = localMediaFiles.map(f => ({
-      id: f.name,
-      type: f.type,
-      originalName: f.name,
-      filename: f.name,
-      url: f.fileUrl // file:///path/to/file
-    }));
-    const localJson = JSON.stringify(localPlaylist);
-    const currentJson = JSON.stringify(videoPlaylist);
-    if (localJson !== currentJson) {
-      videoPlaylist = localPlaylist;
-      currentMediaIndex = 0;
-      currentActiveMediaUrl = '';
-      clearMediaTimer();
-      console.log('[Display] Menggunakan', localPlaylist.length, 'media dari folder lokal:', localMediaFolder);
-      syncVideoPlayers(currentDisplayMode);
-    }
-    return;
-  }
-
   const playlist = Array.isArray(newPlaylist) ? newPlaylist : [];
   const playlistJson = JSON.stringify(playlist);
   const currentJson = JSON.stringify(videoPlaylist);
@@ -1139,7 +1101,7 @@ function syncVideoPlayers(displayMode) {
   const fullscreenImage = document.getElementById('fullscreen-image-player');
   const fullscreenPlaceholder = document.getElementById('fullscreen-video-placeholder');
   
-  if (!sidebarPlayer || !fullscreenPlayer) return;
+  if (!sidebarPlayer) return;
   
   // Jika playlist kosong, bersihkan media player
   if (videoPlaylist.length === 0) {
@@ -1164,10 +1126,12 @@ function syncVideoPlayers(displayMode) {
       sidebarImage.removeAttribute('src');
     }
     
-    fullscreenPlayer.pause();
-    fullscreenPlayer.removeAttribute('src');
-    fullscreenPlayer.load();
-    fullscreenPlayer.style.display = 'none';
+    if (fullscreenPlayer) {
+      fullscreenPlayer.pause();
+      fullscreenPlayer.removeAttribute('src');
+      fullscreenPlayer.load();
+      fullscreenPlayer.style.display = 'none';
+    }
     if (fullscreenImage) {
       fullscreenImage.style.display = 'none';
       fullscreenImage.removeAttribute('src');
@@ -1247,8 +1211,10 @@ function syncVideoPlayers(displayMode) {
     
     if (isImg) {
       // Tampilkan Foto Fullscreen
-      fullscreenPlayer.pause();
-      fullscreenPlayer.style.display = 'none';
+      if (fullscreenPlayer) {
+        fullscreenPlayer.pause();
+        fullscreenPlayer.style.display = 'none';
+      }
       if (fullscreenImage) {
         fullscreenImage.style.display = 'block';
         if (currentActiveMediaUrl !== mediaUrl || fullscreenImage.src !== mediaUrl) {
@@ -1266,38 +1232,42 @@ function syncVideoPlayers(displayMode) {
         fullscreenImage.removeAttribute('src');
       }
       // Hanya set properti DOM jika belum benar (mencegah freeze akibat DOM thrashing)
-      if (fullscreenPlayer.style.display !== 'block') fullscreenPlayer.style.display = 'block';
-      const fsLoop = (videoPlaylist.length === 1);
-      if (fullscreenPlayer.loop !== fsLoop) fullscreenPlayer.loop = fsLoop;
-      if (fullscreenPlayer.muted !== videoFullscreenMuted) fullscreenPlayer.muted = videoFullscreenMuted;
-      
-      if (currentActiveMediaUrl !== mediaUrl) {
-        currentActiveMediaUrl = mediaUrl;
-        clearMediaTimer();
-        fullscreenPlayer.src = mediaUrl;
-        fullscreenPlayer.load();
+      if (fullscreenPlayer) {
+        if (fullscreenPlayer.style.display !== 'block') fullscreenPlayer.style.display = 'block';
+        const fsLoop = (videoPlaylist.length === 1);
+        if (fullscreenPlayer.loop !== fsLoop) fullscreenPlayer.loop = fsLoop;
+        if (fullscreenPlayer.muted !== videoFullscreenMuted) fullscreenPlayer.muted = videoFullscreenMuted;
         
-        const playPromise = fullscreenPlayer.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            if (error.name === 'AbortError') return;
-            if (error.name === 'NotAllowedError') {
-              fullscreenPlayer.muted = true;
-              fullscreenPlayer.play().catch(() => {});
-              return;
-            }
-            console.warn("[FullscreenPlayer] Autoplay failed, advancing in 3s:", error);
-            clearMediaTimer();
-            mediaAdvanceTimer = setTimeout(() => advanceMedia(true), 3000);
-          });
+        if (currentActiveMediaUrl !== mediaUrl) {
+          currentActiveMediaUrl = mediaUrl;
+          clearMediaTimer();
+          fullscreenPlayer.src = mediaUrl;
+          fullscreenPlayer.load();
+          
+          const playPromise = fullscreenPlayer.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(error => {
+              if (error.name === 'AbortError') return;
+              if (error.name === 'NotAllowedError') {
+                fullscreenPlayer.muted = true;
+                fullscreenPlayer.play().catch(() => {});
+                return;
+              }
+              console.warn("[FullscreenPlayer] Autoplay failed, advancing in 3s:", error);
+              clearMediaTimer();
+              mediaAdvanceTimer = setTimeout(() => advanceMedia(true), 3000);
+            });
+          }
         }
       }
     }
   } else if (currentDisplayMode === 'queue') {
     // Mode Antrian Standar / Swapped
     if (fullscreenContainer) fullscreenContainer.style.display = 'none';
-    if (!fullscreenPlayer.paused) fullscreenPlayer.pause();
-    fullscreenPlayer.style.display = 'none';
+    if (fullscreenPlayer) {
+      if (!fullscreenPlayer.paused) fullscreenPlayer.pause();
+      fullscreenPlayer.style.display = 'none';
+    }
     if (fullscreenImage) fullscreenImage.style.display = 'none';
     
     // Tampilkan video card (di sidebar jika standar, atau di kiri jika swapped)

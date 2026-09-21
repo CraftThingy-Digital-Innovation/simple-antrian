@@ -1045,40 +1045,104 @@ function getChineseNumberTokens(num) {
   return tokens;
 }
 
+
+/**
+ * Mendeteksi secara otomatis apakah nama/kata loket berbahasa Indonesia atau Inggris.
+ * @param {string} text - Nama atau kata loket (contoh: "Poli Umum", "Interview Room", "Teller", "Pendaftaran")
+ * @returns {'id' | 'en'}
+ */
+function detectDeskLanguage(text) {
+  if (!text || typeof text !== 'string') return 'id';
+  const clean = text.trim().toLowerCase();
+
+  // Pola kata kunci bahasa Inggris yang jelas
+  const enPatterns = [
+    /\b(counter|desk|room|interview|cashier|teller|booth|service|customer|registration|support|consultation|office|department|billing|inquiry|station|gate|helpdesk|window|floor|hall|unit|line)\b/i,
+    /\b(general|special|vip|priority|fast|express|intake|payment|admission|medical|dental|clinic)\b/i
+  ];
+
+  // Pola kata kunci bahasa Indonesia yang jelas
+  const idPatterns = [
+    /\b(loket|meja|ruang|poli|pendaftaran|kasir|pelayanan|tata usaha|pengaduan|layanan|pemeriksaan|penyerahan|pengambilan|antrean|antrian|keuangan|imigrasi|dokter|bidan|apotek|administrasi|informasi)\b/i,
+    /\b(umum|khusus|lansia|anak|ibu|gigi|mata|dalam|bedah|syaraf|kulit|jantung|terpadu|utama)\b/i
+  ];
+
+  let enScore = 0;
+  let idScore = 0;
+
+  for (const p of enPatterns) {
+    if (p.test(clean)) enScore += 2;
+  }
+  for (const p of idPatterns) {
+    if (p.test(clean)) idScore += 2;
+  }
+
+  // Cek imbuhan / pola morfologi khas Indonesia: ber-, men-, pen-, per-, -an, -kan, -i
+  if (/\b(ber|men|pen|per|peng|pem)[a-z]{3,}/i.test(clean)) idScore += 1;
+  if (/[a-z]{3,}(an|kan|nya)\b/i.test(clean)) idScore += 1;
+
+  // Cek akhiran khas Inggris: -tion, -ment, -ing, -er, -or, -th
+  if (/[a-z]{3,}(tion|ment|ing|ship|hood)\b/i.test(clean)) enScore += 1;
+
+  if (enScore > idScore) return 'en';
+  if (idScore > enScore) return 'id';
+
+  // Fallback default: 'id'
+  return 'id';
+}
+
 async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName) {
   const prefix = ticketNumber.charAt(0);
   const num = parseInt(ticketNumber.substring(1), 10);
   
   let safeDesk = (deskNumber || '').trim();
   const digits = safeDesk.replace(/[^0-9]/g, '');
-  const deskNum = digits ? parseInt(digits, 10) : 1;
-  let deskWord = safeDesk.replace(/[0-9]+/g, '').trim().toLowerCase();
+  const deskNum = digits ? parseInt(digits, 10) : NaN;
+  let deskWord = safeDesk.replace(/[0-9]+/g, '').trim();
   
-  // Jika deskWord kosong atau kata kategori layanan (bukan kata loket/counter/meja/ruang), fallback ke 'loket'
-  if (!deskWord || (!deskWord.includes('loket') && !deskWord.includes('counter') && !deskWord.includes('meja') && !deskWord.includes('ruang') && !deskWord.includes('desk') && !deskWord.includes('cs'))) {
-    deskWord = 'loket';
+  // Jika deskWord kosong sama sekali, default ke 'Loket'
+  if (!deskWord) {
+    deskWord = 'Loket';
   }
   
   const files = [];
 
-  const getDeskWordFile = async (word, lang) => {
-    const cleanWord = word.trim().toLowerCase();
+  const getDeskWordFile = async (word, targetVoiceLang) => {
+    if (!word || !word.trim()) return targetVoiceLang === 'en' ? 'en_counter.wav' : 'id_loket.wav';
+    const cleanWord = word.trim();
+    const cleanLower = cleanWord.toLowerCase();
     
-    // Map standard words directly to static vocabulary files to avoid redundant TTS generation
-    if (lang === 'id' && (cleanWord === 'loket' || cleanWord === 'counter')) return 'id_loket.wav';
-    if (lang === 'en' && (cleanWord === 'counter' || cleanWord === 'loket')) return 'en_counter.wav';
+    // Optimalisasi audio statis bawaan untuk kata standar 'loket' & 'counter'
+    if (cleanLower === 'loket' && targetVoiceLang === 'id') return 'id_loket.wav';
+    if ((cleanLower === 'counter' || cleanLower === 'desk') && targetVoiceLang === 'en') return 'en_counter.wav';
     
-    // Custom phrase generation via Piper if available
+    let phraseToSynthesize = cleanWord;
+    let synthLang = detectDeskLanguage(cleanWord);
+    
+    if (targetVoiceLang === 'en') {
+      let translated = phraseToSynthesize;
+      if (/\bloket\b/i.test(translated)) translated = translated.replace(/\bloket\b/gi, 'counter');
+      if (/\bmeja\b/i.test(translated)) translated = translated.replace(/\bmeja\b/gi, 'desk');
+      if (/\bruang\b/i.test(translated)) translated = translated.replace(/\bruang\b/gi, 'room');
+      if (/\bkasir\b/i.test(translated)) translated = translated.replace(/\bkasir\b/gi, 'cashier');
+      if (/\bpelayanan\b/i.test(translated)) translated = translated.replace(/\bpelayanan\b/gi, 'service');
+      if (/\bpendaftaran\b/i.test(translated)) translated = translated.replace(/\bpendaftaran\b/gi, 'registration');
+      
+      phraseToSynthesize = translated;
+      synthLang = detectDeskLanguage(phraseToSynthesize);
+    } else {
+      synthLang = detectDeskLanguage(phraseToSynthesize);
+    }
+
     try {
       const ttsGenerator = require('./tts-generator');
-      const generated = await ttsGenerator.generatePhraseIfNeeded(word, lang);
+      const generated = await ttsGenerator.generatePhraseIfNeeded(phraseToSynthesize, synthLang);
       if (generated) return generated;
     } catch (err) {
-      console.warn(`[WebSocket Server] Dynamic TTS phrase generation failed for "${word}" (${lang}):`, err.message);
+      console.warn(`[WebSocket Server] Dynamic TTS phrase generation failed for "${phraseToSynthesize}" (${synthLang}):`, err.message);
     }
     
-    // Fallback aman ke berkas audio bawaan (loket / counter) agar tidak terjadi audio hilang / 404
-    return lang === 'en' ? 'en_counter.wav' : 'id_loket.wav';
+    return targetVoiceLang === 'en' ? 'en_counter.wav' : 'id_loket.wav';
   };
 
   const settings = await db.getSettings();

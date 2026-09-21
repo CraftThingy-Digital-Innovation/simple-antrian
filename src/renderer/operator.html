@@ -1041,36 +1041,12 @@
           </button>
         </section>
 
-        <!-- ===== FOLDER MEDIA LOKAL (PER-MESIN) ===== -->
-        <section class="glass-panel config-section" id="section-local-media-folder">
-          <h3 class="config-title">📂 Folder Media Lokal</h3>
-          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
-            Pilih folder berisi video/foto di komputer <strong>ini</strong>. Display akan memutar file langsung dari disk lokal (tanpa streaming HTTP) — <strong>jauh lebih lancar dan tanpa lag</strong>. Setiap mesin (server/client) bisa punya folder sendiri.
-          </p>
-
-          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
-            <button type="button" class="btn btn-secondary" id="btn-select-local-folder" style="padding: 10px 16px; white-space: nowrap;">
-              📁 Pilih Folder Media Lokal
-            </button>
-            <button type="button" class="btn btn-secondary" id="btn-clear-local-folder" style="padding: 10px 12px; white-space: nowrap; display: none;" title="Hapus folder lokal dan gunakan playlist server">
-              ❌ Hapus
-            </button>
-          </div>
-
-          <div id="local-media-folder-info" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">
-            Belum ada folder media lokal terpilih. Display menggunakan playlist server (HTTP streaming).
-          </div>
-          <div id="local-media-folder-list" style="display: none; max-height: 160px; overflow-y: auto; border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px; margin-bottom: 8px; font-size: 0.8rem; color: var(--text-secondary);">
-          </div>
-          <div style="font-size: 0.75rem; color: var(--accent-success); margin-bottom: 4px;" id="local-media-folder-status"></div>
-        </section>
-
         <!-- ===== PLAYLIST MEDIA (VIDEO & FOTO) DISPLAY ===== -->
         <section class="glass-panel config-section" id="section-video-playlist-config">
           <h3 class="config-title">🎬 Playlist Media (Video & Foto) Layar Display</h3>
           <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
             Pilih dan atur urutan video atau foto yang akan diputar/ditampilkan di layar display pelanggan.
-            <span id="playlist-local-override-notice" style="display: none; color: var(--accent-warning); font-weight: 600;">⚠️ Folder media lokal aktif — playlist server ini diabaikan pada mesin ini.</span>
+            
           </p>
 
           <!-- Daftar video & foto saat ini -->
