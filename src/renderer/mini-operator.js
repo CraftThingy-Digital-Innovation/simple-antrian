@@ -299,13 +299,16 @@ function updateCurrentCall(callingTickets, services) {
     if (btnRecall) btnRecall.disabled = false;
     if (btnSkip) btnSkip.disabled = false;
   } else {
-    // Standby untuk layanan ini
+    // Standby untuk layanan ini (gunakan format prefix + '---', misal B---)
     if (callPanel) callPanel.classList.add('standby');
+    const prefix = currentSrv ? currentSrv.prefix : '';
     if (numEl) {
-      numEl.textContent = nextWaiting ? nextWaiting.ticket_number : '---';
+      numEl.textContent = prefix ? `${prefix}---` : '---';
     }
     if (deskEl) {
-      deskEl.textContent = nextWaiting ? `${chosenDesk} (Menunggu: ${waitingCount})` : `${chosenDesk} (Standby)`;
+      deskEl.textContent = nextWaiting 
+        ? `${chosenDesk} (Berikutnya: ${nextWaiting.ticket_number})` 
+        : `${chosenDesk} (Standby)`;
     }
     if (btnCall) {
       btnCall.textContent = nextWaiting ? `📢 Panggil ${nextWaiting.ticket_number}` : '📢 Panggil';
