@@ -1063,12 +1063,15 @@
           <!-- Form tambah media baru -->
           <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
             <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Tambah Media Baru (Video / Foto)</label>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <button type="button" class="btn btn-secondary" id="btn-browse-video" style="padding: 12px 16px; white-space: nowrap;">
-                📁 Pilih Berkas Media (Video / Foto)
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary" id="btn-browse-video" style="padding: 10px 16px; white-space: nowrap;">
+                📄 Pilih Berkas File
               </button>
-              <div style="flex: 1; font-size: 0.85rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="selected-video-path">
-                Belum ada file terpilih...
+              <button type="button" class="btn btn-primary" id="btn-import-folder-media" style="padding: 10px 18px; white-space: nowrap; display: flex; align-items: center; gap: 6px;">
+                <span>📁</span> Impor Seluruh Folder Foto/Video
+              </button>
+              <div style="flex: 1; min-width: 150px; font-size: 0.85rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="selected-video-path">
+                Pilih file satuan atau impor langsung 1 folder
               </div>
             </div>
             <div style="font-size: 0.75rem; color: var(--text-muted);">

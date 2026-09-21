@@ -2158,6 +2158,41 @@ function setupEventListeners() {
   loadLocalMediaFolder();
 
   // Pengaturan Playlist Video Layar Display
+  const btnImportFolderMedia = document.getElementById('btn-import-folder-media');
+  if (btnImportFolderMedia) {
+    btnImportFolderMedia.addEventListener('click', async () => {
+      showToast('Membuka pemilih folder...', 'info');
+      try {
+        const res = await window.api.importMediaFromFolder();
+        if (res.success && Array.isArray(res.mediaList) && res.mediaList.length > 0) {
+          // Tambahkan seluruh media ke playlist
+          res.mediaList.forEach(item => currentVideoPlaylist.push(item));
+          renderVideoPlaylist();
+
+          // Otomatis simpan & terapkan ke resources sistem dan display
+          const photoDuration = parseInt(document.getElementById('setting-photo-duration')?.value || '10', 10) || 10;
+          sendAction('SAVE_VIDEO_PLAYLIST', {
+            playlist: currentVideoPlaylist,
+            photoDuration: photoDuration
+          });
+
+          const sidebarMuted = document.getElementById('setting-video-sidebar-muted')?.checked ?? true;
+          const fullscreenMuted = document.getElementById('setting-video-fullscreen-muted')?.checked ?? false;
+          sendAction('SAVE_VIDEO_AUDIO_SETTINGS', {
+            sidebarMuted,
+            fullscreenMuted
+          });
+
+          showToast(`🎉 Berhasil memindahkan & menyimpan ${res.count} media dari folder "${res.folderName}"!`, 'success');
+        } else if (res.message && !res.message.includes('Batal')) {
+          showToast(res.message, 'warning');
+        }
+      } catch (err) {
+        showToast('Gagal mengimpor dari folder: ' + err.message, 'error');
+      }
+    });
+  }
+
   const btnBrowseVideo = document.getElementById('btn-browse-video');
   const btnSaveVideoPlaylist = document.getElementById('btn-save-video-playlist');
 

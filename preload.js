@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('api', {
   closeKioskWindow: () => ipcRenderer.invoke('close-kiosk-window'),
   isKioskWindowOpen: () => ipcRenderer.invoke('is-kiosk-window-open'),
   addVideoFile: () => ipcRenderer.invoke('add-video-file'),
+  importMediaFromFolder: () => ipcRenderer.invoke('import-media-from-folder'),
   // Local Media Folder: folder lokal per-mesin untuk video/foto tanpa HTTP streaming
   selectLocalMediaFolder: () => ipcRenderer.invoke('select-local-media-folder'),
   getLocalMediaFolder: () => ipcRenderer.invoke('get-local-media-folder'),

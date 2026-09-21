@@ -779,6 +779,78 @@ ipcMain.handle('restore-main-window', () => {
 });
 
 // IPC Handler to pick and copy local video or photo files to data/videos/
+// IPC Handler to pick a folder, scan for all videos/photos, and copy them to data/videos/
+ipcMain.handle('import-media-from-folder', async () => {
+  if (!mainWindow) return { success: false, message: 'Window utama tidak ditemukan.' };
+
+  const { filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Pilih Folder Berisi Foto atau Video untuk Playlist',
+    properties: ['openDirectory']
+  });
+
+  if (!filePaths || filePaths.length === 0) {
+    return { success: false, message: 'Batal memilih folder.' };
+  }
+
+  const selectedDir = filePaths[0];
+  const videoDir = app ? path.join(app.getPath('userData'), 'data', 'videos') : path.join(process.cwd(), 'data', 'videos');
+  if (!fs.existsSync(videoDir)) {
+    fs.mkdirSync(videoDir, { recursive: true });
+  }
+
+  const crypto = require('crypto');
+  const videoExtensions = ['.mp4', '.webm', '.ogg', '.mkv', '.mov', '.avi', '.flv', '.wmv', '.m4v', '.3gp', '.ts'];
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg', '.avif'];
+  const supportedExtensions = [...videoExtensions, ...imageExtensions];
+
+  try {
+    const entries = fs.readdirSync(selectedDir, { withFileTypes: true });
+    const mediaList = [];
+
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      const ext = path.extname(entry.name).toLowerCase();
+      if (!supportedExtensions.includes(ext)) continue;
+
+      const srcPath = path.join(selectedDir, entry.name);
+      const isImage = imageExtensions.includes(ext);
+      const uniqueFilename = `${crypto.randomUUID()}${ext}`;
+      const destPath = path.join(videoDir, uniqueFilename);
+
+      try {
+        fs.copyFileSync(srcPath, destPath);
+        mediaList.push({
+          id: crypto.randomUUID().substring(0, 8),
+          type: isImage ? 'image' : 'video',
+          originalName: entry.name,
+          filename: uniqueFilename,
+          url: `/video/${uniqueFilename}`
+        });
+      } catch (err) {
+        console.error(`Gagal menyalin ${entry.name}:`, err);
+      }
+    }
+
+    if (mediaList.length === 0) {
+      return {
+        success: false,
+        message: `Tidak ditemukan berkas video atau foto yang didukung di dalam folder "${path.basename(selectedDir)}".`
+      };
+    }
+
+    return {
+      success: true,
+      folderPath: selectedDir,
+      folderName: path.basename(selectedDir),
+      count: mediaList.length,
+      mediaList: mediaList
+    };
+  } catch (err) {
+    console.error('Error importing media from folder:', err);
+    return { success: false, message: 'Gagal membaca folder: ' + err.message };
+  }
+});
+
 ipcMain.handle('add-video-file', async () => {
   if (!mainWindow) return { success: false, message: 'Window utama tidak ditemukan.' };
   
