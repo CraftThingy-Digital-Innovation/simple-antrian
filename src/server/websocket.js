@@ -580,7 +580,20 @@ async function handleClientAction(action, ws) {
             await triggerWhatsAppQueueReminder(serviceId, calledTicket.number_sequence);
           } catch (e) {}
         } else {
-          ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Antrian kosong.' } }));
+          // Fallback cerdas: Jika tidak ada antrian waiting, panggil ulang antrian aktif saat ini dengan loket yang dipilih
+          const callingTickets = await db.getCallingTickets();
+          const activeCalling = callingTickets.find(t => t.service_id === serviceId) || callingTickets[0];
+          if (activeCalling) {
+            if (deskNumber && activeCalling.desk_number !== deskNumber) {
+              await db.updateTicketDesk(activeCalling.id, deskNumber);
+              activeCalling.desk_number = deskNumber;
+            }
+            const recalledTicket = await db.recallTicket(activeCalling.id);
+            await broadcastStateUpdate();
+            await announceCall(recalledTicket.ticket_number, recalledTicket.desk_number, recalledTicket.service_name, recalledTicket.customer_name);
+          } else {
+            ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Antrian kosong.' } }));
+          }
         }
         break;
       }

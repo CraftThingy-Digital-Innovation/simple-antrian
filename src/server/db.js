@@ -160,7 +160,7 @@ async function initDb() {
       WHERE status = 'calling' 
       AND id NOT IN (
         SELECT id FROM (
-          SELECT id, ROW_NUMBER() OVER (PARTITION BY service_id, desk_number ORDER BY called_at DESC) as rn 
+          SELECT id, ROW_NUMBER() OVER (PARTITION BY service_id ORDER BY called_at DESC) as rn 
           FROM tickets 
           WHERE status = 'calling'
         ) WHERE rn = 1
@@ -413,18 +413,11 @@ async function callNextTicket(serviceId, deskNumber) {
 
   const now = new Date().toISOString();
 
-  // Selesaikan tiket calling sebelumnya di loket ini agar tidak ada zombie calling
-  if (deskNumber) {
-    await run(
-      "UPDATE tickets SET status = 'completed', completed_at = ? WHERE desk_number = ? AND status = 'calling'",
-      [now, deskNumber]
-    );
-  } else {
-    await run(
-      "UPDATE tickets SET status = 'completed', completed_at = ? WHERE service_id = ? AND status = 'calling'",
-      [now, serviceId]
-    );
-  }
+  // Selesaikan tiket calling sebelumnya untuk layanan ini atau loket ini agar tidak ada zombie calling
+  await run(
+    "UPDATE tickets SET status = 'completed', completed_at = ? WHERE (service_id = ? OR desk_number = ?) AND status = 'calling'",
+    [now, serviceId, deskNumber || '']
+  );
 
   await run(
     "UPDATE tickets SET status = 'calling', desk_number = ?, called_at = ? WHERE id = ?",
@@ -497,6 +490,10 @@ async function recallTicket(ticketId) {
   if (!ticket) return null;
 
   const now = new Date().toISOString();
+  await run(
+    "UPDATE tickets SET status = 'completed', completed_at = ? WHERE service_id = ? AND id != ? AND status = 'calling'",
+    [now, ticket.service_id, ticketId]
+  );
   await run("UPDATE tickets SET called_at = ? WHERE id = ?", [now, ticketId]);
 
   return get("SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.id = ?", [ticketId]);
@@ -685,6 +682,9 @@ async function restoreDatabase(srcPath) {
 }
 
 module.exports = {
+  get,
+  all,
+  run,
   dbPath,
   initDb,
   getServices,
