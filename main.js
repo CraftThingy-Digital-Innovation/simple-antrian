@@ -364,7 +364,9 @@ ipcMain.handle('save-mode-settings', async (event, modeSettings) => {
   
   currentMode = mode;
   await db.saveSetting('app_mode', mode);
-  if (serverName) await db.saveSetting('server_name', serverName);
+  const existingName = await db.getSetting('server_name');
+  const effectiveServerName = (serverName && serverName.trim()) || existingName || 'Server Utama';
+  await db.saveSetting('server_name', effectiveServerName);
   if (port) await db.saveSetting('port', port);
   
   const settings = await db.getSettings();

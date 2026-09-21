@@ -29,8 +29,9 @@ async function initConnection() {
         return;
       }
     }
-    // Client mode: ambil dari localStorage
-    const lastServer = localStorage.getItem('last_connected_server');
+    // Client mode: ambil dari db settings atau localStorage
+    const settings = await window.api.getSettings().catch(() => ({}));
+    const lastServer = (settings && settings.active_server_endpoint) || localStorage.getItem('last_connected_server');
     if (lastServer) {
       connectWebSocket('ws://' + lastServer);
     } else {

@@ -104,8 +104,19 @@ const wsRequestCallbacks = {};
 
 async function getSettingsData() {
   if (currentMode === 'client') {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      return await window.api.getSettings().catch(() => ({}));
+    }
     return new Promise((resolve) => {
-      wsRequestCallbacks['SETTINGS_RESPONSE'] = resolve;
+      const timer = setTimeout(async () => {
+        delete wsRequestCallbacks['SETTINGS_RESPONSE'];
+        const fallback = await window.api.getSettings().catch(() => ({}));
+        resolve(fallback || {});
+      }, 1500);
+      wsRequestCallbacks['SETTINGS_RESPONSE'] = (data) => {
+        clearTimeout(timer);
+        resolve(data || {});
+      };
       sendAction('GET_SETTINGS');
     });
   } else {
@@ -1836,13 +1847,18 @@ function setupEventListeners() {
   // Live preview perubahan pilihan mode operasi
   const appModeSelect = document.getElementById('app-mode-select');
   if (appModeSelect) {
-    appModeSelect.addEventListener('change', (e) => {
+    appModeSelect.addEventListener('change', async (e) => {
       const selectedMode = e.target.value;
       const serverGroup = document.getElementById('settings-server-group');
       const clientInfoGroup = document.getElementById('settings-client-info-group');
       if (selectedMode === 'server') {
         if (serverGroup) serverGroup.style.display = 'flex';
         if (clientInfoGroup) clientInfoGroup.style.display = 'none';
+        const srvInput = document.getElementById('setting-server-name');
+        if (srvInput && !srvInput.value.trim()) {
+          const localSettings = await window.api.getSettings().catch(() => ({}));
+          srvInput.value = (localSettings && localSettings.server_name) || 'Server Utama';
+        }
       } else {
         if (serverGroup) serverGroup.style.display = 'none';
         if (clientInfoGroup) clientInfoGroup.style.display = 'flex';
@@ -1870,12 +1886,14 @@ function setupEventListeners() {
   if (btnSaveMode) {
     btnSaveMode.addEventListener('click', async () => {
       const mode = document.getElementById('app-mode-select').value;
-      const serverName = document.getElementById('setting-server-name').value.trim();
+      let serverName = document.getElementById('setting-server-name').value.trim();
       const port = document.getElementById('setting-port').value || '8080';
 
       if (mode === 'server' && !serverName) {
-        showToast('Nama Server tidak boleh kosong.', 'error');
-        return;
+        const localSettings = await window.api.getSettings().catch(() => ({}));
+        serverName = (localSettings && localSettings.server_name) || 'Server Utama';
+        const srvInput = document.getElementById('setting-server-name');
+        if (srvInput) srvInput.value = serverName;
       }
 
       await window.api.saveModeSettings({ mode, serverName, port });
@@ -2589,16 +2607,23 @@ async function loadStats(dateStr) {
 
 // Muat Konfigurasi pada Pengaturan
 async function loadSettings() {
-  const settings = await getSettingsData();
+  const localSettings = await window.api.getSettings().catch(() => ({}));
+  let settings = localSettings || {};
+  try {
+    const remoteSettings = await getSettingsData();
+    if (remoteSettings && typeof remoteSettings === 'object') {
+      settings = { ...localSettings, ...remoteSettings };
+    }
+  } catch (_) {}
   
-  // App Mode UI
-  const appMode = settings.app_mode || 'server';
+  // App Mode UI (Gunakan mode lokal PC ini)
+  const appMode = currentMode || localSettings.app_mode || 'server';
   const appModeSelectEl = document.getElementById('app-mode-select');
   if (appModeSelectEl) appModeSelectEl.value = appMode;
   const srvNameInput = document.getElementById('setting-server-name');
-  if (srvNameInput) srvNameInput.value = settings.server_name || 'Server Utama';
+  if (srvNameInput) srvNameInput.value = localSettings.server_name || (settings && settings.server_name) || 'Server Utama';
   const srvPortInput = document.getElementById('setting-port');
-  if (srvPortInput) srvPortInput.value = settings.port || '8080';
+  if (srvPortInput) srvPortInput.value = localSettings.port || (settings && settings.port) || '8080';
 
   const serverGroup = document.getElementById('settings-server-group');
   const clientInfoGroup = document.getElementById('settings-client-info-group');
