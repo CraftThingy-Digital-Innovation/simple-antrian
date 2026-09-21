@@ -272,14 +272,22 @@ document.addEventListener('DOMContentLoaded', () => {
   // Sound toggle button
   const soundBtn = document.getElementById('mini-btn-sound');
   if (soundBtn) {
-    const isMuted = localStorage.getItem('mini_audio_muted') === 'true';
+    // Default adalah MUTED (true) jika belum ada setelan tersimpan
+    const savedMuted = localStorage.getItem('mini_audio_muted');
+    const isMuted = savedMuted === null ? true : savedMuted === 'true';
     soundBtn.textContent = isMuted ? '🔇' : '🔊';
-    soundBtn.addEventListener('click', () => {
-      const currentlyMuted = localStorage.getItem('mini_audio_muted') === 'true';
+    soundBtn.title = isMuted ? 'Suara Dinonaktifkan (Klik untuk aktifkan)' : 'Suara Aktif (Klik untuk bisukan)';
+
+    soundBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const currentVal = localStorage.getItem('mini_audio_muted');
+      const currentlyMuted = currentVal === null ? true : currentVal === 'true';
       const newMuted = !currentlyMuted;
       localStorage.setItem('mini_audio_muted', newMuted ? 'true' : 'false');
       soundBtn.textContent = newMuted ? '🔇' : '🔊';
-      showToast(newMuted ? 'Suara panggilan dinonaktifkan' : 'Suara panggilan diaktifkan', 'info');
+      soundBtn.title = newMuted ? 'Suara Dinonaktifkan (Klik untuk aktifkan)' : 'Suara Aktif (Klik untuk bisukan)';
+      showToast(newMuted ? 'Suara di Mini Operator dibisukan' : 'Suara di Mini Operator diaktifkan', 'info');
       if (newMuted) stopMiniAudio();
     });
   }
@@ -560,7 +568,9 @@ function playMiniAudioSequence(urls) {
 }
 
 async function playMiniAnnouncement(ticketNumber, deskNumber, voiceFiles) {
-  const isMuted = localStorage.getItem('mini_audio_muted') === 'true';
+  // Default adalah MUTED (true) jika belum pernah diaktifkan secara manual
+  const savedMuted = localStorage.getItem('mini_audio_muted');
+  const isMuted = savedMuted === null ? true : savedMuted === 'true';
   if (isMuted) return;
   if (!voiceFiles || voiceFiles.length === 0) return;
 

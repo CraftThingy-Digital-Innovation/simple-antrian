@@ -67,6 +67,21 @@
       -webkit-app-region: no-drag;
     }
 
+        .btn-sound-toggle {
+      -webkit-app-region: no-drag !important;
+      background: none;
+      border: none;
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 2px 5px;
+      line-height: 1;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .btn-sound-toggle:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: scale(1.1);
+    }
     .mini-titlebar .btn-close {
       width: 18px; height: 18px;
       border-radius: 50%;
@@ -311,7 +326,7 @@
     <div class="mini-titlebar">
       <div style="display: flex; align-items: center; gap: 6px;">
         <span class="title">⚡ MINI OPERATOR</span>
-        <button id="mini-btn-sound" type="button" title="Suara Panggilan (Aktif/Mute)" style="background: none; border: none; font-size: 0.85rem; cursor: pointer; padding: 0 4px; line-height: 1;">🔊</button>
+        <button class="btn-sound-toggle" id="mini-btn-sound" type="button" title="Suara Dinonaktifkan (Klik untuk aktifkan)" style="-webkit-app-region: no-drag !important;">🔇</button>
       </div>
       <div class="controls">
         <button class="btn-close" id="btn-restore" title="Buka kembali jendela utama">✕</button>

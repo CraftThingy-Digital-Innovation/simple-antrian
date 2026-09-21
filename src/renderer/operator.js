@@ -1161,10 +1161,9 @@ function renderWaStatus(waState) {
 
 // Play Voice Announce menggunakan Web Speech API & Web Audio Ding-Dong (3 bahasa)
 async function playVoiceAnnounce(ticketNumber, deskNumber, voiceFiles) {
-  // Bunyikan di operator panel (bisa diatur di localStorage / settings)
+  // Hanya bunyikan di operator jika dicentang di setelan audio (default suara hanya di layar display)
   const settings = await window.api.getSettings();
-  const isOperatorAudioMuted = localStorage.getItem('operator_audio_muted') === 'true';
-  if (isOperatorAudioMuted) return;
+  if (settings.play_audio_operator !== 'true') return;
 
   if (!voiceFiles || voiceFiles.length === 0) return;
 
