@@ -651,12 +651,13 @@ function buildThermalReceiptHtml({ instansi, service, number, customer, time, su
 '    }' +
 '    .divider {' +
 '      border-top: 1px dashed #000000;' +
-'      margin: 6px 0;' +
+'      width: 100%;' +
+'      margin: 6px auto;' +
 '    }' +
 '    .number {' +
 '      font-size: ' + numSize + ';' +
 '      font-weight: 900;' +
-'      letter-spacing: -1px;' +
+'      letter-spacing: 0.5px;' +
 '      line-height: 1.1;' +
 '      margin: 4px 0;' +
 '      font-family: \'Segoe UI\', Arial, sans-serif;' +
@@ -682,10 +683,11 @@ function buildThermalReceiptHtml({ instansi, service, number, customer, time, su
 '      margin-bottom: 2px;' +
 '    }' +
 '    .survey-url {' +
-'      font-size: 7pt;' +
+'      font-size: 6.8pt;' +
 '      word-break: break-all;' +
 '      margin-bottom: 3px;' +
-'      font-family: monospace;' +
+'      font-family: \'Segoe UI\', Arial, sans-serif;' +
+'      line-height: 1.25;' +
 '    }' +
 '    .survey-qr {' +
 '      width: ' + qrSize + ';' +
