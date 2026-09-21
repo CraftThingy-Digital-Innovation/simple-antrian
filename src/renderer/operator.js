@@ -1422,22 +1422,17 @@ function renderQueueState(state) {
     `;
   }
 
+  const validServiceNames = services.map(s => s.name);
   services.forEach(srv => {
-    // Tentukan nomor loket
+    // Tentukan nomor loket: STRICTLY ikuti srv.name dari Settings kecuali diubah ke nama layanan lain yang sah
     let currentDesk = localDeskSettings[srv.id];
+    if (!currentDesk || !validServiceNames.includes(currentDesk)) {
+      currentDesk = srv.name;
+      localDeskSettings[srv.id] = currentDesk;
+      localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
+    }
     // Ambil calling tickets untuk layanan ini (terurut dari yang paling baru dipanggil)
     const serviceCallingTickets = callingTickets.filter(t => t.service_id === srv.id);
-    
-    if (!currentDesk) {
-      // Jika ada tiket aktif dipanggil untuk layanan ini, samakan nomor loketnya
-      if (serviceCallingTickets.length > 0 && serviceCallingTickets[0].desk_number) {
-        currentDesk = serviceCallingTickets[0].desk_number;
-        localDeskSettings[srv.id] = currentDesk;
-        localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
-      } else {
-        currentDesk = srv.name;
-      }
-    }
 
     // Cari apakah ada tiket sedang dipanggil untuk layanan dan loket ini
     // 1. Cocokkan nomor loket yang terdaftar (case-insensitive & trimmed)
@@ -1452,8 +1447,12 @@ function renderQueueState(state) {
     // 3. Fallback: jika ada tiket calling untuk layanan ini, pasangkan yang terbaru dan sinkronkan loket
     if (!activeCall && serviceCallingTickets.length > 0) {
       activeCall = serviceCallingTickets[0];
-      if (activeCall.desk_number) {
+      if (activeCall.desk_number && validServiceNames.includes(activeCall.desk_number)) {
         currentDesk = activeCall.desk_number;
+        localDeskSettings[srv.id] = currentDesk;
+        localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
+      } else {
+        currentDesk = srv.name;
         localDeskSettings[srv.id] = currentDesk;
         localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
       }
@@ -1551,23 +1550,14 @@ function renderQueueState(state) {
       <div class="desk-setting-row">
         <label for="desk-input-${srv.id}" style="font-size: 0.85rem; font-weight:600; color:var(--text-secondary);">Loket:</label>
         ${(() => {
-          // Buat pilihan Loket dropdown berdasarkan pengaturan layanan & preset standar
+          // Pilihan Loket MURNI HANYA mengikuti layanan yang terdaftar di Pengaturan (Settings)
           const deskOptions = [];
           if (srv.name) deskOptions.push(srv.name);
           services.forEach(s => {
             if (s.name && !deskOptions.includes(s.name)) deskOptions.push(s.name);
           });
-          for (let i = 1; i <= 10; i++) {
-            const lk = `Loket ${i}`;
-            if (!deskOptions.includes(lk)) deskOptions.push(lk);
-          }
-          if (!deskOptions.includes('Customer Service')) deskOptions.push('Customer Service');
-          if (!deskOptions.includes('Kasir')) deskOptions.push('Kasir');
-          if (currentDesk && !deskOptions.includes(currentDesk)) {
-            deskOptions.unshift(currentDesk);
-          }
 
-          return `<select class="input-control desk-input" id="desk-input-${srv.id}" style="font-weight: 600; cursor: pointer; padding: 4px 8px; width: 160px; text-align: center;">
+          return `<select class="input-control desk-input" id="desk-input-${srv.id}" style="font-weight: 600; cursor: pointer; padding: 4px 8px; width: 160px; text-align: center;" title="Layanan dari Pengaturan">
             ${deskOptions.map(opt => `<option value="${escapeHtml(opt)}" ${opt === currentDesk ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
           </select>`;
         })()}
@@ -1649,7 +1639,7 @@ window.callNext = function(serviceId) {
     deskNumber = deskInput.value.trim();
   } else {
     const srv = servicesList.find(s => s.id === serviceId);
-    deskNumber = srv ? srv.name : 'Loket 1';
+    deskNumber = srv ? srv.name : 'Loket';
   }
   localDeskSettings[serviceId] = deskNumber;
   localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
@@ -1663,7 +1653,7 @@ window.callSkipped = function(serviceId) {
     deskNumber = deskInput.value.trim();
   } else {
     const srv = servicesList.find(s => s.id === serviceId);
-    deskNumber = srv ? srv.name : 'Loket 1';
+    deskNumber = srv ? srv.name : 'Loket';
   }
   localDeskSettings[serviceId] = deskNumber;
   localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
@@ -1678,7 +1668,7 @@ window.recall = function(ticketId, serviceId) {
     deskNumber = deskInput.value.trim();
   } else {
     const srv = servicesList.find(s => s.id === serviceId);
-    deskNumber = srv ? srv.name : 'Loket 1';
+    deskNumber = srv ? srv.name : 'Loket';
   }
   localDeskSettings[serviceId] = deskNumber;
   localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
@@ -1688,11 +1678,12 @@ window.recall = function(ticketId, serviceId) {
 window.completeCall = function(ticketId, serviceId) {
   if (!ticketId) return;
   const deskInput = document.getElementById(`desk-input-${serviceId}`);
+  const srv = servicesList.find(s => s.id === serviceId);
   let deskNumber = '';
   if (deskInput && deskInput.value) {
     deskNumber = deskInput.value.trim();
   } else {
-    deskNumber = localDeskSettings[serviceId] || 'Loket 1';
+    deskNumber = localDeskSettings[serviceId] || (srv ? srv.name : 'Loket');
   }
   if (serviceId && activeTickets[serviceId]) {
     delete activeTickets[serviceId];

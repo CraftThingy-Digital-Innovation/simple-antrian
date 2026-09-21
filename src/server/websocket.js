@@ -560,14 +560,20 @@ async function handleClientAction(action, ws) {
       }
 
       case 'CALL_NEXT': {
-        const { serviceId, deskNumber } = payload;
+        const { serviceId } = payload;
+        let { deskNumber } = payload;
+        const srv = serviceId ? await db.getServiceById(serviceId) : null;
+        if (!deskNumber || !deskNumber.trim()) {
+          deskNumber = srv ? srv.name : '';
+        }
         const calledTicket = await db.callNextTicket(serviceId, deskNumber);
         
         if (calledTicket) {
           await broadcastStateUpdate();
           
           // Kirim trigger panggilan suara (announcement) ke seluruh display
-          await announceCall(calledTicket.ticket_number, calledTicket.desk_number, calledTicket.service_name, calledTicket.customer_name);
+          const targetDesk = calledTicket.desk_number || deskNumber || (srv ? srv.name : calledTicket.service_name);
+          await announceCall(calledTicket.ticket_number, targetDesk, calledTicket.service_name, calledTicket.customer_name);
 
           // Kirim WhatsApp pemberitahuan giliran tiba
           try {
@@ -582,15 +588,17 @@ async function handleClientAction(action, ws) {
         } else {
           // Fallback cerdas: Jika tidak ada antrian waiting, panggil ulang antrian aktif saat ini dengan loket yang dipilih
           const callingTickets = await db.getCallingTickets();
-          const activeCalling = callingTickets.find(t => t.service_id === serviceId) || callingTickets[0];
+          const activeCalling = (serviceId ? callingTickets.find(t => t.service_id === serviceId) : null) || callingTickets[0];
           if (activeCalling) {
-            if (deskNumber && activeCalling.desk_number !== deskNumber) {
-              await db.updateTicketDesk(activeCalling.id, deskNumber);
-              activeCalling.desk_number = deskNumber;
+            const finalDesk = deskNumber || (srv ? srv.name : activeCalling.desk_number) || activeCalling.service_name;
+            if (finalDesk && activeCalling.desk_number !== finalDesk) {
+              await db.updateTicketDesk(activeCalling.id, finalDesk);
+              activeCalling.desk_number = finalDesk;
             }
             const recalledTicket = await db.recallTicket(activeCalling.id);
             await broadcastStateUpdate();
-            await announceCall(recalledTicket.ticket_number, recalledTicket.desk_number, recalledTicket.service_name, recalledTicket.customer_name);
+            const targetDesk = (recalledTicket && recalledTicket.desk_number) || finalDesk || activeCalling.service_name;
+            await announceCall((recalledTicket || activeCalling).ticket_number, targetDesk, (recalledTicket || activeCalling).service_name, (recalledTicket || activeCalling).customer_name);
           } else {
             ws.send(JSON.stringify({ type: 'ALERT', payload: { message: 'Antrian kosong.' } }));
           }
@@ -649,7 +657,7 @@ async function handleClientAction(action, ws) {
         const shouldAutoCall = autoCallNext !== undefined ? autoCallNext === true : isAutoCallEnabled;
 
         const targetServiceId = (ticket && ticket.service_id) || serviceId;
-        const targetDesk = (ticket && ticket.desk_number) || deskNumber || 'Loket 1';
+        const targetDesk = (ticket && ticket.desk_number) || deskNumber || '';
 
         // Pastikan tidak ada tiket calling zombie tertinggal untuk desk ini
         if (targetDesk) {
@@ -1041,7 +1049,7 @@ async function getVoiceAnnouncementFiles(ticketNumber, deskNumber, customerName)
   const prefix = ticketNumber.charAt(0);
   const num = parseInt(ticketNumber.substring(1), 10);
   
-  let safeDesk = (deskNumber || 'Loket 1').trim();
+  let safeDesk = (deskNumber || '').trim();
   const digits = safeDesk.replace(/[^0-9]/g, '');
   const deskNum = digits ? parseInt(digits, 10) : 1;
   let deskWord = safeDesk.replace(/[0-9]+/g, '').trim().toLowerCase();

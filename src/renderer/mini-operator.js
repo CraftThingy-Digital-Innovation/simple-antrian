@@ -114,10 +114,10 @@ function handleMessage(msg) {
     latestWaitingTickets = waitingTickets;
     if (payload.serverName) currentServerName = payload.serverName;
 
+    updateActiveTickets(callingTickets);
     updateServiceDropdown(services);
     updateServiceFilterDropdown(services);
     updateCallDeskDropdown(services, callingTickets);
-    updateActiveTickets(callingTickets);
   }
 
   if (type === 'SETTINGS_UPDATE' && payload) {
@@ -197,59 +197,41 @@ function updateCallDeskDropdown(services, callingTickets) {
   const select = document.getElementById('mini-call-desk-select');
   if (!select) return;
 
-  const selectedServiceId = getSelectedServiceId();
-  const currentSrv = (services || servicesList).find(s => s.id === selectedServiceId) || (services && services[0]);
-
-  // Kumpulkan pilihan Loket: nama layanan, preset Loket 1 - 10, Customer Service, Kasir
-  const deskOptions = [];
-  if (currentSrv && currentSrv.name) {
-    deskOptions.push(currentSrv.name);
-  }
-  if (services) {
-    services.forEach(s => {
-      if (s.name && !deskOptions.includes(s.name)) deskOptions.push(s.name);
-    });
-  }
-  for (let i = 1; i <= 10; i++) {
-    const lk = `Loket ${i}`;
-    if (!deskOptions.includes(lk)) deskOptions.push(lk);
-  }
-  if (!deskOptions.includes('Customer Service')) deskOptions.push('Customer Service');
-  if (!deskOptions.includes('Kasir')) deskOptions.push('Kasir');
-
-  // Cari tiket aktif saat ini untuk menentukan nilai terpilih
-  let activeTicket = null;
-  if (selectedServiceId && callingTickets) {
-    activeTicket = callingTickets.find(t => t.service_id === selectedServiceId);
-  }
-  if (!activeTicket && callingTickets && callingTickets.length > 0) {
-    activeTicket = callingTickets[0];
+  if (!services || services.length === 0) {
+    select.innerHTML = '<option value="">-- Belum ada layanan di Settings --</option>';
+    updateCurrentCall(callingTickets, services);
+    return;
   }
 
-  if (activeTicket && activeTicket.desk_number && !deskOptions.includes(activeTicket.desk_number)) {
-    deskOptions.unshift(activeTicket.desk_number);
+  // Pilihan MURNI DAN HANYA mengikuti layanan yang terdaftar di Settings!
+  const validServiceIds = services.map(s => s.id);
+  let selectedServiceId = localStorage.getItem('mini_selected_service_id');
+  if (!selectedServiceId || !validServiceIds.includes(selectedServiceId)) {
+    selectedServiceId = services[0].id;
+    localStorage.setItem('mini_selected_service_id', selectedServiceId);
   }
 
-  // Tentukan pilihan yang harus di-select
+  const currentSrv = services.find(s => s.id === selectedServiceId) || services[0];
+
+  // Bersihkan stale localStorage
   let savedLocalDesks = {};
   try { savedLocalDesks = JSON.parse(localStorage.getItem('local_desk_settings') || '{}'); } catch (_) {}
-  const savedDeskForSrv = currentSrv ? savedLocalDesks[currentSrv.id] : null;
-  const savedMiniDesk = localStorage.getItem('mini_selected_desk');
-  const targetDesk = savedDeskForSrv || savedMiniDesk || (activeTicket ? activeTicket.desk_number : (currentSrv ? currentSrv.name : 'Loket 1'));
+  if (!savedLocalDesks[currentSrv.id] || savedLocalDesks[currentSrv.id] !== currentSrv.name) {
+    savedLocalDesks[currentSrv.id] = currentSrv.name;
+    localStorage.setItem('local_desk_settings', JSON.stringify(savedLocalDesks));
+  }
 
   select.innerHTML = '';
-  deskOptions.forEach(d => {
+  services.forEach(srv => {
     const opt = document.createElement('option');
-    opt.value = d;
-    opt.textContent = d;
+    opt.value = srv.id;
+    opt.dataset.desk = srv.name;
+    opt.dataset.prefix = srv.prefix;
+    opt.textContent = services.length > 1 ? `[${srv.prefix}] ${srv.name}` : srv.name;
     select.appendChild(opt);
   });
 
-  if (deskOptions.includes(targetDesk)) {
-    select.value = targetDesk;
-  } else if (deskOptions.length > 0) {
-    select.value = deskOptions[0];
-  }
+  select.value = currentSrv.id;
 
   updateCurrentCall(callingTickets, services);
 }
@@ -264,16 +246,11 @@ function getSelectedServiceId() {
 }
 
 function getDeskNumber(serviceId) {
-  const select = document.getElementById('mini-call-desk-select');
-  if (select && select.value) return select.value.trim();
-  const savedMini = localStorage.getItem('mini_selected_desk');
-  if (savedMini) return savedMini;
-  let savedLocalDesks = {};
-  try { savedLocalDesks = JSON.parse(localStorage.getItem('local_desk_settings') || '{}'); } catch (_) {}
-  if (serviceId && savedLocalDesks[serviceId]) return savedLocalDesks[serviceId];
-  const srv = servicesList.find(s => s.id === serviceId);
+  const targetId = serviceId || getSelectedServiceId();
+  const srv = servicesList.find(s => s.id === targetId);
   if (srv) return srv.name;
-  return 'Loket 1';
+  if (servicesList.length > 0) return servicesList[0].name;
+  return 'Loket';
 }
 
 function updateCurrentCall(callingTickets, services) {
@@ -297,9 +274,20 @@ function updateCurrentCall(callingTickets, services) {
   }
 
   if (ticket) {
+    const srvForTicket = (services || servicesList).find(s => s.id === ticket.service_id);
+    const validNames = (services || servicesList).map(s => s.name);
+    let displayDesk = '';
+    if (ticket.desk_number && validNames.includes(ticket.desk_number)) {
+      displayDesk = ticket.desk_number;
+    } else if (srvForTicket) {
+      displayDesk = srvForTicket.name;
+    } else {
+      displayDesk = ticket.service_name || chosenDesk;
+    }
+
     if (callPanel) callPanel.classList.remove('standby');
     if (numEl) numEl.textContent = ticket.ticket_number;
-    if (deskEl) deskEl.textContent = ticket.desk_number || chosenDesk;
+    if (deskEl) deskEl.textContent = displayDesk;
     if (btnComplete) btnComplete.disabled = false;
     if (btnRecall) btnRecall.disabled = false;
     if (btnSkip) btnSkip.disabled = false;
@@ -430,33 +418,36 @@ document.addEventListener('DOMContentLoaded', () => {
   const callDeskSelect = document.getElementById('mini-call-desk-select');
   if (callDeskSelect) {
     callDeskSelect.addEventListener('change', (e) => {
-      const newDesk = e.target.value;
-      if (!newDesk) return;
+      const srvId = e.target.value;
+      if (!srvId) return;
 
-      const serviceId = getSelectedServiceId();
-      localStorage.setItem('mini_selected_desk', newDesk);
+      localStorage.setItem('mini_selected_service_id', srvId);
+      const printSelect = document.getElementById('mini-service-select');
+      if (printSelect) printSelect.value = srvId;
 
+      const srv = servicesList.find(s => s.id === srvId);
+      const deskName = srv ? srv.name : '';
+
+      // Update localDeskSettings
       let savedLocalDesks = {};
       try { savedLocalDesks = JSON.parse(localStorage.getItem('local_desk_settings') || '{}'); } catch (_) {}
-      if (serviceId) {
-        savedLocalDesks[serviceId] = newDesk;
-        localStorage.setItem('local_desk_settings', JSON.stringify(savedLocalDesks));
-      }
+      savedLocalDesks[srvId] = deskName;
+      localStorage.setItem('local_desk_settings', JSON.stringify(savedLocalDesks));
 
       // Update UI Mini Operator seketika
       const deskEl = document.getElementById('mini-call-desk');
-      const ticket = getActiveTicketForService(serviceId);
+      const ticket = getActiveTicketForService(srvId);
       if (ticket) {
-        ticket.desk_number = newDesk;
-        if (deskEl) deskEl.textContent = newDesk;
-        // PENTING: Segera update ke server agar DB dan Layar Customer Display realtime terupdate ke loket baru!
-        sendAction('UPDATE_ACTIVE_TICKET_DESK', { ticketId: ticket.id, deskNumber: newDesk });
+        ticket.desk_number = deskName;
+        if (deskEl) deskEl.textContent = deskName;
+        sendAction('UPDATE_ACTIVE_TICKET_DESK', { ticketId: ticket.id, deskNumber: deskName });
       } else {
-        if (deskEl) deskEl.textContent = `${newDesk} (Standby)`;
+        if (deskEl) deskEl.textContent = `${deskName} (Standby)`;
       }
 
-      sendAction('SYNC_DESK_NAMES', { deskNames: [newDesk] });
-      showToast('Loket diatur ke: ' + newDesk, 'info');
+      updateCurrentCall(latestCallingTickets, servicesList);
+      sendAction('SYNC_DESK_NAMES', { deskNames: [deskName] });
+      showToast('Layanan aktif: ' + deskName, 'info');
     });
   }
 

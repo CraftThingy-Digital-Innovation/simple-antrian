@@ -173,6 +173,16 @@ async function initDb() {
 
   // 2. Perbaiki tiket duplikat di antrian waiting jika ada dari versi sebelumnya
   await fixDuplicateWaitingTickets();
+
+  // 3. Sinkronisasikan desk_number tiket ke nama layanan di Settings jika kosong atau tidak cocok
+  try {
+    await run(`
+      UPDATE tickets 
+      SET desk_number = (SELECT name FROM services WHERE services.id = tickets.service_id)
+      WHERE service_id IN (SELECT id FROM services)
+        AND (desk_number IS NULL OR desk_number = '' OR desk_number NOT IN (SELECT name FROM services));
+    `);
+  } catch (_) {}
 }
 
 // ==================== PENANGANAN PERGANTIAN HARI & DUPLIKASI ====================
@@ -403,6 +413,9 @@ function createTicket(serviceId, name, phone) {
 async function callNextTicket(serviceId, deskNumber) {
   await handleDayRollover();
 
+  const service = await getServiceById(serviceId);
+  const safeDeskNumber = (deskNumber && deskNumber.trim()) ? deskNumber.trim() : (service ? service.name : 'Loket');
+
   // Cari tiket waiting pertama hari ini
   const nextTicket = await get(
     "SELECT * FROM tickets WHERE service_id = ? AND status = 'waiting' AND date(created_at, 'localtime') = date('now', 'localtime') ORDER BY number_sequence ASC LIMIT 1",
@@ -416,12 +429,12 @@ async function callNextTicket(serviceId, deskNumber) {
   // Selesaikan tiket calling sebelumnya untuk layanan ini atau loket ini agar tidak ada zombie calling
   await run(
     "UPDATE tickets SET status = 'completed', completed_at = ? WHERE (service_id = ? OR desk_number = ?) AND status = 'calling'",
-    [now, serviceId, deskNumber || '']
+    [now, serviceId, safeDeskNumber]
   );
 
   await run(
     "UPDATE tickets SET status = 'calling', desk_number = ?, called_at = ? WHERE id = ?",
-    [deskNumber, now, nextTicket.id]
+    [safeDeskNumber, now, nextTicket.id]
   );
 
   // Update current_number di service
@@ -437,6 +450,9 @@ async function callNextTicket(serviceId, deskNumber) {
 async function callSkippedTicket(serviceId, deskNumber) {
   await handleDayRollover();
 
+  const service = await getServiceById(serviceId);
+  const safeDeskNumber = (deskNumber && deskNumber.trim()) ? deskNumber.trim() : (service ? service.name : 'Loket');
+
   const nextSkipped = await get(
     "SELECT * FROM tickets WHERE service_id = ? AND status = 'skipped' AND date(created_at, 'localtime') = date('now', 'localtime') ORDER BY created_at ASC LIMIT 1",
     [serviceId]
@@ -447,21 +463,14 @@ async function callSkippedTicket(serviceId, deskNumber) {
   const now = new Date().toISOString();
 
   // Selesaikan tiket calling sebelumnya di loket ini
-  if (deskNumber) {
-    await run(
-      "UPDATE tickets SET status = 'completed', completed_at = ? WHERE desk_number = ? AND status = 'calling'",
-      [now, deskNumber]
-    );
-  } else {
-    await run(
-      "UPDATE tickets SET status = 'completed', completed_at = ? WHERE service_id = ? AND status = 'calling'",
-      [now, serviceId]
-    );
-  }
+  await run(
+    "UPDATE tickets SET status = 'completed', completed_at = ? WHERE (desk_number = ? OR service_id = ?) AND status = 'calling'",
+    [now, safeDeskNumber, serviceId]
+  );
 
   await run(
     "UPDATE tickets SET status = 'calling', desk_number = ?, called_at = ? WHERE id = ?",
-    [deskNumber, now, nextSkipped.id]
+    [safeDeskNumber, now, nextSkipped.id]
   );
 
   return get("SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.id = ?", [nextSkipped.id]);
@@ -486,7 +495,7 @@ async function completeCallingTicketsByDesk(deskNumber, serviceId = null) {
 
 // Panggil ulang antrian (recall)
 async function recallTicket(ticketId) {
-  const ticket = await get("SELECT * FROM tickets WHERE id = ?", [ticketId]);
+  const ticket = await get("SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.id = ?", [ticketId]);
   if (!ticket) return null;
 
   const now = new Date().toISOString();
@@ -494,14 +503,17 @@ async function recallTicket(ticketId) {
     "UPDATE tickets SET status = 'completed', completed_at = ? WHERE service_id = ? AND id != ? AND status = 'calling'",
     [now, ticket.service_id, ticketId]
   );
-  await run("UPDATE tickets SET called_at = ? WHERE id = ?", [now, ticketId]);
+  const safeDesk = (ticket.desk_number && ticket.desk_number.trim()) ? ticket.desk_number : ticket.service_name;
+  await run("UPDATE tickets SET called_at = ?, desk_number = ? WHERE id = ?", [now, safeDesk, ticketId]);
 
   return get("SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.id = ?", [ticketId]);
 }
 
 // Update desk number untuk tiket tertentu
 async function updateTicketDesk(ticketId, deskNumber) {
-  await run("UPDATE tickets SET desk_number = ? WHERE id = ?", [deskNumber, ticketId]);
+  const ticket = await get("SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.id = ?", [ticketId]);
+  const safeDesk = (deskNumber && deskNumber.trim()) ? deskNumber.trim() : (ticket ? ticket.service_name : 'Loket');
+  await run("UPDATE tickets SET desk_number = ? WHERE id = ?", [safeDesk, ticketId]);
   return get("SELECT t.*, s.name as service_name FROM tickets t JOIN services s ON t.service_id = s.id WHERE t.id = ?", [ticketId]);
 }
 

@@ -376,9 +376,20 @@ function renderDisplayState(state) {
     if (mainNumberEl && mainDeskEl && mainDisplayPanel) {
       if (callingTickets.length > 0) {
         const currentTicket = callingTickets[0];
+        const srvForCurrent = services.find(s => s.id === currentTicket.service_id);
+        const validNames = services.map(s => s.name);
+        let resolvedDesk = '';
+        if (currentTicket.desk_number && validNames.includes(currentTicket.desk_number)) {
+          resolvedDesk = currentTicket.desk_number;
+        } else if (srvForCurrent) {
+          resolvedDesk = srvForCurrent.name;
+        } else {
+          resolvedDesk = currentTicket.service_name || currentTicket.desk_number || 'Loket';
+        }
+
         mainDisplayPanel.classList.remove('standby');
         mainNumberEl.innerText = currentTicket.ticket_number;
-        mainDeskEl.innerText = currentTicket.desk_number;
+        mainDeskEl.innerText = resolvedDesk;
         mainDisplayPanel.classList.add('animate-call-blink');
         setTimeout(() => mainDisplayPanel.classList.remove('animate-call-blink'), 5000);
       } else {
