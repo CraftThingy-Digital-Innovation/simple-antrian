@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>SimpleAntrian - Mini Operator</title>
+  <style>
+    :root {
+      --bg-primary: #0f0f1a;
+      --bg-card: rgba(25, 25, 50, 0.95);
+      --bg-card-hover: rgba(35, 35, 65, 0.95);
+      --text-primary: #f0f0f5;
+      --text-secondary: #a0a0c0;
+      --text-muted: #6a6a8a;
+      --accent-primary: #6c5ce7;
+      --accent-success: #00cec9;
+      --accent-warning: #fdcb6e;
+      --accent-danger: #ff6b6b;
+      --border-glass: rgba(255,255,255,0.08);
+      --radius: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+      background: transparent;
+      color: var(--text-primary);
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .mini-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(108, 92, 231, 0.15);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    /* Draggable Title Bar */
+    .mini-titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: rgba(108, 92, 231, 0.15);
+      border-bottom: 1px solid var(--border-glass);
+      -webkit-app-region: drag;
+      cursor: grab;
+      flex-shrink: 0;
+    }
+
+    .mini-titlebar .title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--accent-primary);
+      letter-spacing: 0.5px;
+    }
+
+    .mini-titlebar .controls {
+      display: flex;
+      gap: 4px;
+      -webkit-app-region: no-drag;
+    }
+
+    .mini-titlebar .btn-close {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      border: none;
+      background: var(--accent-danger);
+      color: white;
+      font-size: 10px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0.7;
+      transition: opacity 0.15s;
+    }
+    .mini-titlebar .btn-close:hover { opacity: 1; }
+
+    /* Content */
+    .mini-body {
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    /* Connection Status */
+    .conn-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(0,0,0,0.2);
+      font-size: 0.7rem;
+    }
+    .conn-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent-warning);
+      flex-shrink: 0;
+    }
+    .conn-dot.connected { background: var(--accent-success); }
+    .conn-dot.disconnected { background: var(--accent-danger); }
+
+    /* Current Call Display */
+    .current-call {
+      text-align: center;
+      padding: 8px;
+      background: linear-gradient(135deg, rgba(108,92,231,0.15), rgba(0,206,201,0.1));
+      border-radius: 8px;
+      border: 1px solid var(--border-glass);
+    }
+    .current-call .number {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--accent-primary);
+      line-height: 1.1;
+    }
+    .current-call .desk {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    .current-call.standby .number {
+      color: var(--text-muted);
+      font-size: 1.2rem;
+    }
+
+    /* Section Label */
+    .section-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-top: 2px;
+    }
+
+    /* 4 Action Buttons */
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+    .btn-action {
+      padding: 7px 4px;
+      border-radius: 6px;
+      border: 1px solid var(--border-glass);
+      background: rgba(255,255,255,0.04);
+      color: var(--text-primary);
+      font-size: 0.7rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .btn-action:hover { background: rgba(255,255,255,0.1); transform: scale(1.02); }
+    .btn-action:active { transform: scale(0.97); }
+    .btn-action.primary { background: rgba(108,92,231,0.3); border-color: rgba(108,92,231,0.4); }
+    .btn-action.success { background: rgba(0,206,201,0.2); border-color: rgba(0,206,201,0.3); }
+    .btn-action.warning { background: rgba(253,203,110,0.15); border-color: rgba(253,203,110,0.25); color: var(--accent-warning); }
+    .btn-action.danger { background: rgba(255,107,107,0.15); border-color: rgba(255,107,107,0.25); color: var(--accent-danger); }
+    .btn-action:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+    /* Input Fields */
+    .mini-input {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border-glass);
+      background: rgba(0,0,0,0.3);
+      color: var(--text-primary);
+      font-size: 0.75rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .mini-input:focus { border-color: var(--accent-primary); }
+    .mini-input::placeholder { color: var(--text-muted); }
+
+    .mini-select {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border-glass);
+      background: rgba(0,0,0,0.3);
+      color: var(--text-primary);
+      font-size: 0.75rem;
+      outline: none;
+      cursor: pointer;
+      -webkit-appearance: none;
+    }
+    .mini-select option { background: #1a1a30; color: #f0f0f5; }
+
+    /* Ticket Section */
+    .ticket-section {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .btn-print-ticket {
+      width: 100%;
+      padding: 8px;
+      border-radius: 6px;
+      border: none;
+      background: linear-gradient(135deg, var(--accent-primary), #a855f7);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-print-ticket:hover { filter: brightness(1.15); transform: scale(1.02); }
+    .btn-print-ticket:active { transform: scale(0.97); }
+
+    /* Mode Selector */
+    .mode-row {
+      display: flex;
+      gap: 3px;
+    }
+    .btn-mode {
+      flex: 1;
+      padding: 5px 2px;
+      border-radius: 5px;
+      border: 1px solid var(--border-glass);
+      background: rgba(255,255,255,0.03);
+      color: var(--text-secondary);
+      font-size: 0.65rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .btn-mode:hover { background: rgba(255,255,255,0.08); }
+    .btn-mode.active {
+      background: rgba(108,92,231,0.25);
+      border-color: var(--accent-primary);
+      color: var(--accent-primary);
+    }
+
+    /* Toast */
+    .mini-toast {
+      position: fixed;
+      bottom: 8px;
+      left: 8px;
+      right: 8px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.25s;
+      z-index: 999;
+      pointer-events: none;
+    }
+    .mini-toast.show { opacity: 1; transform: translateY(0); }
+    .mini-toast.success { background: rgba(0,206,201,0.9); color: #fff; }
+    .mini-toast.error { background: rgba(255,107,107,0.9); color: #fff; }
+    .mini-toast.info { background: rgba(108,92,231,0.9); color: #fff; }
+
+    /* Scrollbar */
+    .mini-body::-webkit-scrollbar { width: 3px; }
+    .mini-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div class="mini-container">
+    <!-- Title Bar (draggable) -->
+    <div class="mini-titlebar">
+      <span class="title">⚡ MINI OPERATOR</span>
+      <div class="controls">
+        <button class="btn-close" id="btn-restore" title="Buka kembali jendela utama">✕</button>
+      </div>
+    </div>
+
+    <div class="mini-body">
+      <!-- Connection Status -->
+      <div class="conn-bar">
+        <div class="conn-dot" id="mini-conn-dot"></div>
+        <span id="mini-conn-text" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Menghubungkan...</span>
+      </div>
+
+      <!-- Current Call Display -->
+      <div class="current-call standby" id="mini-current-call">
+        <div class="number" id="mini-call-number">---</div>
+        <div class="desk" id="mini-call-desk">Belum ada antrian</div>
+      </div>
+
+      <!-- 4 Important Buttons -->
+      <div class="section-label">Aksi Panggilan</div>
+      <div class="action-grid">
+        <button class="btn-action primary" id="mini-btn-call" title="Panggil Berikutnya">📢 Panggil</button>
+        <button class="btn-action success" id="mini-btn-complete" title="Selesaikan Antrian" disabled>✅ Selesai</button>
+        <button class="btn-action warning" id="mini-btn-recall" title="Panggil Ulang" disabled>🔁 Ulang</button>
+        <button class="btn-action danger" id="mini-btn-skip" title="Lewati Antrian" disabled>⏭️ Lewati</button>
+      </div>
+
+      <!-- Create Ticket Section -->
+      <div class="section-label">Cetak Tiket Antrian</div>
+      <div class="ticket-section">
+        <select class="mini-select" id="mini-service-select">
+          <option value="">-- Pilih Layanan --</option>
+        </select>
+        <input type="text" class="mini-input" id="mini-ticket-name" placeholder="Nama pelanggan (opsional)">
+        <input type="text" class="mini-input" id="mini-ticket-phone" placeholder="No. HP (opsional)">
+        <button class="btn-print-ticket" id="mini-btn-print">🎫 Cetak Tiket Antrian</button>
+      </div>
+
+      <!-- Display Mode -->
+      <div class="section-label">Mode Display</div>
+      <div class="mode-row">
+        <button class="btn-mode active" id="mini-mode-queue" data-mode="queue">📋 Antrian</button>
+        <button class="btn-mode" id="mini-mode-video" data-mode="video">🎬 Video</button>
+        <button class="btn-mode" id="mini-mode-mirror" data-mode="mirror">🖥️ Mirror</button>
+      </div>
+
+      <!-- Mirror Source (only shown in mirror mode) -->
+      <div id="mini-mirror-section" style="display: none;">
+        <select class="mini-select" id="mini-mirror-source">
+          <option value="">-- Pilih Sumber Mirror --</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="mini-toast" id="mini-toast"></div>
+
+  <script src="mini-operator.js"></script>
+</body>
+</html>

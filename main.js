@@ -110,6 +110,7 @@ const whatsapp = require('./src/server/whatsapp');
 
 let mainWindow = null;
 let displayWindow = null;
+let miniOperatorWindow = null; // Jendela kecil mengambang saat operator diminimalkan
 let currentDisplayMonitorId = null;
 let kioskWindow = null;
 let currentMode = 'server'; // default mode
@@ -216,10 +217,75 @@ function createMainWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
-    // Jika window utama ditutup, tutup juga layar display & kiosk
+    // Jika window utama ditutup, tutup juga layar display, kiosk, dan mini operator
     if (displayWindow) displayWindow.close();
     if (kioskWindow) kioskWindow.close();
+    if (miniOperatorWindow) { miniOperatorWindow.close(); miniOperatorWindow = null; }
   });
+
+  // Saat operator diminimalkan -> tampilkan mini floating window
+  mainWindow.on('minimize', () => {
+    createMiniOperatorWindow();
+  });
+
+  // Saat operator di-restore -> tutup mini floating window
+  mainWindow.on('restore', () => {
+    if (miniOperatorWindow) {
+      miniOperatorWindow.close();
+      miniOperatorWindow = null;
+    }
+  });
+
+  mainWindow.on('focus', () => {
+    if (miniOperatorWindow) {
+      miniOperatorWindow.close();
+      miniOperatorWindow = null;
+    }
+  });
+}
+
+// Membuat Mini Operator Window (floating, always-on-top, draggable)
+function createMiniOperatorWindow() {
+  if (miniOperatorWindow) return; // Sudah terbuka
+
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+
+  // Posisi di pojok kanan bawah
+  const winWidth = 280;
+  const winHeight = 520;
+  const x = screenW - winWidth - 16;
+  const y = screenH - winHeight - 16;
+
+  miniOperatorWindow = new BrowserWindow({
+    width: winWidth,
+    height: winHeight,
+    x: x,
+    y: y,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    movable: true,
+    hasShadow: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false
+    },
+    title: 'SimpleAntrian - Mini Operator'
+  });
+
+  miniOperatorWindow.loadFile(path.join(__dirname, 'src/renderer/mini-operator.html'));
+
+  miniOperatorWindow.on('closed', () => {
+    miniOperatorWindow = null;
+  });
+
+  console.log('[Main] Mini Operator window dibuka di posisi', x, y);
 }
 
 const runtimeServerUuid = require('crypto').randomUUID();
@@ -655,6 +721,14 @@ function scanMediaFolder(folderPath) {
 
   return results;
 }
+
+// IPC Handler: Restore jendela utama (dipanggil dari mini operator)
+ipcMain.handle('restore-main-window', () => {
+  if (mainWindow) {
+    mainWindow.restore();
+    mainWindow.focus();
+  }
+});
 
 // IPC Handler to pick and copy local video or photo files to data/videos/
 ipcMain.handle('add-video-file', async () => {

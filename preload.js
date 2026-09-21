@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('api', {
   selectLocalMediaFolder: () => ipcRenderer.invoke('select-local-media-folder'),
   getLocalMediaFolder: () => ipcRenderer.invoke('get-local-media-folder'),
   clearLocalMediaFolder: () => ipcRenderer.invoke('clear-local-media-folder'),
+  // Mini Operator Window: restore jendela utama
+  restoreMainWindow: () => ipcRenderer.invoke('restore-main-window'),
   performWaUpdate: () => ipcRenderer.invoke('wa-perform-update'),
   checkAppUpdates: () => ipcRenderer.invoke('check-app-updates'),
   onAppUpdateAvailable: (callback) => {
