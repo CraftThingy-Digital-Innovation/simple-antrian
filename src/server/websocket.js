@@ -195,8 +195,47 @@ function startWebSocketServer(port) {
         }));
       });
     } else {
-      res.writeHead(404);
-      res.end();
+      // Layani Static Files untuk Layar Customer Display melalui Web Browser (misal Smart TV, Tablet, Browser Eksternal)
+      let reqPath = req.url.split('?')[0];
+      if (reqPath === '/' || reqPath === '/display' || reqPath === '/display.html') {
+        reqPath = '/display.html';
+      }
+
+      // Cari file di src/renderer atau src/assets
+      let staticFilePath = path.join(__dirname, '..', 'renderer', reqPath.replace(/^\//, ''));
+      if (!fs.existsSync(staticFilePath)) {
+        staticFilePath = path.join(__dirname, '..', 'assets', reqPath.replace(/^\//, ''));
+      }
+
+      if (fs.existsSync(staticFilePath) && fs.statSync(staticFilePath).isFile()) {
+        const ext = path.extname(staticFilePath).toLowerCase();
+        const mimeMap = {
+          '.html': 'text/html; charset=utf-8',
+          '.css': 'text/css; charset=utf-8',
+          '.js': 'application/javascript; charset=utf-8',
+          '.json': 'application/json; charset=utf-8',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.webp': 'image/webp',
+          '.svg': 'image/svg+xml',
+          '.ico': 'image/x-icon',
+          '.woff': 'font/woff',
+          '.woff2': 'font/woff2',
+          '.ttf': 'font/ttf'
+        };
+        const contentType = mimeMap[ext] || 'application/octet-stream';
+        res.writeHead(200, {
+          'Content-Type': contentType,
+          'Access-Control-Allow-Origin': '*'
+        });
+        const stream = fs.createReadStream(staticFilePath);
+        stream.pipe(res);
+        res.on('close', () => stream.destroy());
+      } else {
+        res.writeHead(404);
+        res.end();
+      }
     }
   });
 

@@ -564,6 +564,8 @@ ipcMain.handle('open-display-window', (event, options = {}) => {
     height: targetDisplay.bounds.height,
     fullscreen: true,
     frame: false,
+    backgroundColor: '#060913',
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -575,11 +577,25 @@ ipcMain.handle('open-display-window', (event, options = {}) => {
 
   displayWindow = new BrowserWindow(windowOptions);
   captureWindowLogs(displayWindow, 'Display');
+
+  displayWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[Display] Gagal memuat halaman: ${errorCode} - ${errorDescription} (${validatedURL})`);
+  });
+
   displayWindow.loadFile(path.join(__dirname, 'src/renderer/display.html'));
 
   displayWindow.once('ready-to-show', () => {
     applyTargetDisplay(displayWindow, targetMonitorId, isLocked);
+    displayWindow.show();
   });
+
+  // Safety fallback agar window dipastikan tampil jika ready-to-show tertunda
+  setTimeout(() => {
+    if (displayWindow && !displayWindow.isDestroyed() && !displayWindow.isVisible()) {
+      applyTargetDisplay(displayWindow, targetMonitorId, isLocked);
+      displayWindow.show();
+    }
+  }, 1200);
 
   displayWindow.on('closed', () => {
     displayWindow = null;

@@ -726,6 +726,7 @@ let currentConnectedEndpoint = '';
 let currentConnectedServerName = '';
 
 function escapeHtml(str) {
+
   if (!str) return '';
   return String(str)
     .replace(/&/g, '&amp;')
@@ -734,6 +735,7 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+const escHtml = escapeHtml;
 
 // Render server yang ditemukan di jaringan lokal (UDP)
 function renderDiscoveredServers(servers) {
@@ -1548,7 +1550,27 @@ function renderQueueState(state) {
       
       <div class="desk-setting-row">
         <label for="desk-input-${srv.id}" style="font-size: 0.85rem; font-weight:600; color:var(--text-secondary);">Loket:</label>
-        <input type="text" class="input-control desk-input" id="desk-input-${srv.id}" value="${currentDesk}">
+        ${(() => {
+          // Buat pilihan Loket dropdown berdasarkan pengaturan layanan & preset standar
+          const deskOptions = [];
+          if (srv.name) deskOptions.push(srv.name);
+          services.forEach(s => {
+            if (s.name && !deskOptions.includes(s.name)) deskOptions.push(s.name);
+          });
+          for (let i = 1; i <= 10; i++) {
+            const lk = `Loket ${i}`;
+            if (!deskOptions.includes(lk)) deskOptions.push(lk);
+          }
+          if (!deskOptions.includes('Customer Service')) deskOptions.push('Customer Service');
+          if (!deskOptions.includes('Kasir')) deskOptions.push('Kasir');
+          if (currentDesk && !deskOptions.includes(currentDesk)) {
+            deskOptions.unshift(currentDesk);
+          }
+
+          return `<select class="input-control desk-input" id="desk-input-${srv.id}" style="font-weight: 600; cursor: pointer; padding: 4px 8px; width: 160px; text-align: center;">
+            ${deskOptions.map(opt => `<option value="${escapeHtml(opt)}" ${opt === currentDesk ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
+          </select>`;
+        })()}
       </div>
 
       ${noticeHtml}
@@ -1556,14 +1578,12 @@ function renderQueueState(state) {
     `;
     callingGrid.appendChild(card);
     
-    // Event listener untuk menyimpan input loket langsung saat diketik (Auto-save local)
+    // Event listener untuk menyimpan pilihan loket saat dipilih dari dropdown (Auto-save local)
     const deskInput = card.querySelector(`.desk-input`);
-    deskInput.addEventListener('input', (e) => {
-      localDeskSettings[srv.id] = e.target.value;
-      localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
-    });
     deskInput.addEventListener('change', (e) => {
       const newDesk = e.target.value;
+      localDeskSettings[srv.id] = newDesk;
+      localStorage.setItem('local_desk_settings', JSON.stringify(localDeskSettings));
       sendAction('SYNC_DESK_NAMES', { deskNames: Object.values(localDeskSettings) });
       if (activeCall) {
         sendAction('UPDATE_ACTIVE_TICKET_DESK', { ticketId: activeCall.id, deskNumber: newDesk });

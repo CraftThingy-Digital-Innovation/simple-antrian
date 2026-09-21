@@ -107,8 +107,9 @@ function handleMessage(msg) {
     const callingTickets = Array.isArray(payload.callingTickets) ? payload.callingTickets : [];
 
     servicesList = services;
+    latestCallingTickets = callingTickets;
     updateServiceDropdown(services);
-    updateCurrentCall(callingTickets, services);
+    updateCallDeskDropdown(services, callingTickets);
     updateActiveTickets(callingTickets);
   }
 
@@ -142,6 +143,8 @@ function handleMessage(msg) {
 }
 
 // ==================== UI UPDATES ====================
+let latestCallingTickets = [];
+
 function updateServiceDropdown(services) {
   const select = document.getElementById('mini-service-select');
   if (!select) return;
@@ -156,6 +159,45 @@ function updateServiceDropdown(services) {
   if (currentVal) select.value = currentVal;
 }
 
+function updateCallDeskDropdown(services, callingTickets) {
+  const select = document.getElementById('mini-call-desk-select');
+  if (!select) return;
+
+  const currentVal = select.value || localStorage.getItem('mini_selected_service_id');
+  select.innerHTML = '';
+
+  if (!services || services.length === 0) {
+    select.innerHTML = '<option value="">-- Belum ada layanan --</option>';
+    updateCurrentCall(callingTickets, services);
+    return;
+  }
+
+  services.forEach(srv => {
+    const opt = document.createElement('option');
+    opt.value = srv.id;
+    opt.dataset.prefix = srv.prefix;
+    opt.dataset.desk = srv.name;
+    opt.textContent = `[${srv.prefix}] ${srv.name}`;
+    select.appendChild(opt);
+  });
+
+  const exists = services.some(s => s.id === currentVal);
+  if (exists) {
+    select.value = currentVal;
+  } else if (services.length > 0) {
+    select.value = services[0].id;
+    localStorage.setItem('mini_selected_service_id', services[0].id);
+  }
+
+  updateCurrentCall(callingTickets, services);
+}
+
+function getSelectedServiceId() {
+  const select = document.getElementById('mini-call-desk-select');
+  if (select && select.value) return select.value;
+  return getFirstServiceId();
+}
+
 function updateCurrentCall(callingTickets, services) {
   const callPanel = document.getElementById('mini-current-call');
   const numEl = document.getElementById('mini-call-number');
@@ -164,18 +206,28 @@ function updateCurrentCall(callingTickets, services) {
   const btnRecall = document.getElementById('mini-btn-recall');
   const btnSkip = document.getElementById('mini-btn-skip');
 
-  if (callingTickets.length > 0) {
-    const ticket = callingTickets[0];
+  const selectedServiceId = getSelectedServiceId();
+  const srv = (services || servicesList).find(s => s.id === selectedServiceId);
+
+  let ticket = null;
+  if (selectedServiceId && callingTickets) {
+    ticket = callingTickets.find(t => t.service_id === selectedServiceId);
+  }
+  if (!ticket && callingTickets && callingTickets.length > 0) {
+    ticket = callingTickets[0];
+  }
+
+  if (ticket) {
     if (callPanel) callPanel.classList.remove('standby');
     if (numEl) numEl.textContent = ticket.ticket_number;
-    if (deskEl) deskEl.textContent = ticket.desk_number || 'Loket';
+    if (deskEl) deskEl.textContent = ticket.desk_number || (srv ? srv.name : 'Loket');
     if (btnComplete) btnComplete.disabled = false;
     if (btnRecall) btnRecall.disabled = false;
     if (btnSkip) btnSkip.disabled = false;
   } else {
     if (callPanel) callPanel.classList.add('standby');
     if (numEl) numEl.textContent = '---';
-    if (deskEl) deskEl.textContent = 'Belum ada antrian';
+    if (deskEl) deskEl.textContent = srv ? `${srv.name} (Standby)` : 'Belum ada antrian';
     if (btnComplete) btnComplete.disabled = true;
     if (btnRecall) btnRecall.disabled = true;
     if (btnSkip) btnSkip.disabled = true;
@@ -205,22 +257,27 @@ function getFirstServiceId() {
 }
 
 function getActiveTicket() {
-  // Ambil tiket aktif pertama yang ada
   const keys = Object.keys(activeTickets);
   if (keys.length > 0) return activeTickets[keys[0]];
   return null;
 }
 
-function getDeskNumber(serviceId) {
-  const deskInput = document.getElementById('mini-operator-desk');
-  if (deskInput && deskInput.value.trim()) {
-    return deskInput.value.trim();
+function getActiveTicketForService(serviceId) {
+  if (serviceId && activeTickets[serviceId]) {
+    return activeTickets[serviceId];
   }
-  try {
-    const local = JSON.parse(localStorage.getItem('local_desk_settings') || '{}');
-    if (local && local[serviceId]) return local[serviceId];
-  } catch (_) {}
-  return localStorage.getItem('mini_operator_desk') || 'Loket 1';
+  return getActiveTicket();
+}
+
+function getDeskNumber(serviceId) {
+  const select = document.getElementById('mini-call-desk-select');
+  if (select && select.selectedOptions && select.selectedOptions[0]) {
+    const opt = select.selectedOptions[0];
+    if (opt.dataset.desk) return opt.dataset.desk;
+  }
+  const srv = servicesList.find(s => s.id === serviceId);
+  if (srv) return srv.name;
+  return 'Loket 1';
 }
 
 // ==================== EVENT LISTENERS ====================
@@ -236,34 +293,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Panggil berikutnya
   document.getElementById('mini-btn-call').addEventListener('click', () => {
-    const serviceId = getFirstServiceId();
+    const serviceId = getSelectedServiceId();
     if (!serviceId) { showToast('Belum ada layanan.', 'error'); return; }
     const deskNumber = getDeskNumber(serviceId);
     sendAction('CALL_NEXT', { serviceId, deskNumber });
-    showToast('Memanggil berikutnya...', 'info');
+    showToast('Memanggil berikutnya (' + deskNumber + ')...', 'info');
   });
 
   // Selesai
   document.getElementById('mini-btn-complete').addEventListener('click', () => {
-    const ticket = getActiveTicket();
+    const serviceId = getSelectedServiceId();
+    const ticket = getActiveTicketForService(serviceId);
     if (!ticket) { showToast('Tidak ada antrian aktif.', 'error'); return; }
-    const deskNumber = getDeskNumber(ticket.service_id);
+    const deskNumber = getDeskNumber(ticket.service_id || serviceId);
     sendAction('COMPLETE', { ticketId: ticket.id, serviceId: ticket.service_id, deskNumber, autoCallNext: true });
     showToast('Antrian diselesaikan.', 'success');
   });
 
   // Panggil ulang
   document.getElementById('mini-btn-recall').addEventListener('click', () => {
-    const ticket = getActiveTicket();
+    const serviceId = getSelectedServiceId();
+    const ticket = getActiveTicketForService(serviceId);
     if (!ticket) { showToast('Tidak ada antrian aktif.', 'error'); return; }
-    const deskNumber = getDeskNumber(ticket.service_id);
+    const deskNumber = getDeskNumber(ticket.service_id || serviceId);
     sendAction('RECALL', { ticketId: ticket.id, deskNumber });
-    showToast('Memanggil ulang...', 'info');
+    showToast('Memanggil ulang ' + ticket.ticket_number + '...', 'info');
   });
 
   // Lewati
   document.getElementById('mini-btn-skip').addEventListener('click', () => {
-    const ticket = getActiveTicket();
+    const serviceId = getSelectedServiceId();
+    const ticket = getActiveTicketForService(serviceId);
     if (!ticket) { showToast('Tidak ada antrian aktif.', 'error'); return; }
     sendAction('SKIP', { ticketId: ticket.id });
     showToast('Antrian dilewati.', 'warning');
@@ -292,16 +352,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Loket input listener & restore
-  const deskInput = document.getElementById('mini-operator-desk');
-  if (deskInput) {
-    const savedDesk = localStorage.getItem('mini_operator_desk') || 'Loket 1';
-    deskInput.value = savedDesk;
-    deskInput.addEventListener('change', () => {
-      const val = deskInput.value.trim() || 'Loket 1';
-      deskInput.value = val;
-      localStorage.setItem('mini_operator_desk', val);
-      showToast('Loket diatur ke: ' + val, 'info');
+  // Listener perubahan dropdown Loket / Layanan
+  const callDeskSelect = document.getElementById('mini-call-desk-select');
+  if (callDeskSelect) {
+    callDeskSelect.addEventListener('change', (e) => {
+      const srvId = e.target.value;
+      if (srvId) {
+        localStorage.setItem('mini_selected_service_id', srvId);
+        const printSelect = document.getElementById('mini-service-select');
+        if (printSelect) printSelect.value = srvId;
+        updateCurrentCall(latestCallingTickets, servicesList);
+        const srvObj = servicesList.find(s => s.id === srvId);
+        showToast('Layanan aktif: ' + (srvObj ? srvObj.name : srvId), 'info');
+      }
     });
   }
 

@@ -379,6 +379,11 @@
       box-shadow: none !important;
     }
 
+  
+    @media print {
+      body * { display: flex !important; }
+      .content-area, .footer-bar { display: flex !important; }
+    }
   </style>
 </head>
 <body>

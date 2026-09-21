@@ -333,11 +333,13 @@ body::after {
   @page {
     margin: 0;
   }
-  body {
+  body:has(#print-ticket) {
     margin: 0 !important;
     padding: 0 !important;
+    background: white !important;
+    color: black !important;
   }
-  body * {
+  body:has(#print-ticket) > *:not(#print-ticket) {
     display: none !important;
   }
   #print-ticket, #print-ticket * {
