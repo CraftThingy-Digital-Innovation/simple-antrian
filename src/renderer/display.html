@@ -449,6 +449,21 @@
     </div>
   </div>
 
+  <!-- BANNER SURVEI KEPUASAN (Di atas footer-bar, hanya tampil jika ada URL yang diisi di Pengaturan) -->
+  <div id="feedback-survey-bar" style="display: none; width: 100%; height: 48px; background: rgba(13, 20, 36, 0.98); border-top: 1px solid rgba(99, 102, 241, 0.25); border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 0 24px; box-sizing: border-box; align-items: center; justify-content: center; z-index: 9; box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3); flex-shrink: 0; text-align: center;">
+    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 16px; margin: 0 auto; max-width: 100%;">
+      <div style="font-size: 1.05rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 8px; letter-spacing: -0.3px; white-space: nowrap;">
+        <span style="font-size: 1.2rem;">⭐</span> Puas dengan layanan kami? silakan nilai di:
+      </div>
+      <div id="feedback-qr-wrapper" style="display: none; align-items: center; background: #ffffff; padding: 3px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); flex-shrink: 0;">
+        <img id="feedback-qr-img" src="" alt="Scan QR Code" style="width: 36px; height: 36px; display: block; image-rendering: pixelated;">
+      </div>
+      <div id="feedback-url-wrapper" style="display: none; align-items: center; font-size: 0.95rem; font-weight: 700; color: #a5b4fc; background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(129, 140, 248, 0.4); padding: 4px 14px; border-radius: 8px; font-family: monospace; letter-spacing: 0.5px; word-break: break-all;">
+        <span id="feedback-url-text">https://...</span>
+      </div>
+    </div>
+  </div>
+
   <!-- FOOTER: Cycling Running Text -->
   <footer class="footer-bar">
     <!-- Label bahasa (opsional, muncul di kiri) -->
@@ -465,21 +480,6 @@
       <div id="footer-date" style="font-size: 0.82rem; font-weight: 700; color: var(--accent-primary); margin-top: 3px; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; line-height: 1;">Kamis, 21 Agustus 2026</div>
     </div>
   </footer>
-
-  <!-- BANNER SURVEI KEPUASAN (Di bawah footer-bar, hanya tampil jika ada URL yang diisi di Pengaturan) -->
-  <div id="feedback-survey-bar" style="display: none; width: 100%; height: 50px; background: rgba(13, 20, 36, 0.98); border-top: 1px solid rgba(99, 102, 241, 0.25); padding: 0 24px; box-sizing: border-box; align-items: center; justify-content: center; z-index: 9; box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4); flex-shrink: 0; text-align: center;">
-    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 16px; margin: 0 auto; max-width: 100%;">
-      <div style="font-size: 1.05rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 8px; letter-spacing: -0.3px; white-space: nowrap;">
-        <span style="font-size: 1.2rem;">⭐</span> Puas dengan layanan kami? silakan nilai di:
-      </div>
-      <div id="feedback-qr-wrapper" style="display: none; align-items: center; background: #ffffff; padding: 3px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); flex-shrink: 0;">
-        <img id="feedback-qr-img" src="" alt="Scan QR Code" style="width: 38px; height: 38px; display: block; image-rendering: pixelated;">
-      </div>
-      <div id="feedback-url-wrapper" style="display: none; align-items: center; font-size: 0.95rem; font-weight: 700; color: #a5b4fc; background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(129, 140, 248, 0.4); padding: 4px 14px; border-radius: 8px; font-family: monospace; letter-spacing: 0.5px; word-break: break-all;">
-        <span id="feedback-url-text">https://...</span>
-      </div>
-    </div>
-  </div>
 
   <!-- FULLSCREEN MEDIA CONTAINER (Video & Foto) -->
   <div id="video-fullscreen-container" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 90; display: none; align-items: center; justify-content: center;">

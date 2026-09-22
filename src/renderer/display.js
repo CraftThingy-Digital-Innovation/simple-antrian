@@ -1168,12 +1168,23 @@ function syncVideoPlayers(displayMode) {
     currentActiveMediaUrl = '';
     
     // Banner Logo/Instansi (.media-card) tidak pernah disentuh agar tetap tampil!
+    const sidebarSlot = document.getElementById('sidebar-swappable-slot');
+    const otherServicesCard = document.querySelector('.other-services-card');
     if (displayLayoutSetting === 'swapped') {
       if (videoCard) videoCard.style.display = 'flex';
       if (emptyPlaceholder) emptyPlaceholder.style.display = 'flex';
     } else {
       if (videoCard) videoCard.style.display = 'none';
       if (emptyPlaceholder) emptyPlaceholder.style.display = 'none';
+  const sidebarSlot = document.getElementById('sidebar-swappable-slot');
+  const otherServicesCard = document.querySelector('.other-services-card');
+  if (displayLayoutSetting !== 'swapped') {
+    if (sidebarSlot) sidebarSlot.style.display = 'flex';
+    if (otherServicesCard) otherServicesCard.style.flex = '5';
+  }
+      // Sembunyikan slot video kosong dan panjangkan Daftar Antrian Aktif ke bawah
+      if (sidebarSlot) sidebarSlot.style.display = 'none';
+      if (otherServicesCard) otherServicesCard.style.flex = '12';
     }
     
     sidebarPlayer.pause();
