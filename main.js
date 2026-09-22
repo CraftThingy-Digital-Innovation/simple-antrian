@@ -750,6 +750,14 @@ ipcMain.handle('clear-local-media-folder', async () => {
   return { success: true };
 });
 
+// IPC Handler: Broadcast update playlist media lokal ke jendela display lokal
+ipcMain.handle('notify-local-playlist-updated', (event, playlist, photoDuration) => {
+  if (displayWindow && !displayWindow.isDestroyed()) {
+    displayWindow.webContents.send('local-playlist-updated', playlist, photoDuration);
+  }
+  return { success: true };
+});
+
 // Helper: Scan folder untuk menemukan file media (video & foto)
 function scanMediaFolder(folderPath) {
   const mediaExtensions = ['.mp4','.webm','.ogg','.mkv','.mov','.avi','.flv','.wmv','.m4v','.3gp','.ts','.webp','.jpg','.jpeg','.png','.gif','.bmp','.svg','.avif'];

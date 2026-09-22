@@ -957,27 +957,77 @@ function initCanvasVisualizer() {
 // ==================== PLAYLIST MEDIA DISPLAY (VIDEO & FOTO) ====================
 let isLocalServer = false;
 let localVideoDir = '';
+let isUsingLocalMedia = false;
+let latestServerPlaylist = [];
 
-// Inisialisasi info server lokal - HARUS selesai SEBELUM WebSocket terhubung
-// agar isLocalServer sudah benar saat syncVideoPlayers pertama kali dipanggil.
-// Sebelumnya ini fire-and-forget -> race condition -> server display pakai http:// bukan file://
+// Inisialisasi info server lokal & media lokal mesin ini
 async function initLocalServerInfo() {
   try {
     if (typeof window !== 'undefined' && window.api && typeof window.api.getSystemInfo === 'function') {
       const info = await window.api.getSystemInfo();
-      if (info && info.mode === 'server') {
-        isLocalServer = true;
+      if (info) {
+        currentMode = info.mode || 'server';
         serverPort = parseInt(info.port, 10) || 8080;
         localVideoDir = info.videoDir || '';
-        console.log('[Display] Server mode confirmed. videoDir:', localVideoDir);
-      } else {
-        console.log('[Display] Client mode detected.');
+        isLocalServer = (info.mode === 'server');
+        console.log('[Display] System info loaded. mode:', currentMode, 'videoDir:', localVideoDir);
       }
     }
 
-    // Inisialisasi info server lokal selesai
+    // Cek apakah ada playlist media lokal khusus mesin ini (Mode Klien atau Server Override)
+    if (typeof window !== 'undefined' && window.api && typeof window.api.getSettings === 'function') {
+      const dbSettings = await window.api.getSettings().catch(() => ({}));
+      if (dbSettings && dbSettings.local_video_playlist) {
+        try {
+          const parsed = JSON.parse(dbSettings.local_video_playlist);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            isUsingLocalMedia = true;
+            videoPlaylist = parsed;
+            if (dbSettings.local_photo_duration) {
+              photoDurationSetting = parseInt(dbSettings.local_photo_duration, 10) || 10;
+            }
+            if (dbSettings.local_video_sidebar_muted) {
+              videoSidebarMuted = dbSettings.local_video_sidebar_muted === 'true';
+            }
+            if (dbSettings.local_video_fullscreen_muted) {
+              videoFullscreenMuted = dbSettings.local_video_fullscreen_muted === 'true';
+            }
+            console.log('[Display] Media lokal terdeteksi (' + parsed.length + ' file). Memutar file:// lokal dan mengabaikan video server.');
+            syncVideoPlayers();
+          }
+        } catch (_) {}
+      }
+    }
+
+    // Dengarkan event pembaruan playlist media lokal dari Operator Panel
+    if (typeof window !== 'undefined' && window.api && typeof window.api.onLocalPlaylistUpdated === 'function') {
+      window.api.onLocalPlaylistUpdated((newPlaylist, newPhotoDuration) => {
+        console.log('[Display] Menerima update playlist lokal:', newPlaylist ? newPlaylist.length : 0);
+        if (Array.isArray(newPlaylist) && newPlaylist.length > 0) {
+          isUsingLocalMedia = true;
+          videoPlaylist = newPlaylist;
+          if (newPhotoDuration) photoDurationSetting = newPhotoDuration;
+          currentMediaIndex = 0;
+          currentActiveMediaUrl = '';
+          clearMediaTimer();
+          syncVideoPlayers();
+        } else {
+          isUsingLocalMedia = false;
+          videoPlaylist = [];
+          currentMediaIndex = 0;
+          currentActiveMediaUrl = '';
+          clearMediaTimer();
+          // Kembali ke video server jika ada
+          if (latestServerPlaylist && latestServerPlaylist.length > 0) {
+            updateVideoPlaylist(latestServerPlaylist);
+          } else {
+            syncVideoPlayers();
+          }
+        }
+      });
+    }
   } catch (err) {
-    console.warn('[Display] Gagal ambil system info, fallback ke HTTP:', err);
+    console.warn('[Display] Gagal ambil info lokal:', err);
   }
 }
 
@@ -1006,7 +1056,15 @@ function isImageMedia(item) {
 }
 
 function updateVideoPlaylist(newPlaylist) {
-  const playlist = Array.isArray(newPlaylist) ? newPlaylist : [];
+  latestServerPlaylist = Array.isArray(newPlaylist) ? newPlaylist : [];
+
+  // PENTING: Jika mesin ini punya media lokal aktif, ABAIKAN video dari server!
+  if (isUsingLocalMedia) {
+    console.log('[Display] Mengabaikan update video server karena mode media lokal aktif pada mesin ini.');
+    return;
+  }
+
+  const playlist = latestServerPlaylist;
   const playlistJson = JSON.stringify(playlist);
   const currentJson = JSON.stringify(videoPlaylist);
   
@@ -1015,6 +1073,7 @@ function updateVideoPlaylist(newPlaylist) {
     currentMediaIndex = 0;
     currentActiveMediaUrl = '';
     clearMediaTimer();
+    console.log('[Display] Video playlist diperbarui dari server:', videoPlaylist.length, 'video');
     syncVideoPlayers(currentDisplayMode);
   }
 }
@@ -1182,9 +1241,9 @@ function syncVideoPlayers(displayMode) {
     // URL file:// dari folder media lokal — langsung pakai, tanpa modifikasi
     // Ini path tercepat: zero network, zero HTTP server, native Chromium playback
   } else if (!mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://')) {
-    // Server lokal: gunakan file:// langsung untuk zero-overhead native Chromium playback
-    // Menghindari bottleneck HTTP server single-thread Node.js
-    if (isLocalServer && localVideoDir && rawUrl.startsWith('/video/')) {
+    // Media Lokal Klien ATAU Server Lokal: gunakan file:// langsung untuk zero-overhead native Chromium playback
+    // Menghindari bottleneck HTTP server dan memastikan klien memutar berkas lokalnya tanpa 404
+    if ((isUsingLocalMedia || isLocalServer) && localVideoDir && rawUrl.startsWith('/video/')) {
       const filename = decodeURIComponent(rawUrl.split('?')[0].replace('/video/', ''));
       mediaUrl = 'file:///' + localVideoDir.replace(/\\/g, '/') + '/' + filename;
     } else {

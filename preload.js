@@ -28,6 +28,11 @@ contextBridge.exposeInMainWorld('api', {
   selectLocalMediaFolder: () => ipcRenderer.invoke('select-local-media-folder'),
   getLocalMediaFolder: () => ipcRenderer.invoke('get-local-media-folder'),
   clearLocalMediaFolder: () => ipcRenderer.invoke('clear-local-media-folder'),
+  notifyLocalPlaylistUpdated: (playlist, photoDuration) => ipcRenderer.invoke('notify-local-playlist-updated', playlist, photoDuration),
+  onLocalPlaylistUpdated: (callback) => {
+    ipcRenderer.removeAllListeners('local-playlist-updated');
+    ipcRenderer.on('local-playlist-updated', (event, playlist, photoDuration) => callback(playlist, photoDuration));
+  },
   // Mini Operator Window: restore jendela utama
   restoreMainWindow: () => ipcRenderer.invoke('restore-main-window'),
   // Printer API

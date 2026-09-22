@@ -2130,7 +2130,43 @@ function setupEventListeners() {
 
 
 
-  // Pengaturan Playlist Video Layar Display
+  // ==================== PENGATURAN PLAYLIST MEDIA LAYAR DISPLAY ====================
+  async function saveMediaPlaylistHelper() {
+    const photoDuration = parseInt(document.getElementById('setting-photo-duration')?.value || '10', 10) || 10;
+    const sidebarMuted = document.getElementById('setting-video-sidebar-muted')?.checked ?? true;
+    const fullscreenMuted = document.getElementById('setting-video-fullscreen-muted')?.checked ?? false;
+
+    if (currentMode === 'client') {
+      // Mode Klien: Simpan HANYA ke lokal mesin ini (SQLite lokal)
+      // JANGAN kirim ke server WebSocket agar tidak menimpa playlist server!
+      await window.api.saveSetting('local_video_playlist', JSON.stringify(currentVideoPlaylist));
+      await window.api.saveSetting('local_photo_duration', photoDuration.toString());
+      await window.api.saveSetting('local_video_sidebar_muted', sidebarMuted ? 'true' : 'false');
+      await window.api.saveSetting('local_video_fullscreen_muted', fullscreenMuted ? 'true' : 'false');
+
+      // Beritahu display lokal mesin ini secara realtime
+      if (window.api && typeof window.api.notifyLocalPlaylistUpdated === 'function') {
+        await window.api.notifyLocalPlaylistUpdated(currentVideoPlaylist, photoDuration);
+      }
+
+      updateMediaModeBanner(true);
+      showToast('✅ Media lokal klien disimpan! Display mesin ini akan memutar media lokal (file://).', 'success');
+    } else {
+      // Mode Server: Simpan ke DB server dan broadcast ke seluruh display
+      await window.api.saveSetting('video_playlist', JSON.stringify(currentVideoPlaylist));
+      sendAction('SAVE_VIDEO_PLAYLIST', {
+        playlist: currentVideoPlaylist,
+        photoDuration: photoDuration
+      });
+      sendAction('SAVE_VIDEO_AUDIO_SETTINGS', {
+        sidebarMuted,
+        fullscreenMuted
+      });
+      updateMediaModeBanner(false);
+      showToast('✅ Playlist media server disimpan & disinkronkan ke seluruh display!', 'success');
+    }
+  }
+
   const btnImportFolderMedia = document.getElementById('btn-import-folder-media');
   if (btnImportFolderMedia) {
     btnImportFolderMedia.addEventListener('click', async () => {
@@ -2141,22 +2177,8 @@ function setupEventListeners() {
           // Tambahkan seluruh media ke playlist
           res.mediaList.forEach(item => currentVideoPlaylist.push(item));
           renderVideoPlaylist();
-
-          // Otomatis simpan & terapkan ke resources sistem dan display
-          const photoDuration = parseInt(document.getElementById('setting-photo-duration')?.value || '10', 10) || 10;
-          sendAction('SAVE_VIDEO_PLAYLIST', {
-            playlist: currentVideoPlaylist,
-            photoDuration: photoDuration
-          });
-
-          const sidebarMuted = document.getElementById('setting-video-sidebar-muted')?.checked ?? true;
-          const fullscreenMuted = document.getElementById('setting-video-fullscreen-muted')?.checked ?? false;
-          sendAction('SAVE_VIDEO_AUDIO_SETTINGS', {
-            sidebarMuted,
-            fullscreenMuted
-          });
-
-          showToast(`🎉 Berhasil memindahkan & menyimpan ${res.count} media dari folder "${res.folderName}"!`, 'success');
+          await saveMediaPlaylistHelper();
+          showToast(`🎉 Berhasil menambahkan ${res.count} media dari folder "${res.folderName}"!`, 'success');
         } else if (res.message && !res.message.includes('Batal')) {
           showToast(res.message, 'warning');
         }
@@ -2178,10 +2200,12 @@ function setupEventListeners() {
           if (Array.isArray(res.mediaList) && res.mediaList.length > 0) {
             res.mediaList.forEach(item => currentVideoPlaylist.push(item));
             renderVideoPlaylist();
+            await saveMediaPlaylistHelper();
             showToast(`Berhasil menambahkan ${res.mediaList.length} berkas media!`, 'success');
           } else if (res.video) {
             currentVideoPlaylist.push(res.video);
             renderVideoPlaylist();
+            await saveMediaPlaylistHelper();
             showToast(`Berhasil menambahkan: ${res.video.originalName}`, 'success');
           }
         } else if (res.message) {
@@ -2196,21 +2220,24 @@ function setupEventListeners() {
   }
 
   if (btnSaveVideoPlaylist) {
-    btnSaveVideoPlaylist.addEventListener('click', () => {
-      const photoDuration = parseInt(document.getElementById('setting-photo-duration')?.value || '10', 10) || 10;
-      sendAction('SAVE_VIDEO_PLAYLIST', {
-        playlist: currentVideoPlaylist,
-        photoDuration: photoDuration
-      });
-      
-      const sidebarMuted = document.getElementById('setting-video-sidebar-muted').checked;
-      const fullscreenMuted = document.getElementById('setting-video-fullscreen-muted').checked;
-      sendAction('SAVE_VIDEO_AUDIO_SETTINGS', {
-        sidebarMuted,
-        fullscreenMuted
-      });
-      
-      showToast('Menyimpan playlist media dan durasi foto...', 'info');
+    btnSaveVideoPlaylist.addEventListener('click', async () => {
+      await saveMediaPlaylistHelper();
+    });
+  }
+
+  // Reset ke Video Server (Hanya muncul saat mode klien punya media lokal aktif)
+  const btnResetToServerMedia = document.getElementById('btn-reset-to-server-media');
+  if (btnResetToServerMedia) {
+    btnResetToServerMedia.addEventListener('click', async () => {
+      const ok = await confirmDialog('Hapus media lokal mesin ini dan kembali mengikuti video dari server?');
+      if (!ok) return;
+
+      await window.api.saveSetting('local_video_playlist', '');
+      if (window.api && typeof window.api.notifyLocalPlaylistUpdated === 'function') {
+        await window.api.notifyLocalPlaylistUpdated([], 10);
+      }
+      showToast('Media lokal mesin ini dihapus. Display kembali memutar video server.', 'info');
+      await loadVideoPlaylist();
     });
   }
 
@@ -3098,18 +3125,73 @@ window.moveRunningText = function(index, dir) {
 // ==================== CONFIG PLAYLIST VIDEO ====================
 let currentVideoPlaylist = [];
 
+function updateMediaModeBanner(isLocalActive) {
+  const notice = document.getElementById('media-mode-notice');
+  const text = document.getElementById('media-mode-text');
+  const btnReset = document.getElementById('btn-reset-to-server-media');
+  if (!notice || !text) return;
+
+  if (currentMode === 'client') {
+    if (isLocalActive) {
+      notice.style.background = 'rgba(16, 185, 129, 0.12)';
+      notice.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+      text.style.color = '#34d399';
+      text.innerHTML = '💻 <strong>Media Lokal Klien Aktif:</strong> Display mesin ini memutar berkas lokal (file://) dan <strong>mengabaikan video server</strong>.';
+      if (btnReset) btnReset.style.display = 'inline-block';
+    } else {
+      notice.style.background = 'rgba(99, 102, 241, 0.12)';
+      notice.style.borderColor = 'rgba(99, 102, 241, 0.3)';
+      text.style.color = 'var(--accent-primary)';
+      text.innerHTML = '🌐 <strong>Mengikuti Video Server:</strong> Belum ada media lokal. Display mesin ini mengikuti video dari server. Tambahkan foto/video di bawah jika ingin memutar media lokal khusus mesin ini.';
+      if (btnReset) btnReset.style.display = 'none';
+    }
+  } else {
+    notice.style.background = 'rgba(99, 102, 241, 0.12)';
+    notice.style.borderColor = 'rgba(99, 102, 241, 0.3)';
+    text.style.color = 'var(--accent-primary)';
+    text.innerHTML = '🖥️ <strong>Server Mode:</strong> Mengatur playlist media utama server. Berkas disimpan di server dan disinkronkan ke seluruh display.';
+    if (btnReset) btnReset.style.display = 'none';
+  }
+}
+
 /**
  * Muat playlist video dari settings database dan render ke UI.
  */
 async function loadVideoPlaylist() {
   try {
-    const settings = await getSettingsData();
     let playlist = [];
-    if (settings.video_playlist) {
-      try { playlist = JSON.parse(settings.video_playlist); } catch (_) {}
+    if (currentMode === 'client') {
+      const localSettings = await window.api.getSettings().catch(() => ({}));
+      if (localSettings && localSettings.local_video_playlist) {
+        try {
+          playlist = JSON.parse(localSettings.local_video_playlist);
+        } catch (_) {}
+      }
+
+      if (Array.isArray(playlist) && playlist.length > 0) {
+        currentVideoPlaylist = playlist;
+        updateMediaModeBanner(true);
+        renderVideoPlaylist();
+        return;
+      }
+
+      // Jika belum ada media lokal di klien, ambil dari server sebagai referensi/preview
+      updateMediaModeBanner(false);
+      const serverSettings = await getSettingsData();
+      if (serverSettings && serverSettings.video_playlist) {
+        try { playlist = JSON.parse(serverSettings.video_playlist); } catch (_) {}
+      }
+      currentVideoPlaylist = Array.isArray(playlist) ? playlist : [];
+      renderVideoPlaylist();
+    } else {
+      updateMediaModeBanner(false);
+      const settings = await window.api.getSettings().catch(() => ({}));
+      if (settings && settings.video_playlist) {
+        try { playlist = JSON.parse(settings.video_playlist); } catch (_) {}
+      }
+      currentVideoPlaylist = Array.isArray(playlist) ? playlist : [];
+      renderVideoPlaylist();
     }
-    currentVideoPlaylist = Array.isArray(playlist) ? playlist : [];
-    renderVideoPlaylist();
   } catch (err) {
     showToast('Gagal memuat playlist video: ' + err.message, 'error');
   }
