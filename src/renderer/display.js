@@ -281,6 +281,80 @@ function handleWebSocketMessage(message) {
   }
 }
 
+// Auto-adjust tipografi dan ukuran elemen Welcome Banner (Judul, Logo, Deskripsi)
+// agar jarak antar baris & font menyesuaikan otomatis tanpa pernah terpotong (ter-clip)
+function adjustBannerTypography() {
+  const bannerCard = document.getElementById('display-banner-card');
+  if (!bannerCard) return;
+  const contentEl = bannerCard.querySelector('.media-card-content');
+  const titleEl = document.getElementById('display-card-title');
+  const textEl = document.getElementById('display-card-text');
+  const logoContainer = document.getElementById('display-logo-container');
+  const logoImg = document.getElementById('display-logo-img');
+  if (!contentEl || !titleEl || !textEl) return;
+
+  const isLogoVisible = !!(logoContainer && logoContainer.style.display !== 'none' && logoImg && logoImg.getAttribute('src'));
+
+  // 1. Reset baseline style untuk pengukuran akurat
+  if (logoContainer) {
+    logoContainer.style.maxHeight = isLogoVisible ? '65px' : '0px';
+    logoContainer.style.marginBottom = isLogoVisible ? '2px' : '0px';
+  }
+  contentEl.style.padding = '12px 14px';
+  contentEl.style.gap = '6px';
+  titleEl.style.fontSize = '1.35rem';
+  titleEl.style.lineHeight = '1.16';
+  titleEl.style.marginBottom = '0px';
+  textEl.style.fontSize = '0.88rem';
+  textEl.style.lineHeight = '1.25';
+  textEl.style.marginBottom = '0px';
+
+  const availHeight = bannerCard.clientHeight;
+  if (availHeight <= 0) return;
+
+  // 2. Loop penyesuaian dinamis jika scrollHeight melebihi clientHeight
+  let iter = 0;
+  while (contentEl.scrollHeight > (availHeight - 2) && iter < 28) {
+    iter++;
+
+    // Fase 1: Padatkan padding container & gap
+    if (iter > 1) {
+      contentEl.style.padding = '6px 10px';
+      contentEl.style.gap = '3px';
+    }
+
+    // Fase 2: Perkecil logo jika memakan ruang tinggi
+    if (isLogoVisible) {
+      const currLogoH = parseFloat(logoContainer.style.maxHeight || '65');
+      if (currLogoH > 26) {
+        logoContainer.style.maxHeight = `${Math.max(24, currLogoH - 5)}px`;
+      }
+    }
+
+    // Fase 3: Perkecil font & rapatkan jarak baris judul instansi
+    const currTitleSize = parseFloat(titleEl.style.fontSize || '1.35');
+    if (currTitleSize > 0.65) {
+      titleEl.style.fontSize = `${(currTitleSize - 0.04).toFixed(2)}rem`;
+      titleEl.style.lineHeight = '1.08';
+    }
+
+    // Fase 4: Perkecil font & rapatkan jarak baris deskripsi / subtitle
+    const currTextSize = parseFloat(textEl.style.fontSize || '0.88');
+    if (currTextSize > 0.55) {
+      textEl.style.fontSize = `${(currTextSize - 0.03).toFixed(2)}rem`;
+      textEl.style.lineHeight = '1.10';
+    }
+
+    // Fase 5: Jika teks sangat panjang (banyak baris) dan masih overflow, perkecil logo lebih lanjut
+    if (isLogoVisible && iter > 12) {
+      const currLogoH = parseFloat(logoContainer.style.maxHeight || '65');
+      if (currLogoH > 18) {
+        logoContainer.style.maxHeight = `${Math.max(16, currLogoH - 3)}px`;
+      }
+    }
+  }
+}
+
 // Terapkan penyesuaian tampilan Welcome Banner (Logo, Judul, Deskripsi)
 function applyDisplayCustomization(settings) {
   if (!settings) return;
@@ -305,6 +379,11 @@ function applyDisplayCustomization(settings) {
       logoImg.src = '';
     }
   }
+
+  // Auto-fit judul, logo, dan deskripsi agar tidak pernah terpotong / terclip
+  requestAnimationFrame(() => {
+    adjustBannerTypography();
+  });
 }
 
 // Render Banner Survei Kepuasan Pelanggan (IKM)
@@ -1621,3 +1700,15 @@ function stopMirrorStream() {
     mirrorStream = null;
   }
 }
+
+// Auto-fit banner listener on layout / screen resize
+let adjustBannerTypographyObserverAttached = true;
+try {
+  const bannerCard = document.getElementById('display-banner-card');
+  if (bannerCard && typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => {
+      adjustBannerTypography();
+    }).observe(bannerCard);
+  }
+} catch (_) {}
+window.addEventListener('resize', () => adjustBannerTypography());
